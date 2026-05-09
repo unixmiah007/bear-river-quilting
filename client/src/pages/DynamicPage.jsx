@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
+import ProductImage from '../components/ProductImage.jsx';
+import { useCart } from '../context/CartContext.jsx';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -12,6 +14,8 @@ export default function DynamicPage() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const { addItem } = useCart();
+  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
@@ -50,19 +54,25 @@ export default function DynamicPage() {
         <div className="card-grid">
           {products.map((p) => (
             <article key={p.id} className="card">
-              {p.image_url ? (
-                <img src={p.image_url} alt="" loading="lazy" />
-              ) : (
-                <div
-                  className="muted"
-                  style={{ aspectRatio: '4/3', display: 'grid', placeItems: 'center' }}
-                >
-                  No image
-                </div>
-              )}
+              <ProductImage src={p.image_url} alt={p.name} />
               <h3>{p.name}</h3>
               {p.description ? <p className="muted">{p.description}</p> : null}
               <div className="price">{formatPrice(p.price)}</div>
+              <div className="row card-actions">
+                <Link className="btn" to={`/products/${p.id}`}>
+                  View
+                </Link>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    addItem(p, 1);
+                    navigate('/cart');
+                  }}
+                >
+                  Add to cart
+                </button>
+              </div>
             </article>
           ))}
         </div>

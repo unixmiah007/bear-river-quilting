@@ -1,38 +1,95 @@
 import { useEffect, useState } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { publicApi } from '../api.js';
+import SiteHeroBanner from '../components/SiteHeroBanner.jsx';
+import BrandLogo from '../components/BrandLogo.jsx';
+import { useCart } from '../context/CartContext.jsx';
+
+/** CMS pages that stay reachable via direct URL / in-page links but are hidden from header/footer nav. */
+const EXCLUDED_MAIN_NAV_PAGE_SLUGS = new Set(['heritage-quilts', 'modern-loft-quilts']);
+
+function pagesForMainNav(data) {
+  const rows = Array.isArray(data) ? data : [];
+  return rows.filter((p) => p?.slug && !EXCLUDED_MAIN_NAV_PAGE_SLUGS.has(p.slug));
+}
+
+function SiteNav({ className, itemCount, pages, 'aria-label': ariaLabel }) {
+  return (
+    <nav className={className} aria-label={ariaLabel}>
+      <NavLink to="/" end>
+        Home
+      </NavLink>
+      <NavLink to="/about">About Us</NavLink>
+      <NavLink to="/products">Products</NavLink>
+      <NavLink to="/cart">Cart ({itemCount})</NavLink>
+      <NavLink to="/account">My account</NavLink>
+      {pages.map((p) => (
+        <NavLink key={p.id} to={`/p/${p.slug}`}>
+          {p.title}
+        </NavLink>
+      ))}
+      <NavLink to="/admin/pages">Admin</NavLink>
+    </nav>
+  );
+}
 
 export default function SiteLayout() {
   const [pages, setPages] = useState([]);
   const [err, setErr] = useState(null);
+  const { itemCount } = useCart();
+  const { pathname } = useLocation();
+  const showHero = pathname === '/';
 
   useEffect(() => {
     publicApi
       .listPages()
-      .then(setPages)
-      .catch(() => setErr('Could not load navigation.'));
+      .then((data) => setPages(pagesForMainNav(data)))
+      .catch((e) => {
+        const detail =
+          [e?.body?.error, e?.body?.hint].filter(Boolean).join(' — ') || null;
+        const proxyOrDown =
+          e?.status === 502 ||
+          e?.status === 503 ||
+          e?.status === 504 ||
+          (typeof e?.message === 'string' &&
+            (e.message === 'Failed to fetch' ||
+              /networkerror|load failed|fetch/i.test(e.message)));
+        setErr(
+          proxyOrDown
+            ? detail ||
+                `${e?.message || 'Could not reach the API.'} If you use Vite, start the backend on port 4000 (for example: npm run dev -w server).`
+            : detail || e?.message || 'Could not load navigation.'
+        );
+      });
   }, []);
 
   return (
     <div className="layout">
       <header className="site-header">
         <div className="brand">
-          <NavLink to="/">CMS Store</NavLink>
-        </div>
-        <nav className="nav">
-          <NavLink to="/" end>
-            Home
+          <NavLink to="/" className="brand-link">
+            <BrandLogo className="brand-logo" />
+            <span>Bear River Quilting</span>
           </NavLink>
-          {pages.map((p) => (
-            <NavLink key={p.id} to={`/p/${p.slug}`}>
-              {p.title}
-            </NavLink>
-          ))}
-          <NavLink to="/admin/pages">Admin</NavLink>
-        </nav>
+        </div>
+        <SiteNav
+          className="nav"
+          itemCount={itemCount}
+          pages={pages}
+          aria-label="Main navigation"
+        />
       </header>
       {err && <p className="error">{err}</p>}
+      {showHero ? <SiteHeroBanner /> : null}
       <Outlet />
+      <footer className="site-footer">
+        <SiteNav
+          className="nav site-footer-nav"
+          itemCount={itemCount}
+          pages={pages}
+          aria-label="Footer navigation"
+        />
+      </footer>
     </div>
   );
 }

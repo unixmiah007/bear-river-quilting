@@ -50,6 +50,12 @@ export default function AdminLayout() {
             >
               Products
             </NavLink>
+            <NavLink
+              className={({ isActive }) => `pill${isActive ? ' active' : ''}`}
+              to="/admin/orders"
+            >
+              Orders
+            </NavLink>
           </nav>
           <button type="button" className="btn" onClick={signOut}>
             Sign out

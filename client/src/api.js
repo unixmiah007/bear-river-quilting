@@ -30,6 +30,11 @@ export async function api(path, options = {}) {
 export const publicApi = {
   listPages: () => api('/api/pages'),
   pageBySlug: (slug) => api(`/api/pages/by-slug/${encodeURIComponent(slug)}`),
+  listProducts: () => api('/api/products'),
+  productById: (id) => api(`/api/products/${encodeURIComponent(id)}`),
+  createOrder: (body) => api('/api/orders', { method: 'POST', body: JSON.stringify(body) }),
+  customerOrdersLookup: (body) =>
+    api('/api/customer/orders', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export const authApi = {
@@ -48,6 +53,43 @@ export const adminApi = {
   deletePage: (id) => api(`/api/admin/pages/${id}`, { method: 'DELETE' }),
 
   products: () => api('/api/admin/products'),
+  product: (id) => api(`/api/admin/products/by-id/${encodeURIComponent(id)}`),
+  uploadProductImages: async (id, files) => {
+    const fd = new FormData();
+    for (const f of files) {
+      fd.append('images', f);
+    }
+    const res = await fetch(`/api/admin/products/${encodeURIComponent(id)}/images`, {
+      method: 'POST',
+      credentials: 'include',
+      body: fd,
+    });
+    const text = await res.text();
+    let data = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+    }
+    if (!res.ok) {
+      const err = new Error(data?.error || res.statusText || 'Upload failed');
+      err.status = res.status;
+      err.body = data;
+      throw err;
+    }
+    return data;
+  },
+  deleteProductImage: (productId, imageId) =>
+    api(
+      `/api/admin/products/${encodeURIComponent(productId)}/images/${encodeURIComponent(imageId)}`,
+      { method: 'DELETE', body: JSON.stringify({}) }
+    ),
+  seedExampleProducts: () =>
+    api('/api/admin/products/seed-examples', { method: 'POST', body: JSON.stringify({}) }),
+  importProductsCsv: (csv) =>
+    api('/api/admin/products/import', { method: 'POST', body: JSON.stringify({ csv }) }),
   createProduct: (body) =>
     api('/api/admin/products', { method: 'POST', body: JSON.stringify(body) }),
   updateProduct: (id, body) =>
@@ -59,5 +101,12 @@ export const adminApi = {
     api(`/api/admin/pages/${pageId}/products`, {
       method: 'PUT',
       body: JSON.stringify({ productIds }),
+    }),
+  orders: () => api('/api/admin/orders'),
+  orderById: (id) => api(`/api/admin/orders/${id}`),
+  updateOrderStatus: (id, status) =>
+    api(`/api/admin/orders/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
     }),
 };
