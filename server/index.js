@@ -905,6 +905,151 @@ app.put('/api/admin/pages/:id/products', authMiddleware, async (req, res) => {
   }
 });
 
+// --- Admin: init-db ---
+
+app.post('/api/admin/init-db', authMiddleware, async (_req, res) => {
+  const conn = await pool.getConnection();
+  const log = [];
+  try {
+    // 1. Create core tables (IF NOT EXISTS — safe to run repeatedly)
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS pages (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        slug VARCHAR(191) NOT NULL UNIQUE,
+        title VARCHAR(255) NOT NULL,
+        body MEDIUMTEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    log.push('pages table ready');
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        sku VARCHAR(64) NULL,
+        name VARCHAR(255) NOT NULL,
+        description TEXT NULL,
+        price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        stock_quantity INT UNSIGNED NOT NULL DEFAULT 0,
+        image_url VARCHAR(512) NULL,
+        is_published TINYINT(1) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_products_sku (sku)
+      )
+    `);
+    log.push('products table ready');
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS product_images (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        product_id INT UNSIGNED NOT NULL,
+        path VARCHAR(512) NOT NULL,
+        sort_order INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_pi_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE,
+        KEY idx_pi_product_sort (product_id, sort_order)
+      )
+    `);
+    log.push('product_images table ready');
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS page_products (
+        page_id INT UNSIGNED NOT NULL,
+        product_id INT UNSIGNED NOT NULL,
+        sort_order INT NOT NULL DEFAULT 0,
+        PRIMARY KEY (page_id, product_id),
+        CONSTRAINT fk_pp_page FOREIGN KEY (page_id) REFERENCES pages (id) ON DELETE CASCADE,
+        CONSTRAINT fk_pp_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+      )
+    `);
+    log.push('page_products table ready');
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        order_number VARCHAR(32) NOT NULL UNIQUE,
+        status VARCHAR(32) NOT NULL DEFAULT 'pending',
+        customer_name VARCHAR(255) NOT NULL,
+        customer_email VARCHAR(255) NOT NULL,
+        customer_phone VARCHAR(64) NULL,
+        shipping_address1 VARCHAR(255) NOT NULL,
+        shipping_address2 VARCHAR(255) NULL,
+        shipping_city VARCHAR(120) NOT NULL,
+        shipping_state VARCHAR(120) NOT NULL,
+        shipping_postal_code VARCHAR(40) NOT NULL,
+        shipping_country VARCHAR(120) NOT NULL,
+        shipping_method VARCHAR(32) NOT NULL DEFAULT 'standard',
+        shipping_cost DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        billing_name VARCHAR(255) NOT NULL,
+        billing_address1 VARCHAR(255) NOT NULL,
+        billing_address2 VARCHAR(255) NULL,
+        billing_city VARCHAR(120) NOT NULL,
+        billing_state VARCHAR(120) NOT NULL,
+        billing_postal_code VARCHAR(40) NOT NULL,
+        billing_country VARCHAR(120) NOT NULL,
+        card_last4 VARCHAR(4) NOT NULL,
+        subtotal DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        tax_amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        total DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    log.push('orders table ready');
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS order_items (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        order_id INT UNSIGNED NOT NULL,
+        product_id INT UNSIGNED NOT NULL,
+        product_name VARCHAR(255) NOT NULL,
+        unit_price DECIMAL(10, 2) NOT NULL,
+        quantity INT UNSIGNED NOT NULL,
+        line_total DECIMAL(10, 2) NOT NULL,
+        CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
+        CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT
+      )
+    `);
+    log.push('order_items table ready');
+
+    // 2. Add missing columns to products (sku, stock_quantity, updated_at, etc.)
+    await ensureProductInventoryColumns(conn);
+    log.push('products columns ensured (sku, stock_quantity, updated_at, ...)');
+
+    // 3. Add missing columns to pages (created_at, updated_at)
+    await ensurePagesTable(conn);
+    log.push('pages columns ensured');
+
+    // 4. Ensure product_images table exists (idempotent)
+    await ensureProductImagesTable(conn);
+    log.push('product_images table ensured');
+
+    // 5. Seed demo products only when the table is empty
+    const [[{ cnt }]] = await conn.query('SELECT COUNT(*) AS cnt FROM products');
+    let seeded = false;
+    if (Number(cnt) === 0) {
+      await seedDemoProducts(conn);
+      seeded = true;
+      log.push('demo products seeded (table was empty)');
+    } else {
+      log.push(`skipped seeding — products table already has ${cnt} row(s)`);
+    }
+
+    res.json({ ok: true, seeded, log });
+  } catch (e) {
+    console.error('[init-db]', e);
+    res.status(500).json({
+      ok: false,
+      error: e.sqlMessage || e.message || 'Database initialisation failed',
+      log,
+    });
+  } finally {
+    conn.release();
+  }
+});
+
 // --- Admin: orders ---
 
 app.get('/api/admin/orders', authMiddleware, async (_req, res) => {
