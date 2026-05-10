@@ -403,6 +403,7 @@ app.post('/api/orders', async (req, res) => {
     }
     await conn.commit();
     res.status(201).json({ ok: true, orderId, orderNumber: ordNo });
+    console.log('[mail] Attempting to send order emails', { orderNumber: ordNo, customerEmail: customer.email });
     void Promise.allSettled([
       sendOrderConfirmationEmail({
         to: customer.email,
@@ -427,13 +428,15 @@ app.post('/api/orders', async (req, res) => {
       if (cust.status === 'fulfilled') {
         console.log('[mail] Customer confirmation sent', ordNo, '→', customer.email);
       } else {
-        console.error('[mail] Customer confirmation failed:', cust.reason?.message ?? cust.reason);
+        console.error('[mail] Customer confirmation failed:', cust.reason?.message ?? cust.reason, cust.reason);
       }
       if (staff.status === 'fulfilled') {
         console.log('[mail] Staff notifications sent', ordNo);
       } else {
-        console.error('[mail] Staff notification failed:', staff.reason?.message ?? staff.reason);
+        console.error('[mail] Staff notification failed:', staff.reason?.message ?? staff.reason, staff.reason);
       }
+    }).catch((err) => {
+      console.error('[mail] Unexpected error in email sending block:', err?.message ?? err, err);
     });
   } catch (e) {
     try {
