@@ -1028,6 +1028,16 @@ app.put('/api/admin/orders/:id/status', authMiddleware, async (req, res) => {
   }
 });
 
+// --- Static file serving & SPA fallback ---
+const clientDist = path.join(__dirnameRoot, '..', 'client', 'dist');
+const clientIndexHtml = path.join(clientDist, 'index.html');
+
+app.use(express.static(clientDist));
+
+app.get('*', (_req, res) => {
+  res.sendFile(clientIndexHtml);
+});
+
 async function startServer() {
   try {
     await ensurePagesTable(pool);
