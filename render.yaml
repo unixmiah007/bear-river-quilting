@@ -1,0 +1,20 @@
+# Blueprint for https://render.com — link this repo and adjust env vars in the dashboard.
+# Render does not provide MySQL; use PlanetScale, Railway, Aiven, or another external MySQL.
+
+services:
+  - type: web
+    name: bear-river-quilting
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: .
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Set these in the dashboard (do not commit real secrets):
+      # MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE
+      # JWT_SECRET — long random string
+      # ADMIN_PASSWORD — admin login for /admin
+      # Optional: CLIENT_ORIGIN=https://bear-river-quilting.onrender.com if API and UI use different hosts

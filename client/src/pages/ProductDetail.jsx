@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
+import CartIcon from '../components/CartIcon.jsx';
 import { useCart } from '../context/CartContext.jsx';
 
 function formatPrice(n) {
@@ -120,8 +121,8 @@ export default function ProductDetail() {
             >
               Add to cart
             </button>
-            <Link className="btn" to="/cart">
-              View cart
+            <Link className="btn cart-inline-link" to="/cart">
+              <CartIcon /> View cart
             </Link>
           </div>
         </div>

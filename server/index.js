@@ -13,6 +13,7 @@ import { ensureProductInventoryColumns } from './lib/ensureProductInventoryColum
 import { ensureProductImagesTable } from './lib/ensureProductImagesTable.js';
 import { ensurePagesTable } from './lib/ensurePagesTable.js';
 import { seedDemoProducts } from './lib/seedDemoProducts.js';
+import { sendOrderPlacedEmail } from './lib/orderNotifyEmail.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameRoot = path.dirname(__filename);
@@ -21,14 +22,19 @@ const UPLOAD_ROOT = path.join(__dirnameRoot, 'uploads');
 fs.mkdirSync(path.join(UPLOAD_ROOT, 'products'), { recursive: true });
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT ?? 4000);
 const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-me';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'admin';
 const COOKIE_NAME = 'cms_token';
 
+const corsOrigin =
+  process.env.CLIENT_ORIGIN ||
+  (process.env.NODE_ENV === 'production' ? true : 'http://localhost:5173');
+
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN ?? 'http://localhost:5173',
+    origin: corsOrigin,
     credentials: true,
   })
 );
@@ -349,6 +355,20 @@ app.post('/api/orders', async (req, res) => {
       );
     }
     await conn.commit();
+
+    void sendOrderPlacedEmail({
+      orderNumber: ordNo,
+      customerName: customer.name,
+      customerEmail: customer.email,
+      customerPhone: customer.phone ?? '',
+      shippingMethod,
+      subtotal,
+      taxAmount,
+      shippingCost,
+      total,
+      items: normalizedItems,
+    }).catch((err) => console.error('[orderNotify]', err?.message || err));
+
     res.status(201).json({ ok: true, orderId, orderNumber: ordNo });
   } catch (e) {
     try {
@@ -943,6 +963,22 @@ app.put('/api/admin/orders/:id/status', authMiddleware, async (req, res) => {
   }
 });
 
+/** Production: serve Vite build from same origin so /api and /uploads work without CORS changes. */
+const clientDist = path.join(__dirnameRoot, '..', 'client', 'dist');
+const clientIndexHtml = path.join(clientDist, 'index.html');
+const serveClient =
+  process.env.NODE_ENV === 'production' &&
+  process.env.SERVE_CLIENT !== 'false' &&
+  fs.existsSync(clientIndexHtml);
+
+if (serveClient) {
+  app.use(express.static(clientDist));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(clientIndexHtml, (err) => (err ? next(err) : undefined));
+  });
+}
+
 async function startServer() {
   try {
     await ensurePagesTable(pool);
@@ -961,6 +997,7 @@ async function startServer() {
   }
   app.listen(PORT, () => {
     console.log(`API listening on http://localhost:${PORT}`);
+    if (serveClient) console.log(`Serving client from ${clientDist}`);
   });
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import CartIcon from '../components/CartIcon.jsx';
 import { publicApi } from '../api.js';
 
 function formatPrice(n) {
@@ -297,7 +298,10 @@ export default function Account() {
       ) : null}
 
       <p className="muted" style={{ marginTop: '2rem' }}>
-        <Link to="/cart">Return to cart</Link> · <Link to="/products">Continue shopping</Link>
+        <Link className="cart-inline-link" to="/cart">
+          <CartIcon /> Return to cart
+        </Link>{' '}
+        · <Link to="/products">Continue shopping</Link>
       </p>
     </>
   );
