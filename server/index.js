@@ -1032,37 +1032,54 @@ app.put('/api/admin/orders/:id/status', authMiddleware, async (req, res) => {
 
 app.post('/api/admin/test-email', authMiddleware, async (req, res) => {
   const toEmail =
-    String(req.body?.email ?? '').trim() || process.env.SMTP_USER?.trim() || '';
+    String(req.body?.email ?? '').trim() || process.env.GMAIL_USER?.trim() || '';
 
   if (!toEmail) {
     return res.status(400).json({
-      error: 'No recipient address. Pass an "email" field in the request body or set SMTP_USER.',
+      error: 'No recipient address. Pass an "email" field in the request body or set GMAIL_USER.',
     });
   }
 
   const testOrderNumber = `TEST-${Date.now()}`;
-  const payload = {
-    orderNumber: testOrderNumber,
-    customerName: 'Test Customer',
-    customerEmail: toEmail,
-    customerPhone: '',
-    shippingMethod: 'standard',
-    subtotal: 29.99,
-    taxAmount: 2.47,
-    shippingCost: 9.99,
-    total: 42.45,
-    items: [
-      {
-        productName: 'Test Quilt Item',
-        quantity: 1,
-        unitPrice: 29.99,
-        lineTotal: 29.99,
-      },
-    ],
+  const testItems = [
+    {
+      productName: 'Test Quilt Item',
+      quantity: 1,
+      unitPrice: 29.99,
+      lineTotal: 29.99,
+    },
+  ];
+  const testTotal = 42.45;
+  const testShipping = {
+    address1: '123 Main St',
+    address2: '',
+    city: 'Logan',
+    state: 'UT',
+    postalCode: '84321',
+    country: 'US',
   };
 
   try {
-    await sendOrderPlacedEmail(payload);
+    await Promise.all([
+      sendOrderConfirmationEmail({
+        to: toEmail,
+        orderNumber: testOrderNumber,
+        customerName: 'Test Customer',
+        total: testTotal,
+        items: testItems,
+      }),
+      sendOrderStaffNotificationEmail({
+        orderNumber: testOrderNumber,
+        customerName: 'Test Customer',
+        customerEmail: toEmail,
+        customerPhone: '',
+        total: testTotal,
+        items: testItems,
+        shipping: testShipping,
+        shippingMethod: 'standard',
+        shippingCost: 9.99,
+      }),
+    ]);
     res.json({ ok: true, orderNumber: testOrderNumber, sentTo: toEmail });
   } catch (e) {
     console.error('[test-email]', e?.message || e);
