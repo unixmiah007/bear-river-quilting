@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 const HERO_PANELS = [
   {
     primary:
-      'https://images.unsplash.com/photo-1616628182509-6f5b5c05463f?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1200&q=80',
     fallback:
       'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80',
     alt: 'Patchwork quilt in warm amber and cream tones',
@@ -14,7 +14,7 @@ const HERO_PANELS = [
     primary:
       'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1200&q=80',
     fallback:
-      'https://images.unsplash.com/photo-1616628182509-6f5b5c05463f?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1200&q=80',
     alt: 'Hand-stitched quilt in soft sage and neutral layers',
   },
   {

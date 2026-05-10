@@ -27,10 +27,17 @@ export async function api(path, options = {}) {
   return data;
 }
 
+/** Safe for list endpoints that must always be arrays in the UI. */
+async function apiJsonArray(path) {
+  const data = await api(path);
+  return Array.isArray(data) ? data : [];
+}
+
 export const publicApi = {
-  listPages: () => api('/api/pages'),
+  listPages: () => apiJsonArray('/api/pages'),
   pageBySlug: (slug) => api(`/api/pages/by-slug/${encodeURIComponent(slug)}`),
-  listProducts: () => api('/api/products'),
+  listProducts: () => apiJsonArray('/api/products'),
+  bestSellers: () => apiJsonArray('/api/products/best-sellers'),
   productById: (id) => api(`/api/products/${encodeURIComponent(id)}`),
   createOrder: (body) => api('/api/orders', { method: 'POST', body: JSON.stringify(body) }),
   customerOrdersLookup: (body) =>
@@ -45,14 +52,14 @@ export const authApi = {
 };
 
 export const adminApi = {
-  pages: () => api('/api/admin/pages'),
+  pages: () => apiJsonArray('/api/admin/pages'),
   createPage: (body) =>
     api('/api/admin/pages', { method: 'POST', body: JSON.stringify(body) }),
   updatePage: (id, body) =>
     api(`/api/admin/pages/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deletePage: (id) => api(`/api/admin/pages/${id}`, { method: 'DELETE' }),
 
-  products: () => api('/api/admin/products'),
+  products: () => apiJsonArray('/api/admin/products'),
   product: (id) => api(`/api/admin/products/by-id/${encodeURIComponent(id)}`),
   uploadProductImages: async (id, files) => {
     const fd = new FormData();
@@ -96,13 +103,13 @@ export const adminApi = {
     api(`/api/admin/products/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteProduct: (id) => api(`/api/admin/products/${id}`, { method: 'DELETE' }),
 
-  pageProducts: (pageId) => api(`/api/admin/pages/${pageId}/products`),
+  pageProducts: (pageId) => apiJsonArray(`/api/admin/pages/${pageId}/products`),
   setPageProducts: (pageId, productIds) =>
     api(`/api/admin/pages/${pageId}/products`, {
       method: 'PUT',
       body: JSON.stringify({ productIds }),
     }),
-  orders: () => api('/api/admin/orders'),
+  orders: () => apiJsonArray('/api/admin/orders'),
   orderById: (id) => api(`/api/admin/orders/${id}`),
   updateOrderStatus: (id, status) =>
     api(`/api/admin/orders/${id}/status`, {

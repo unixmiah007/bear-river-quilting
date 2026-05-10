@@ -7,7 +7,7 @@ function normalizedPassword(raw) {
 }
 
 const CURATED_QUILT_URLS = [
-  'https://images.unsplash.com/photo-1616628182509-6f5b5c05463f?auto=format&fit=crop&w=1600&q=80',
+  'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1600&q=80',
   'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1600&q=80',
   'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1600&q=80',
   'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1600&q=80',
