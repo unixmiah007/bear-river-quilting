@@ -1,3 +1,4 @@
+import './loadEnv.js';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -6,14 +7,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import multer from 'multer';
-import 'dotenv/config';
 import pool from './db.js';
 import { importProductsFromCsv, PRODUCT_CSV_TEMPLATE } from './lib/csvProductImport.js';
 import { ensureProductInventoryColumns } from './lib/ensureProductInventoryColumns.js';
 import { ensureProductImagesTable } from './lib/ensureProductImagesTable.js';
 import { ensurePagesTable } from './lib/ensurePagesTable.js';
 import { seedDemoProducts } from './lib/seedDemoProducts.js';
-import { sendOrderPlacedEmail } from './lib/orderNotifyEmail.js';
+import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './lib/mail.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameRoot = path.dirname(__filename);
@@ -22,19 +22,14 @@ const UPLOAD_ROOT = path.join(__dirnameRoot, 'uploads');
 fs.mkdirSync(path.join(UPLOAD_ROOT, 'products'), { recursive: true });
 
 const app = express();
-app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT ?? 4000);
 const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-me';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'admin';
 const COOKIE_NAME = 'cms_token';
 
-const corsOrigin =
-  process.env.CLIENT_ORIGIN ||
-  (process.env.NODE_ENV === 'production' ? true : 'http://localhost:5173');
-
 app.use(
   cors({
-    origin: corsOrigin,
+    origin: process.env.CLIENT_ORIGIN ?? 'http://localhost:5173',
     credentials: true,
   })
 );
@@ -212,6 +207,58 @@ app.get('/api/products', async (_req, res) => {
   }
 });
 
+/** Top published products by total units sold (order_items); max 10. Falls back to recent products if none. */
+app.get('/api/products/best-sellers', async (_req, res) => {
+  try {
+    const [ranked] = await pool.query(
+      `SELECT p.id, p.name, p.description, p.price, p.image_url, p.stock_quantity,
+              agg.units_sold AS units_sold
+       FROM products p
+       INNER JOIN (
+         SELECT oi.product_id, SUM(oi.quantity) AS units_sold
+         FROM order_items oi
+         INNER JOIN orders o ON o.id = oi.order_id
+         GROUP BY oi.product_id
+       ) agg ON agg.product_id = p.id
+       WHERE p.is_published = 1
+       ORDER BY agg.units_sold DESC, p.id ASC
+       LIMIT 10`
+    );
+    if (ranked.length > 0) {
+      return res.json(ranked);
+    }
+    const [fallback] = await pool.query(
+      `SELECT id, name, description, price, image_url, stock_quantity, NULL AS units_sold
+       FROM products
+       WHERE is_published = 1
+       ORDER BY updated_at DESC, name ASC
+       LIMIT 10`
+    );
+    res.json(fallback);
+  } catch (e) {
+    console.error(e);
+    if (e.code === 'ER_NO_SUCH_TABLE') {
+      try {
+        const [rows] = await pool.query(
+          `SELECT id, name, description, price, image_url, stock_quantity, NULL AS units_sold
+           FROM products
+           WHERE is_published = 1
+           ORDER BY updated_at DESC, name ASC
+           LIMIT 10`
+        );
+        return res.json(rows);
+      } catch (e2) {
+        console.error(e2);
+        return res.json([]);
+      }
+    }
+    if (isMissingProductColumnError(e)) {
+      return sendProductSchemaMismatch(res);
+    }
+    res.status(500).json({ error: 'Failed to load best sellers' });
+  }
+});
+
 app.get('/api/products/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -355,21 +402,39 @@ app.post('/api/orders', async (req, res) => {
       );
     }
     await conn.commit();
-
-    void sendOrderPlacedEmail({
-      orderNumber: ordNo,
-      customerName: customer.name,
-      customerEmail: customer.email,
-      customerPhone: customer.phone ?? '',
-      shippingMethod,
-      subtotal,
-      taxAmount,
-      shippingCost,
-      total,
-      items: normalizedItems,
-    }).catch((err) => console.error('[orderNotify]', err?.message || err));
-
     res.status(201).json({ ok: true, orderId, orderNumber: ordNo });
+    void Promise.allSettled([
+      sendOrderConfirmationEmail({
+        to: customer.email,
+        orderNumber: ordNo,
+        customerName: customer.name,
+        total,
+        items: normalizedItems,
+      }),
+      sendOrderStaffNotificationEmail({
+        orderNumber: ordNo,
+        customerName: customer.name,
+        customerEmail: customer.email,
+        customerPhone: customer.phone ?? null,
+        total,
+        items: normalizedItems,
+        shipping,
+        shippingMethod,
+        shippingCost,
+      }),
+    ]).then((results) => {
+      const [cust, staff] = results;
+      if (cust.status === 'fulfilled') {
+        console.log('[mail] Customer confirmation sent', ordNo, '→', customer.email);
+      } else {
+        console.error('[mail] Customer confirmation failed:', cust.reason?.message ?? cust.reason);
+      }
+      if (staff.status === 'fulfilled') {
+        console.log('[mail] Staff notifications sent', ordNo);
+      } else {
+        console.error('[mail] Staff notification failed:', staff.reason?.message ?? staff.reason);
+      }
+    });
   } catch (e) {
     try {
       await conn.rollback();
@@ -905,151 +970,6 @@ app.put('/api/admin/pages/:id/products', authMiddleware, async (req, res) => {
   }
 });
 
-// --- Admin: init-db ---
-
-app.post('/api/admin/init-db', authMiddleware, async (_req, res) => {
-  const conn = await pool.getConnection();
-  const log = [];
-  try {
-    // 1. Create core tables (IF NOT EXISTS — safe to run repeatedly)
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS pages (
-        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        slug VARCHAR(191) NOT NULL UNIQUE,
-        title VARCHAR(255) NOT NULL,
-        body MEDIUMTEXT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      )
-    `);
-    log.push('pages table ready');
-
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS products (
-        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        sku VARCHAR(64) NULL,
-        name VARCHAR(255) NOT NULL,
-        description TEXT NULL,
-        price DECIMAL(10, 2) NOT NULL DEFAULT 0,
-        stock_quantity INT UNSIGNED NOT NULL DEFAULT 0,
-        image_url VARCHAR(512) NULL,
-        is_published TINYINT(1) NOT NULL DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        UNIQUE KEY uk_products_sku (sku)
-      )
-    `);
-    log.push('products table ready');
-
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS product_images (
-        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        product_id INT UNSIGNED NOT NULL,
-        path VARCHAR(512) NOT NULL,
-        sort_order INT NOT NULL DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT fk_pi_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE,
-        KEY idx_pi_product_sort (product_id, sort_order)
-      )
-    `);
-    log.push('product_images table ready');
-
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS page_products (
-        page_id INT UNSIGNED NOT NULL,
-        product_id INT UNSIGNED NOT NULL,
-        sort_order INT NOT NULL DEFAULT 0,
-        PRIMARY KEY (page_id, product_id),
-        CONSTRAINT fk_pp_page FOREIGN KEY (page_id) REFERENCES pages (id) ON DELETE CASCADE,
-        CONSTRAINT fk_pp_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
-      )
-    `);
-    log.push('page_products table ready');
-
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS orders (
-        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        order_number VARCHAR(32) NOT NULL UNIQUE,
-        status VARCHAR(32) NOT NULL DEFAULT 'pending',
-        customer_name VARCHAR(255) NOT NULL,
-        customer_email VARCHAR(255) NOT NULL,
-        customer_phone VARCHAR(64) NULL,
-        shipping_address1 VARCHAR(255) NOT NULL,
-        shipping_address2 VARCHAR(255) NULL,
-        shipping_city VARCHAR(120) NOT NULL,
-        shipping_state VARCHAR(120) NOT NULL,
-        shipping_postal_code VARCHAR(40) NOT NULL,
-        shipping_country VARCHAR(120) NOT NULL,
-        shipping_method VARCHAR(32) NOT NULL DEFAULT 'standard',
-        shipping_cost DECIMAL(10, 2) NOT NULL DEFAULT 0,
-        billing_name VARCHAR(255) NOT NULL,
-        billing_address1 VARCHAR(255) NOT NULL,
-        billing_address2 VARCHAR(255) NULL,
-        billing_city VARCHAR(120) NOT NULL,
-        billing_state VARCHAR(120) NOT NULL,
-        billing_postal_code VARCHAR(40) NOT NULL,
-        billing_country VARCHAR(120) NOT NULL,
-        card_last4 VARCHAR(4) NOT NULL,
-        subtotal DECIMAL(10, 2) NOT NULL DEFAULT 0,
-        tax_amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
-        total DECIMAL(10, 2) NOT NULL DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      )
-    `);
-    log.push('orders table ready');
-
-    await conn.query(`
-      CREATE TABLE IF NOT EXISTS order_items (
-        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        order_id INT UNSIGNED NOT NULL,
-        product_id INT UNSIGNED NOT NULL,
-        product_name VARCHAR(255) NOT NULL,
-        unit_price DECIMAL(10, 2) NOT NULL,
-        quantity INT UNSIGNED NOT NULL,
-        line_total DECIMAL(10, 2) NOT NULL,
-        CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
-        CONSTRAINT fk_order_items_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT
-      )
-    `);
-    log.push('order_items table ready');
-
-    // 2. Add missing columns to products (sku, stock_quantity, updated_at, etc.)
-    await ensureProductInventoryColumns(conn);
-    log.push('products columns ensured (sku, stock_quantity, updated_at, ...)');
-
-    // 3. Add missing columns to pages (created_at, updated_at)
-    await ensurePagesTable(conn);
-    log.push('pages columns ensured');
-
-    // 4. Ensure product_images table exists (idempotent)
-    await ensureProductImagesTable(conn);
-    log.push('product_images table ensured');
-
-    // 5. Seed demo products only when the table is empty
-    const [[{ cnt }]] = await conn.query('SELECT COUNT(*) AS cnt FROM products');
-    let seeded = false;
-    if (Number(cnt) === 0) {
-      await seedDemoProducts(conn);
-      seeded = true;
-      log.push('demo products seeded (table was empty)');
-    } else {
-      log.push(`skipped seeding — products table already has ${cnt} row(s)`);
-    }
-
-    res.json({ ok: true, seeded, log });
-  } catch (e) {
-    console.error('[init-db]', e);
-    res.status(500).json({
-      ok: false,
-      error: e.sqlMessage || e.message || 'Database initialisation failed',
-      log,
-    });
-  } finally {
-    conn.release();
-  }
-});
-
 // --- Admin: orders ---
 
 app.get('/api/admin/orders', authMiddleware, async (_req, res) => {
@@ -1151,20 +1071,15 @@ app.post('/api/admin/test-email', authMiddleware, async (req, res) => {
 });
 
 /** Production: serve Vite build from same origin so /api and /uploads work without CORS changes. */
+// --- Static file serving & SPA fallback ---
 const clientDist = path.join(__dirnameRoot, '..', 'client', 'dist');
 const clientIndexHtml = path.join(clientDist, 'index.html');
-const serveClient =
-  process.env.NODE_ENV === 'production' &&
-  process.env.SERVE_CLIENT !== 'false' &&
-  fs.existsSync(clientIndexHtml);
 
-if (serveClient) {
-  app.use(express.static(clientDist));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
-    res.sendFile(clientIndexHtml, (err) => (err ? next(err) : undefined));
-  });
-}
+app.use(express.static(clientDist));
+
+app.get('*', (_req, res) => {
+  res.sendFile(clientIndexHtml);
+});
 
 async function startServer() {
   try {
@@ -1184,7 +1099,6 @@ async function startServer() {
   }
   app.listen(PORT, () => {
     console.log(`API listening on http://localhost:${PORT}`);
-    if (serveClient) console.log(`Serving client from ${clientDist}`);
   });
 }
 

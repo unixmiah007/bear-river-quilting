@@ -1,5 +1,5 @@
+import './loadEnv.js';
 import mysql from 'mysql2/promise';
-import 'dotenv/config';
 
 function normalizedPassword(raw) {
   // Treat scaffolding placeholder as "no password" for local MySQL defaults.

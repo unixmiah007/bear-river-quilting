@@ -11,7 +11,8 @@
     "db:seed-products": "node scripts/seed-products.js",
     "db:retheme-images": "node scripts/retheme-product-images.js",
     "db:migrate-products-csv": "node scripts/add-product-inventory-columns.js",
-    "db:migrate-product-images": "node scripts/add-product-images-table.js"
+    "db:migrate-product-images": "node scripts/add-product-images-table.js",
+    "mail:test": "node scripts/send-test-email.js"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
@@ -22,6 +23,6 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.12.0",
-    "nodemailer": "^6.9.16"
+    "nodemailer": "^8.0.7"
   }
 }

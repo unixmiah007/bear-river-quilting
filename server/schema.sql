@@ -117,7 +117,7 @@ VALUES
     'Soft cotton layers with a deep amber and cream patchwork pattern.',
     249.00,
     0,
-    'https://images.unsplash.com/photo-1616628182509-6f5b5c05463f?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1200&q=80',
     1
   ),
   (

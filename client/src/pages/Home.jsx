@@ -14,6 +14,9 @@ export default function Home() {
   const [carouselProducts, setCarouselProducts] = useState([]);
   const [loadingFeatured, setLoadingFeatured] = useState(true);
   const [startIndex, setStartIndex] = useState(0);
+  const [bestSellers, setBestSellers] = useState([]);
+  const [loadingBest, setLoadingBest] = useState(true);
+  const [bestStartIndex, setBestStartIndex] = useState(0);
   const { addItem } = useCart();
   const navigate = useNavigate();
 
@@ -35,6 +38,42 @@ export default function Home() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadBest() {
+      try {
+        const rows = await publicApi.bestSellers();
+        if (!cancelled) setBestSellers(Array.isArray(rows) ? rows.slice(0, 10) : []);
+      } catch {
+        if (!cancelled) setBestSellers([]);
+      } finally {
+        if (!cancelled) setLoadingBest(false);
+      }
+    }
+    loadBest();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (bestSellers.length <= 3) return undefined;
+    const timer = setInterval(() => {
+      setBestStartIndex((i) => (i + 1) % bestSellers.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [bestSellers]);
+
+  const visibleBestSellers = useMemo(() => {
+    if (bestSellers.length === 0) return [];
+    const count = Math.min(3, bestSellers.length);
+    return Array.from({ length: count }, (_, idx) => {
+      return bestSellers[(bestStartIndex + idx) % bestSellers.length];
+    });
+  }, [bestSellers, bestStartIndex]);
+
+  const hasBestSellers = visibleBestSellers.length > 0;
 
   useEffect(() => {
     if (carouselProducts.length <= 3) return undefined;
@@ -77,7 +116,7 @@ export default function Home() {
           </div>
           <div className="hero-mosaic">
             <img
-              src="https://images.unsplash.com/photo-1616628182509-6f5b5c05463f?auto=format&fit=crop&w=1200&q=80"
+              src="https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1200&q=80"
               alt="Handmade quilt folded in soft warm tones"
               loading="eager"
               fetchPriority="high"
@@ -128,6 +167,55 @@ export default function Home() {
             </p>
           </div>
         </article>
+      </section>
+
+      <section className="featured best-sellers">
+        <div className="featured-head">
+          <h2>Best sellers</h2>
+          <Link to="/p/heritage-quilts">See collections</Link>
+        </div>
+        {loadingBest ? (
+          <p className="muted">Loading best sellers…</p>
+        ) : hasBestSellers ? (
+          <>
+            <div className="card-grid featured-carousel-grid">
+              {visibleBestSellers.map((p) => (
+                <article key={p.id} className="card featured-card">
+                  <ProductImage src={p.image_url} alt={p.name} />
+                  {p.units_sold != null && Number(p.units_sold) > 0 ? (
+                    <p className="eyebrow" style={{ margin: '0 0 0.35rem' }}>
+                      {Number(p.units_sold)} sold
+                    </p>
+                  ) : null}
+                  <h3>{p.name}</h3>
+                  {p.description ? <p className="muted">{p.description}</p> : null}
+                  <div className="price">{formatPrice(p.price)}</div>
+                  <div className="row card-actions">
+                    <Link className="btn" to={`/products/${p.id}`}>
+                      View
+                    </Link>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => {
+                        addItem(p, 1);
+                        navigate('/cart');
+                      }}
+                    >
+                      Add to cart
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <p className="muted" style={{ marginTop: '0.65rem' }}>
+              Top {bestSellers.length} by units sold—showing 3 at a time, rotating through the list
+              {bestSellers.length > 3 ? ' every 4 seconds' : ''}.
+            </p>
+          </>
+        ) : (
+          <p className="muted">No published products yet.</p>
+        )}
       </section>
 
       <section className="featured">
