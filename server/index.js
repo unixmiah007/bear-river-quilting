@@ -1028,6 +1028,49 @@ app.put('/api/admin/orders/:id/status', authMiddleware, async (req, res) => {
   }
 });
 
+// --- Admin: test email ---
+
+app.post('/api/admin/test-email', authMiddleware, async (req, res) => {
+  const toEmail =
+    String(req.body?.email ?? '').trim() || process.env.SMTP_USER?.trim() || '';
+
+  if (!toEmail) {
+    return res.status(400).json({
+      error: 'No recipient address. Pass an "email" field in the request body or set SMTP_USER.',
+    });
+  }
+
+  const testOrderNumber = `TEST-${Date.now()}`;
+  const payload = {
+    orderNumber: testOrderNumber,
+    customerName: 'Test Customer',
+    customerEmail: toEmail,
+    customerPhone: '',
+    shippingMethod: 'standard',
+    subtotal: 29.99,
+    taxAmount: 2.47,
+    shippingCost: 9.99,
+    total: 42.45,
+    items: [
+      {
+        productName: 'Test Quilt Item',
+        quantity: 1,
+        unitPrice: 29.99,
+        lineTotal: 29.99,
+      },
+    ],
+  };
+
+  try {
+    await sendOrderPlacedEmail(payload);
+    res.json({ ok: true, orderNumber: testOrderNumber, sentTo: toEmail });
+  } catch (e) {
+    console.error('[test-email]', e?.message || e);
+    res.status(500).json({ error: 'Failed to send test email', detail: e?.message || String(e) });
+  }
+});
+
+/** Production: serve Vite build from same origin so /api and /uploads work without CORS changes. */
 // --- Static file serving & SPA fallback ---
 const clientDist = path.join(__dirnameRoot, '..', 'client', 'dist');
 const clientIndexHtml = path.join(clientDist, 'index.html');
