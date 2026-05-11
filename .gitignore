@@ -1,7 +1,11 @@
 node_modules/
 dist/
-.env
-server/.env
 .DS_Store
 *.log
 server/uploads/products/
+
+# Environment files (secrets) — keep *.example tracked
+.env
+.env.local
+server/.env
+client/.env

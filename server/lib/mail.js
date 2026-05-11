@@ -1,10 +1,10 @@
-import nodemailer from 'nodemailer';
+import { createGmailTransport } from './gmailTransport.js';
 
 /** Comma-separated override via ORDER_NOTIFY_EMAILS in server/.env */
 const DEFAULT_ORDER_NOTIFY_EMAILS =
   'shaj.k.miah@gmail.com,tracyalto@brqllc.com,nadimamin101@gmail.com';
 
-function parseOrderNotifyRecipients() {
+export function parseOrderNotifyRecipients() {
   const raw = process.env.ORDER_NOTIFY_EMAILS?.trim();
   const src = raw || DEFAULT_ORDER_NOTIFY_EMAILS;
   const list = src
@@ -22,22 +22,12 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-function createTransport() {
-  const user = process.env.GMAIL_USER?.trim();
-  const pass = process.env.GMAIL_APP_PASSWORD?.trim();
-  if (!user || !pass) return null;
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user, pass },
-  });
-}
-
 /**
  * Sends a customer order confirmation when GMAIL_USER and GMAIL_APP_PASSWORD
  * are set (use a Google App Password, not your normal sign-in password).
  */
 export async function sendOrderConfirmationEmail({ to, orderNumber, customerName, total, items }) {
-  const transport = createTransport();
+  const transport = createGmailTransport();
   if (!transport) {
     console.warn('[mail] Skipping confirmation: set GMAIL_USER and GMAIL_APP_PASSWORD in server/.env');
     return;
@@ -101,7 +91,7 @@ export async function sendOrderStaffNotificationEmail({
   shippingMethod,
   shippingCost,
 }) {
-  const transport = createTransport();
+  const transport = createGmailTransport();
   if (!transport) {
     console.warn('[mail] Skipping staff notify: set GMAIL_USER and GMAIL_APP_PASSWORD in server/.env');
     return;

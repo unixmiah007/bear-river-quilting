@@ -14,6 +14,7 @@ import { ensureProductImagesTable } from './lib/ensureProductImagesTable.js';
 import { ensurePagesTable } from './lib/ensurePagesTable.js';
 import { seedDemoProducts } from './lib/seedDemoProducts.js';
 import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './lib/mail.js';
+import { verifyGmailIfConfigured } from './lib/gmailTransport.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameRoot = path.dirname(__filename);
@@ -1117,8 +1118,9 @@ async function startServer() {
   } catch (e) {
     console.error('[ensureProductImagesTable]', e?.message || e);
   }
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log(`API listening on http://localhost:${PORT}`);
+    await verifyGmailIfConfigured();
   });
 }
 
