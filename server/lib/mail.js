@@ -1,4 +1,27 @@
+import nodemailer from 'nodemailer';
 import { createGmailTransport } from './gmailTransport.js';
+
+/**
+ * Returns a nodemailer transport for Ethereal Email if ETHEREAL_USER and
+ * ETHEREAL_PASSWORD are set, otherwise falls back to the Gmail transport.
+ * Returns null when neither service is configured.
+ */
+function createTransport() {
+  const etherealUser = process.env.ETHEREAL_USER?.trim();
+  const etherealPass = process.env.ETHEREAL_PASSWORD?.trim();
+
+  if (etherealUser && etherealPass) {
+    console.log('[mail] Using Ethereal Email transport — view messages at https://ethereal.email/messages');
+    return nodemailer.createTransport({
+      host: 'smtp.ethereal.email',
+      port: 587,
+      secure: false,
+      auth: { user: etherealUser, pass: etherealPass },
+    });
+  }
+
+  return createGmailTransport();
+}
 
 /** Comma-separated override via ORDER_NOTIFY_EMAILS in server/.env */
 const DEFAULT_ORDER_NOTIFY_EMAILS =
@@ -27,15 +50,15 @@ function escapeHtml(s) {
  * are set (use a Google App Password, not your normal sign-in password).
  */
 export async function sendOrderConfirmationEmail({ to, orderNumber, customerName, total, items }) {
-  const transport = createGmailTransport();
+  const transport = createTransport();
   if (!transport) {
-    console.warn('[mail] Skipping confirmation: set GMAIL_USER and GMAIL_APP_PASSWORD in server/.env');
+    console.warn('[mail] Skipping confirmation: set ETHEREAL_USER/ETHEREAL_PASSWORD or GMAIL_USER/GMAIL_APP_PASSWORD in server/.env');
     return;
   }
 
-  const gmailUser = process.env.GMAIL_USER.trim();
+  const senderUser = (process.env.ETHEREAL_USER ?? process.env.GMAIL_USER ?? '').trim();
   const fromName = process.env.MAIL_FROM_NAME?.trim() || 'Order confirmation';
-  const from = process.env.MAIL_FROM?.trim() || `${fromName} <${gmailUser}>`;
+  const from = process.env.MAIL_FROM?.trim() || `${fromName} <${senderUser}>`;
 
   const lines = items.map(
     (it) => `  - ${it.productName} × ${it.quantity}  $${Number(it.lineTotal).toFixed(2)}`
@@ -91,18 +114,18 @@ export async function sendOrderStaffNotificationEmail({
   shippingMethod,
   shippingCost,
 }) {
-  const transport = createGmailTransport();
+  const transport = createTransport();
   if (!transport) {
-    console.warn('[mail] Skipping staff notify: set GMAIL_USER and GMAIL_APP_PASSWORD in server/.env');
+    console.warn('[mail] Skipping staff notify: set ETHEREAL_USER/ETHEREAL_PASSWORD or GMAIL_USER/GMAIL_APP_PASSWORD in server/.env');
     return;
   }
 
   const notifyTo = parseOrderNotifyRecipients();
   if (notifyTo.length === 0) return;
 
-  const gmailUser = process.env.GMAIL_USER.trim();
+  const senderUser = (process.env.ETHEREAL_USER ?? process.env.GMAIL_USER ?? '').trim();
   const fromName = process.env.MAIL_STAFF_FROM_NAME?.trim() || 'New order';
-  const from = process.env.MAIL_STAFF_FROM?.trim() || `${fromName} <${gmailUser}>`;
+  const from = process.env.MAIL_STAFF_FROM?.trim() || `${fromName} <${senderUser}>`;
 
   const lines = items.map(
     (it) => `  - ${it.productName} × ${it.quantity}  $${Number(it.lineTotal).toFixed(2)}`
