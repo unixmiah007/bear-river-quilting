@@ -1,43 +1,29 @@
-import nodemailer from 'nodemailer';
-import { createGmailTransport } from './gmailTransport.js';
+import sgMail from '@sendgrid/mail';
 
 /**
- * Returns a nodemailer transport for Ethereal Email if ETHEREAL_USER and
- * ETHEREAL_PASSWORD are set, otherwise falls back to the Gmail transport.
- * Returns null when neither service is configured.
+ * Sends an email via the SendGrid HTTP API.
+ * Requires SENDGRID_API_KEY to be set in the environment.
+ *
+ * @param {{ to: string, from: string, subject: string, text: string, html: string }} options
+ * @returns {Promise<void>}
  */
-function createTransport() {
-  const etherealUser = process.env.ETHEREAL_USER?.trim();
-  const etherealPass = process.env.ETHEREAL_PASSWORD?.trim();
-
-  if (etherealUser && etherealPass) {
-    console.log('[mail] Using Ethereal Email transport — view messages at https://ethereal.email/messages');
-    return nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: { user: etherealUser, pass: etherealPass },
-      connectionTimeout: 5000,
-      socketTimeout: 5000,
-    });
+async function sendEmail({ to, from, subject, text, html }) {
+  const apiKey = process.env.SENDGRID_API_KEY?.trim();
+  if (!apiKey) {
+    console.warn('[mail] Skipping email: SENDGRID_API_KEY is not set in the environment');
+    return;
   }
 
-  return createGmailTransport();
-}
+  sgMail.setApiKey(apiKey);
 
-/**
- * Wraps transport.sendMail() in a Promise.race() so it fails fast instead of
- * hanging indefinitely when the SMTP server is unreachable or unresponsive.
- */
-function sendMailWithTimeout(transport, options, timeoutMs = 10000) {
-  const send = transport.sendMail(options);
-  const timeout = new Promise((_, reject) =>
-    setTimeout(
-      () => reject(new Error(`[mail] sendMail timed out after ${timeoutMs}ms`)),
-      timeoutMs
-    )
-  );
-  return Promise.race([send, timeout]);
+  try {
+    await sgMail.send({ to, from, subject, text, html });
+    console.log('[mail] Email sent via SendGrid', { to, subject });
+  } catch (err) {
+    const detail = err?.response?.body?.errors ?? err?.message ?? err;
+    console.error('[mail] SendGrid send failed:', detail);
+    throw err;
+  }
 }
 
 /** Comma-separated override via ORDER_NOTIFY_EMAILS in server/.env */
@@ -63,19 +49,18 @@ function escapeHtml(s) {
 }
 
 /**
- * Sends a customer order confirmation when GMAIL_USER and GMAIL_APP_PASSWORD
- * are set (use a Google App Password, not your normal sign-in password).
+ * Sends a customer order confirmation email via SendGrid.
+ * Requires SENDGRID_API_KEY to be set in the environment.
  */
 export async function sendOrderConfirmationEmail({ to, orderNumber, customerName, total, items }) {
-  const transport = createTransport();
-  if (!transport) {
-    console.warn('[mail] Skipping confirmation: set ETHEREAL_USER/ETHEREAL_PASSWORD or GMAIL_USER/GMAIL_APP_PASSWORD in server/.env');
+  if (!process.env.SENDGRID_API_KEY?.trim()) {
+    console.warn('[mail] Skipping confirmation: SENDGRID_API_KEY is not set in the environment');
     return;
   }
 
-  const senderUser = (process.env.ETHEREAL_USER ?? process.env.GMAIL_USER ?? '').trim();
   const fromName = process.env.MAIL_FROM_NAME?.trim() || 'Order confirmation';
-  const from = process.env.MAIL_FROM?.trim() || `${fromName} <${senderUser}>`;
+  const fromAddress = process.env.MAIL_FROM_ADDRESS?.trim() || process.env.MAIL_FROM?.trim();
+  const from = fromAddress ? `${fromName} <${fromAddress}>` : fromName;
 
   const lines = items.map(
     (it) => `  - ${it.productName} × ${it.quantity}  $${Number(it.lineTotal).toFixed(2)}`
@@ -107,18 +92,13 @@ ${items
 <p><strong>Total: $${Number(total).toFixed(2)}</strong></p>
 `.trim();
 
-  await sendMailWithTimeout(transport, {
-    from,
-    to,
-    subject: `Order confirmation ${orderNumber}`,
-    text,
-    html,
-  });
+  await sendEmail({ to, from, subject: `Order confirmation ${orderNumber}`, text, html });
   console.log('[mail] Sent customer confirmation', { orderNumber, to });
 }
 
 /**
- * Notifies internal recipients when a new order is placed (same Gmail transport).
+ * Notifies internal recipients when a new order is placed via SendGrid.
+ * Requires SENDGRID_API_KEY to be set in the environment.
  */
 export async function sendOrderStaffNotificationEmail({
   orderNumber,
@@ -131,18 +111,17 @@ export async function sendOrderStaffNotificationEmail({
   shippingMethod,
   shippingCost,
 }) {
-  const transport = createTransport();
-  if (!transport) {
-    console.warn('[mail] Skipping staff notify: set ETHEREAL_USER/ETHEREAL_PASSWORD or GMAIL_USER/GMAIL_APP_PASSWORD in server/.env');
+  if (!process.env.SENDGRID_API_KEY?.trim()) {
+    console.warn('[mail] Skipping staff notify: SENDGRID_API_KEY is not set in the environment');
     return;
   }
 
   const notifyTo = parseOrderNotifyRecipients();
   if (notifyTo.length === 0) return;
 
-  const senderUser = (process.env.ETHEREAL_USER ?? process.env.GMAIL_USER ?? '').trim();
   const fromName = process.env.MAIL_STAFF_FROM_NAME?.trim() || 'New order';
-  const from = process.env.MAIL_STAFF_FROM?.trim() || `${fromName} <${senderUser}>`;
+  const fromAddress = process.env.MAIL_STAFF_FROM_ADDRESS?.trim() || process.env.MAIL_STAFF_FROM?.trim();
+  const from = fromAddress ? `${fromName} <${fromAddress}>` : fromName;
 
   const lines = items.map(
     (it) => `  - ${it.productName} × ${it.quantity}  $${Number(it.lineTotal).toFixed(2)}`
@@ -198,13 +177,7 @@ ${items
   let staffSent = 0;
   for (const addr of notifyTo) {
     try {
-      await sendMailWithTimeout(transport, {
-        from,
-        to: addr,
-        subject: `New order ${orderNumber}`,
-        text,
-        html,
-      });
+      await sendEmail({ to: addr, from, subject: `New order ${orderNumber}`, text, html });
       staffSent += 1;
       console.log('[mail] Sent staff notify', orderNumber, '→', addr);
     } catch (e) {
