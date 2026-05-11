@@ -17,10 +17,27 @@ function createTransport() {
       port: 587,
       secure: false,
       auth: { user: etherealUser, pass: etherealPass },
+      connectionTimeout: 5000,
+      socketTimeout: 5000,
     });
   }
 
   return createGmailTransport();
+}
+
+/**
+ * Wraps transport.sendMail() in a Promise.race() so it fails fast instead of
+ * hanging indefinitely when the SMTP server is unreachable or unresponsive.
+ */
+function sendMailWithTimeout(transport, options, timeoutMs = 10000) {
+  const send = transport.sendMail(options);
+  const timeout = new Promise((_, reject) =>
+    setTimeout(
+      () => reject(new Error(`[mail] sendMail timed out after ${timeoutMs}ms`)),
+      timeoutMs
+    )
+  );
+  return Promise.race([send, timeout]);
 }
 
 /** Comma-separated override via ORDER_NOTIFY_EMAILS in server/.env */
@@ -90,7 +107,7 @@ ${items
 <p><strong>Total: $${Number(total).toFixed(2)}</strong></p>
 `.trim();
 
-  await transport.sendMail({
+  await sendMailWithTimeout(transport, {
     from,
     to,
     subject: `Order confirmation ${orderNumber}`,
@@ -181,7 +198,7 @@ ${items
   let staffSent = 0;
   for (const addr of notifyTo) {
     try {
-      await transport.sendMail({
+      await sendMailWithTimeout(transport, {
         from,
         to: addr,
         subject: `New order ${orderNumber}`,
