@@ -14,7 +14,7 @@ import { ensureProductImagesTable } from './lib/ensureProductImagesTable.js';
 import { ensurePagesTable } from './lib/ensurePagesTable.js';
 import { seedDemoProducts } from './lib/seedDemoProducts.js';
 import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './lib/mail.js';
-import { verifyGmailIfConfigured } from './lib/gmailTransport.js';
+import { verifySendGridIfConfigured } from './lib/sendgridMail.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameRoot = path.dirname(__filename);
@@ -403,9 +403,9 @@ app.post('/api/orders', async (req, res) => {
       );
     }
     await conn.commit();
-    res.status(201).json({ ok: true, orderId, orderNumber: ordNo });
-    console.log('[mail] Attempting to send order emails', { orderNumber: ordNo, customerEmail: customer.email });
-    void Promise.allSettled([
+
+    console.log('[mail] Sending order emails', { orderNumber: ordNo, customerEmail: customer.email });
+    const mailResults = await Promise.allSettled([
       sendOrderConfirmationEmail({
         to: customer.email,
         orderNumber: ordNo,
@@ -424,20 +424,27 @@ app.post('/api/orders', async (req, res) => {
         shippingMethod,
         shippingCost,
       }),
-    ]).then((results) => {
-      const [cust, staff] = results;
-      if (cust.status === 'fulfilled') {
-        console.log('[mail] Customer confirmation sent', ordNo, '→', customer.email);
-      } else {
-        console.error('[mail] Customer confirmation failed:', cust.reason?.message ?? cust.reason, cust.reason);
-      }
-      if (staff.status === 'fulfilled') {
-        console.log('[mail] Staff notifications sent', ordNo);
-      } else {
-        console.error('[mail] Staff notification failed:', staff.reason?.message ?? staff.reason, staff.reason);
-      }
-    }).catch((err) => {
-      console.error('[mail] Unexpected error in email sending block:', err?.message ?? err, err);
+    ]);
+    const [cust, staff] = mailResults;
+    if (cust.status === 'fulfilled') {
+      console.log('[mail] Customer confirmation finished', ordNo);
+    } else {
+      console.error('[mail] Customer confirmation failed:', cust.reason?.message ?? cust.reason);
+    }
+    if (staff.status === 'fulfilled') {
+      console.log('[mail] Staff notifications finished', ordNo);
+    } else {
+      console.error('[mail] Staff notification failed:', staff.reason?.message ?? staff.reason);
+    }
+
+    res.status(201).json({
+      ok: true,
+      orderId,
+      orderNumber: ordNo,
+      mail: {
+        customerOk: cust.status === 'fulfilled',
+        staffOk: staff.status === 'fulfilled',
+      },
     });
   } catch (e) {
     try {
@@ -1036,11 +1043,14 @@ app.put('/api/admin/orders/:id/status', authMiddleware, async (req, res) => {
 
 app.post('/api/admin/test-email', authMiddleware, async (req, res) => {
   const toEmail =
-    String(req.body?.email ?? '').trim() || process.env.GMAIL_USER?.trim() || '';
+    String(req.body?.email ?? '').trim() ||
+    process.env.MAIL_FROM_ADDRESS?.trim() ||
+    '';
 
   if (!toEmail) {
     return res.status(400).json({
-      error: 'No recipient address. Pass an "email" field in the request body or set GMAIL_USER.',
+      error:
+        'No recipient address. Pass an "email" field in the request body or set MAIL_FROM_ADDRESS (verified SendGrid sender).',
     });
   }
 
@@ -1120,7 +1130,7 @@ async function startServer() {
   }
   app.listen(PORT, async () => {
     console.log(`API listening on http://localhost:${PORT}`);
-    await verifyGmailIfConfigured();
+    await verifySendGridIfConfigured();
   });
 }
 

@@ -1,30 +1,9 @@
-import sgMail from '@sendgrid/mail';
-
-/**
- * Sends an email via the SendGrid HTTP API.
- * Requires SENDGRID_API_KEY to be set in the environment.
- *
- * @param {{ to: string, from: string, subject: string, text: string, html: string }} options
- * @returns {Promise<void>}
- */
-async function sendEmail({ to, from, subject, text, html }) {
-  const apiKey = process.env.SENDGRID_API_KEY?.trim();
-  if (!apiKey) {
-    console.warn('[mail] Skipping email: SENDGRID_API_KEY is not set in the environment');
-    return;
-  }
-
-  sgMail.setApiKey(apiKey);
-
-  try {
-    await sgMail.send({ to, from, subject, text, html });
-    console.log('[mail] Email sent via SendGrid', { to, subject });
-  } catch (err) {
-    const detail = err?.response?.body?.errors ?? err?.message ?? err;
-    console.error('[mail] SendGrid send failed:', detail);
-    throw err;
-  }
-}
+import {
+  sendSendGridMail,
+  resolveSendGridFromCustomer,
+  resolveSendGridFromStaff,
+  isSendGridConfigured,
+} from './sendgridMail.js';
 
 /** Comma-separated override via ORDER_NOTIFY_EMAILS in server/.env */
 const DEFAULT_ORDER_NOTIFY_EMAILS =
@@ -49,18 +28,30 @@ function escapeHtml(s) {
 }
 
 /**
- * Sends a customer order confirmation email via SendGrid.
- * Requires SENDGRID_API_KEY to be set in the environment.
+ * Sends a customer order confirmation via SendGrid.
+ * Requires SENDGRID_API_KEY and a verified sender (MAIL_FROM_ADDRESS or MAIL_FROM).
  */
 export async function sendOrderConfirmationEmail({ to, orderNumber, customerName, total, items }) {
-  if (!process.env.SENDGRID_API_KEY?.trim()) {
-    console.warn('[mail] Skipping confirmation: SENDGRID_API_KEY is not set in the environment');
+  const toAddr = String(to ?? '')
+    .trim()
+    .toLowerCase();
+  if (!toAddr || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toAddr)) {
+    console.error('[mail] Invalid customer email for confirmation:', to);
     return;
   }
 
-  const fromName = process.env.MAIL_FROM_NAME?.trim() || 'Order confirmation';
-  const fromAddress = process.env.MAIL_FROM_ADDRESS?.trim() || process.env.MAIL_FROM?.trim();
-  const from = fromAddress ? `${fromName} <${fromAddress}>` : fromName;
+  if (!isSendGridConfigured()) {
+    console.warn('[mail] Skipping confirmation: SENDGRID_API_KEY is not set in server/.env');
+    return;
+  }
+
+  const from = resolveSendGridFromCustomer();
+  if (!from) {
+    console.error(
+      '[mail] Skipping confirmation: set MAIL_FROM_ADDRESS or MAIL_FROM to a verified SendGrid sender (same as mail:test).'
+    );
+    return;
+  }
 
   const lines = items.map(
     (it) => `  - ${it.productName} × ${it.quantity}  $${Number(it.lineTotal).toFixed(2)}`
@@ -92,13 +83,24 @@ ${items
 <p><strong>Total: $${Number(total).toFixed(2)}</strong></p>
 `.trim();
 
-  await sendEmail({ to, from, subject: `Order confirmation ${orderNumber}`, text, html });
-  console.log('[mail] Sent customer confirmation', { orderNumber, to });
+  try {
+    await sendSendGridMail({
+      to: toAddr,
+      from,
+      subject: `Order confirmation ${orderNumber}`,
+      text,
+      html,
+    });
+    console.log('[mail] Sent customer confirmation', { orderNumber, to: toAddr });
+  } catch (err) {
+    const detail = err?.response?.body?.errors ?? err?.message ?? err;
+    console.error('[mail] SendGrid confirmation failed:', detail);
+    throw err;
+  }
 }
 
 /**
- * Notifies internal recipients when a new order is placed via SendGrid.
- * Requires SENDGRID_API_KEY to be set in the environment.
+ * Notifies internal recipients when a new order is placed (SendGrid).
  */
 export async function sendOrderStaffNotificationEmail({
   orderNumber,
@@ -111,17 +113,19 @@ export async function sendOrderStaffNotificationEmail({
   shippingMethod,
   shippingCost,
 }) {
-  if (!process.env.SENDGRID_API_KEY?.trim()) {
-    console.warn('[mail] Skipping staff notify: SENDGRID_API_KEY is not set in the environment');
+  if (!isSendGridConfigured()) {
+    console.warn('[mail] Skipping staff notify: SENDGRID_API_KEY is not set in server/.env');
+    return;
+  }
+
+  const from = resolveSendGridFromStaff();
+  if (!from) {
+    console.warn('[mail] Skipping staff notify: set MAIL_STAFF_FROM_ADDRESS or MAIL_FROM_ADDRESS / MAIL_FROM.');
     return;
   }
 
   const notifyTo = parseOrderNotifyRecipients();
   if (notifyTo.length === 0) return;
-
-  const fromName = process.env.MAIL_STAFF_FROM_NAME?.trim() || 'New order';
-  const fromAddress = process.env.MAIL_STAFF_FROM_ADDRESS?.trim() || process.env.MAIL_STAFF_FROM?.trim();
-  const from = fromAddress ? `${fromName} <${fromAddress}>` : fromName;
 
   const lines = items.map(
     (it) => `  - ${it.productName} × ${it.quantity}  $${Number(it.lineTotal).toFixed(2)}`
@@ -177,11 +181,18 @@ ${items
   let staffSent = 0;
   for (const addr of notifyTo) {
     try {
-      await sendEmail({ to: addr, from, subject: `New order ${orderNumber}`, text, html });
+      await sendSendGridMail({
+        to: addr,
+        from,
+        subject: `New order ${orderNumber}`,
+        text,
+        html,
+      });
       staffSent += 1;
       console.log('[mail] Sent staff notify', orderNumber, '→', addr);
     } catch (e) {
-      console.error('[mail] Staff notify failed for', addr, e?.message ?? e);
+      const detail = e?.response?.body?.errors ?? e?.message ?? e;
+      console.error('[mail] Staff notify failed for', addr, detail);
     }
   }
   if (staffSent === 0 && notifyTo.length > 0) {

@@ -15,11 +15,19 @@ if (!apiKey) {
 
 sgMail.setApiKey(apiKey);
 
-const fromAddress = process.env.MAIL_FROM?.trim();
-if (!fromAddress) {
-  console.error('Set MAIL_FROM in server/.env to a SendGrid-verified sender address or domain.');
+const fromAddress =
+  process.env.MAIL_FROM_ADDRESS?.trim() ||
+  process.env.MAIL_FROM?.trim()?.match(/<([^>]+)>/)?.[1] ||
+  process.env.MAIL_FROM?.trim();
+if (!fromAddress || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromAddress)) {
+  console.error(
+    'Set MAIL_FROM_ADDRESS (or MAIL_FROM as email / "Name <email>") to a SendGrid-verified sender.'
+  );
   process.exit(1);
 }
+
+const fromName = process.env.MAIL_FROM_NAME?.trim() || 'SMTP test';
+const from = { email: fromAddress, name: fromName };
 
 let recipients;
 if (notifyAll) {
@@ -41,7 +49,7 @@ const html = `<p>${text}</p>`;
 
 try {
   for (const to of recipients) {
-    await sgMail.send({ from: fromAddress, to, subject, text, html });
+    await sgMail.send({ from, to, subject, text, html });
     console.log('Sent to', to);
   }
   console.log(`Done (${recipients.length} message(s)).`);
