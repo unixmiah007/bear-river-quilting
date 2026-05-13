@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
 import { useCart } from '../context/CartContext.jsx';
+import { formatProductSizeLabel } from '../lib/productSizes.js';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -56,6 +57,11 @@ export default function DynamicPage() {
             <article key={p.id} className="card">
               <ProductImage src={p.image_url} alt={p.name} />
               <h3>{p.name}</h3>
+              {formatProductSizeLabel(p.product_size) ? (
+                <p className="muted" style={{ margin: '0.2rem 0' }}>
+                  Size: {formatProductSizeLabel(p.product_size)}
+                </p>
+              ) : null}
               {p.description ? <p className="muted">{p.description}</p> : null}
               <div className="price">{formatPrice(p.price)}</div>
               <div className="row card-actions">

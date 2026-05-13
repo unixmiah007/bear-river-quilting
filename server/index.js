@@ -11,10 +11,12 @@ import pool from './db.js';
 import { importProductsFromCsv, PRODUCT_CSV_TEMPLATE } from './lib/csvProductImport.js';
 import { ensureProductInventoryColumns } from './lib/ensureProductInventoryColumns.js';
 import { ensureProductImagesTable } from './lib/ensureProductImagesTable.js';
+import { ensureProductSizeColumn } from './lib/ensureProductSizeColumn.js';
 import { ensurePagesTable } from './lib/ensurePagesTable.js';
 import { seedDemoProducts } from './lib/seedDemoProducts.js';
 import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './lib/mail.js';
 import { verifySendGridIfConfigured } from './lib/sendgridMail.js';
+import { normalizeProductSize } from './lib/productSize.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameRoot = path.dirname(__filename);
@@ -49,6 +51,19 @@ function authMiddleware(req, res, next) {
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });
   }
+}
+
+function parseProductSizeInput(body) {
+  const raw = body?.product_size ?? body?.productSize;
+  if (raw === undefined || raw === null || String(raw).trim() === '') return { ok: true, value: null };
+  const v = normalizeProductSize(raw);
+  if (!v) {
+    return {
+      ok: false,
+      error: 'Invalid product_size. Allowed: small, large, x-large, xx-large, xxx-large',
+    };
+  }
+  return { ok: true, value: v };
 }
 
 function slugify(input) {
@@ -170,7 +185,7 @@ app.get('/api/pages/by-slug/:slug', async (req, res) => {
       return res.status(404).json({ error: 'Page not found' });
     }
     const [products] = await pool.query(
-      `SELECT p.id, p.name, p.description, p.price, p.image_url, p.stock_quantity
+      `SELECT p.id, p.name, p.description, p.price, p.image_url, p.stock_quantity, p.product_size
        FROM products p
        INNER JOIN page_products pp ON pp.product_id = p.id
        WHERE pp.page_id = ? AND p.is_published = 1
@@ -187,7 +202,7 @@ app.get('/api/pages/by-slug/:slug', async (req, res) => {
 app.get('/api/products', async (_req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id, name, description, price, image_url, stock_quantity
+      `SELECT id, name, description, price, image_url, stock_quantity, product_size
        FROM products
        WHERE is_published = 1
        ORDER BY updated_at DESC, name ASC`
@@ -212,7 +227,7 @@ app.get('/api/products', async (_req, res) => {
 app.get('/api/products/best-sellers', async (_req, res) => {
   try {
     const [ranked] = await pool.query(
-      `SELECT p.id, p.name, p.description, p.price, p.image_url, p.stock_quantity,
+      `SELECT p.id, p.name, p.description, p.price, p.image_url, p.stock_quantity, p.product_size,
               agg.units_sold AS units_sold
        FROM products p
        INNER JOIN (
@@ -229,7 +244,7 @@ app.get('/api/products/best-sellers', async (_req, res) => {
       return res.json(ranked);
     }
     const [fallback] = await pool.query(
-      `SELECT id, name, description, price, image_url, stock_quantity, NULL AS units_sold
+      `SELECT id, name, description, price, image_url, stock_quantity, product_size, NULL AS units_sold
        FROM products
        WHERE is_published = 1
        ORDER BY updated_at DESC, name ASC
@@ -241,7 +256,7 @@ app.get('/api/products/best-sellers', async (_req, res) => {
     if (e.code === 'ER_NO_SUCH_TABLE') {
       try {
         const [rows] = await pool.query(
-          `SELECT id, name, description, price, image_url, stock_quantity, NULL AS units_sold
+          `SELECT id, name, description, price, image_url, stock_quantity, product_size, NULL AS units_sold
            FROM products
            WHERE is_published = 1
            ORDER BY updated_at DESC, name ASC
@@ -267,7 +282,7 @@ app.get('/api/products/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid product id' });
     }
     const [[row]] = await pool.query(
-      `SELECT id, name, description, price, image_url, stock_quantity, updated_at
+      `SELECT id, name, description, price, image_url, stock_quantity, product_size, updated_at
        FROM products
        WHERE id = ? AND is_published = 1`,
       [id]
@@ -677,7 +692,7 @@ app.post('/api/admin/products/import', authMiddleware, async (req, res) => {
 app.get('/api/admin/products', authMiddleware, async (_req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, sku, name, description, price, stock_quantity, image_url, is_published, updated_at FROM products ORDER BY name ASC'
+      'SELECT id, sku, name, description, price, stock_quantity, product_size, image_url, is_published, updated_at FROM products ORDER BY name ASC'
     );
     res.json(rows);
   } catch (e) {
@@ -696,7 +711,7 @@ app.get('/api/admin/products/by-id/:id', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Invalid product id' });
     }
     const [[product]] = await pool.query(
-      `SELECT id, sku, name, description, price, stock_quantity, image_url, is_published, updated_at
+      `SELECT id, sku, name, description, price, stock_quantity, product_size, image_url, is_published, updated_at
        FROM products WHERE id = ?`,
       [id]
     );
@@ -827,14 +842,19 @@ app.delete(
 
 app.post('/api/admin/products', authMiddleware, async (req, res) => {
   try {
-    const { name, description, price, image_url, is_published, sku, stock_quantity } = req.body ?? {};
+    const { name, description, price, image_url, is_published, sku, stock_quantity, product_size } =
+      req.body ?? {};
     if (!name) {
       return res.status(400).json({ error: 'name is required' });
+    }
+    const sizeParsed = parseProductSizeInput({ product_size });
+    if (!sizeParsed.ok) {
+      return res.status(400).json({ error: sizeParsed.error });
     }
     const skuVal = sku != null && String(sku).trim() !== '' ? String(sku).trim().slice(0, 64) : null;
     const stock = Math.max(0, Math.min(9999999, Math.floor(Number(stock_quantity) || 0)));
     const [result] = await pool.query(
-      'INSERT INTO products (name, description, price, image_url, is_published, sku, stock_quantity) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO products (name, description, price, image_url, is_published, sku, stock_quantity, product_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         name,
         description ?? null,
@@ -843,6 +863,7 @@ app.post('/api/admin/products', authMiddleware, async (req, res) => {
         is_published ? 1 : 0,
         skuVal,
         stock,
+        sizeParsed.value,
       ]
     );
     res.status(201).json({ id: result.insertId });
@@ -858,14 +879,19 @@ app.post('/api/admin/products', authMiddleware, async (req, res) => {
 app.put('/api/admin/products/:id', authMiddleware, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { name, description, price, image_url, is_published, sku, stock_quantity } = req.body ?? {};
+    const { name, description, price, image_url, is_published, sku, stock_quantity, product_size } =
+      req.body ?? {};
     if (!name) {
       return res.status(400).json({ error: 'name is required' });
+    }
+    const sizeParsed = parseProductSizeInput({ product_size });
+    if (!sizeParsed.ok) {
+      return res.status(400).json({ error: sizeParsed.error });
     }
     const skuVal = sku != null && String(sku).trim() !== '' ? String(sku).trim().slice(0, 64) : null;
     const stock = Math.max(0, Math.min(9999999, Math.floor(Number(stock_quantity) || 0)));
     const [result] = await pool.query(
-      'UPDATE products SET name = ?, description = ?, price = ?, image_url = ?, is_published = ?, sku = ?, stock_quantity = ? WHERE id = ?',
+      'UPDATE products SET name = ?, description = ?, price = ?, image_url = ?, is_published = ?, sku = ?, stock_quantity = ?, product_size = ? WHERE id = ?',
       [
         name,
         description ?? null,
@@ -874,6 +900,7 @@ app.put('/api/admin/products/:id', authMiddleware, async (req, res) => {
         is_published ? 1 : 0,
         skuVal,
         stock,
+        sizeParsed.value,
         id,
       ]
     );
@@ -1127,6 +1154,11 @@ async function startServer() {
     await ensureProductImagesTable(pool);
   } catch (e) {
     console.error('[ensureProductImagesTable]', e?.message || e);
+  }
+  try {
+    await ensureProductSizeColumn(pool);
+  } catch (e) {
+    console.error('[ensureProductSizeColumn]', e?.message || e);
   }
   app.listen(PORT, async () => {
     console.log(`API listening on http://localhost:${PORT}`);

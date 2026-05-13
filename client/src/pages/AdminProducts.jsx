@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { adminApi } from '../api.js';
+import { PRODUCT_SIZE_OPTIONS } from '../lib/productSizes.js';
 
 const emptyForm = {
   sku: '',
@@ -8,6 +9,7 @@ const emptyForm = {
   description: '',
   price: '0',
   stock_quantity: '0',
+  product_size: '',
   image_url: '',
   is_published: false,
 };
@@ -19,6 +21,7 @@ function formatPrice(n) {
 }
 
 export default function AdminProducts() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -102,7 +105,7 @@ export default function AdminProducts() {
     }
   }
 
-  function startEdit(p) {
+  const startEdit = useCallback((p) => {
     setEditingId(p.id);
     setForm({
       sku: p.sku ?? '',
@@ -110,10 +113,59 @@ export default function AdminProducts() {
       description: p.description ?? '',
       price: String(p.price),
       stock_quantity: String(p.stock_quantity ?? 0),
+      product_size: p.product_size ?? '',
       image_url: p.image_url ?? '',
       is_published: !!p.is_published,
     });
-  }
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    const raw = searchParams.get('edit');
+    if (raw == null || String(raw).trim() === '') return;
+    const editId = Number(raw);
+    if (!Number.isFinite(editId) || editId <= 0) {
+      setSearchParams(
+        (sp) => {
+          const n = new URLSearchParams(sp);
+          n.delete('edit');
+          return n;
+        },
+        { replace: true }
+      );
+      return;
+    }
+
+    setSearchParams(
+      (sp) => {
+        const n = new URLSearchParams(sp);
+        n.delete('edit');
+        return n;
+      },
+      { replace: true }
+    );
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const fromList = rows.find((r) => Number(r.id) === editId);
+        const p = fromList ?? (await adminApi.product(editId));
+        if (cancelled) return;
+        startEdit(p);
+      } catch (e) {
+        if (cancelled) return;
+        setError(
+          [e.body?.error, e.body?.hint].filter(Boolean).join(' ') ||
+            e.message ||
+            'Failed to open product for editing.'
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, searchParams, rows, startEdit, setSearchParams]);
 
   async function onUpdate(e) {
     e.preventDefault();
@@ -229,13 +281,176 @@ export default function AdminProducts() {
       {error ? <p className="error">{error}</p> : null}
       {info ? <p className="muted">{info}</p> : null}
 
+      <h2 style={{ marginTop: 0 }}>{editingId ? 'Edit product' : 'New product'}</h2>
+      <form className="form" onSubmit={editingId ? onUpdate : onCreate}>
+        <div className="field">
+          <label htmlFor="sku">SKU</label>
+          <input
+            id="sku"
+            value={form.sku}
+            onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
+            placeholder="Optional, unique"
+            maxLength={64}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="name">Name</label>
+          <input
+            id="name"
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            required
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="description">Description</label>
+          <textarea
+            id="description"
+            value={form.description}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="price">Price (USD)</label>
+          <input
+            id="price"
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.price}
+            onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+            required
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="stock_quantity">Stock (available)</label>
+          <input
+            id="stock_quantity"
+            type="number"
+            min="0"
+            step="1"
+            value={form.stock_quantity}
+            onChange={(e) => setForm((f) => ({ ...f, stock_quantity: e.target.value }))}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="product_size">Product size</label>
+          <select
+            id="product_size"
+            value={form.product_size}
+            onChange={(e) => setForm((f) => ({ ...f, product_size: e.target.value }))}
+          >
+            {PRODUCT_SIZE_OPTIONS.map((o) => (
+              <option key={o.value || 'none'} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="image_url">Image URL (optional)</label>
+          <input
+            id="image_url"
+            value={form.image_url}
+            onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))}
+            placeholder="External https://… or leave empty if you use uploads"
+          />
+        </div>
+        <div className="field row">
+          <input
+            id="pub"
+            type="checkbox"
+            checked={!!form.is_published}
+            onChange={(e) => setForm((f) => ({ ...f, is_published: e.target.checked }))}
+          />
+          <label htmlFor="pub" style={{ margin: 0, textTransform: 'none', letterSpacing: 'normal' }}>
+            Published (visible on public pages when linked)
+          </label>
+        </div>
+        <div className="row">
+          {editingId ? (
+            <>
+              <button type="submit" className="btn btn-primary">
+                Save changes
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setEditingId(null);
+                  setForm(emptyForm);
+                  setGalleryImages([]);
+                }}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button type="submit" className="btn btn-primary">
+              Create product
+            </button>
+          )}
+        </div>
+      </form>
+
+      <section className="card admin-gallery-section" style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>
+        <h3 style={{ marginTop: 0 }}>Product images</h3>
+        {editingId ? (
+          <>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Uploaded images appear on the public product page as a gallery. The first image in the
+              list is used as the thumbnail in product listings.
+            </p>
+            <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <label className="btn" style={{ cursor: uploadBusy ? 'wait' : 'pointer' }}>
+                {uploadBusy ? 'Uploading…' : 'Browse images'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  disabled={uploadBusy}
+                  onChange={onGalleryFiles}
+                  style={{ display: 'none' }}
+                />
+              </label>
+            </div>
+            {galleryImages.length === 0 ? (
+              <p className="muted">No images yet. Choose one or more files (JPEG, PNG, WebP, GIF).</p>
+            ) : (
+              <div className="admin-gallery-strip">
+                {galleryImages.map((img) => (
+                  <div key={img.id} className="admin-gallery-thumb">
+                    <img src={img.url} alt="" />
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      onClick={() => removeGalleryImage(img.id)}
+                      disabled={uploadBusy}
+                      aria-label="Remove image"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="muted" style={{ marginTop: 0 }}>
+            Save a new product once (or click Edit on an existing row), then use Browse images to
+            add photos stored on the server and linked in the database.
+          </p>
+        )}
+      </section>
+
       <section className="card" style={{ marginBottom: '1.5rem' }}>
         <h2 style={{ marginTop: 0 }}>Import from CSV</h2>
         <p className="muted" style={{ marginTop: 0 }}>
           Upload a spreadsheet exported as CSV. Required column: <strong>name</strong> (or{' '}
           <strong>title</strong>). Use <strong>sku</strong> to create new rows or update existing
           products with the same SKU. Use numeric <strong>id</strong> to update a specific product.
-          Optional: description, price, stock_quantity (or stock / quantity / available), image_url
+          Optional: description, price, stock_quantity (or stock / quantity / available), product_size
+          (small, large, x-large, xx-large, xxx-large), image_url
           (or image), is_published (1/0, yes/no).
         </p>
         <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -291,6 +506,7 @@ export default function AdminProducts() {
             <tr>
               <th>SKU</th>
               <th>Name</th>
+              <th>Size</th>
               <th>Price</th>
               <th>Stock</th>
               <th>Published</th>
@@ -300,7 +516,7 @@ export default function AdminProducts() {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6}>
+                <td colSpan={7}>
                   <p className="muted" style={{ marginBottom: '0.75rem' }}>
                     No products in the database yet. Use the button below to add the demo quilt
                     catalog (50 handmade placeholders, published), or run{' '}
@@ -322,6 +538,12 @@ export default function AdminProducts() {
                 <tr key={p.id}>
                   <td className="muted">{p.sku || '—'}</td>
                   <td>{p.name}</td>
+                  <td className="muted">
+                    {p.product_size
+                      ? PRODUCT_SIZE_OPTIONS.find((o) => o.value === p.product_size)?.label ??
+                        p.product_size
+                      : '—'}
+                  </td>
                   <td>{formatPrice(p.price)}</td>
                   <td>{Number(p.stock_quantity ?? 0)}</td>
                   <td>
@@ -358,154 +580,6 @@ export default function AdminProducts() {
           </tbody>
         </table>
       </div>
-
-      <h2>{editingId ? 'Edit product' : 'New product'}</h2>
-      <form className="form" onSubmit={editingId ? onUpdate : onCreate}>
-        <div className="field">
-          <label htmlFor="sku">SKU</label>
-          <input
-            id="sku"
-            value={form.sku}
-            onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
-            placeholder="Optional, unique"
-            maxLength={64}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="name">Name</label>
-          <input
-            id="name"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            required
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="description">Description</label>
-          <textarea
-            id="description"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="price">Price (USD)</label>
-          <input
-            id="price"
-            type="number"
-            step="0.01"
-            min="0"
-            value={form.price}
-            onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-            required
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="stock_quantity">Stock (available)</label>
-          <input
-            id="stock_quantity"
-            type="number"
-            min="0"
-            step="1"
-            value={form.stock_quantity}
-            onChange={(e) => setForm((f) => ({ ...f, stock_quantity: e.target.value }))}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="image_url">Image URL (optional)</label>
-          <input
-            id="image_url"
-            value={form.image_url}
-            onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))}
-            placeholder="External https://… or leave empty if you use uploads"
-          />
-        </div>
-        <div className="field row">
-          <input
-            id="pub"
-            type="checkbox"
-            checked={!!form.is_published}
-            onChange={(e) => setForm((f) => ({ ...f, is_published: e.target.checked }))}
-          />
-          <label htmlFor="pub" style={{ margin: 0, textTransform: 'none', letterSpacing: 'normal' }}>
-            Published (visible on public pages when linked)
-          </label>
-        </div>
-        <div className="row">
-          {editingId ? (
-            <>
-              <button type="submit" className="btn btn-primary">
-                Save changes
-              </button>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  setEditingId(null);
-                  setForm(emptyForm);
-                  setGalleryImages([]);
-                }}
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <button type="submit" className="btn btn-primary">
-              Create product
-            </button>
-          )}
-        </div>
-      </form>
-
-      <section className="card admin-gallery-section" style={{ marginTop: '1.5rem' }}>
-        <h3 style={{ marginTop: 0 }}>Product images</h3>
-        {editingId ? (
-          <>
-            <p className="muted" style={{ marginTop: 0 }}>
-              Uploaded images appear on the public product page as a gallery. The first image in the
-              list is used as the thumbnail in product listings.
-            </p>
-            <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
-              <label className="btn" style={{ cursor: uploadBusy ? 'wait' : 'pointer' }}>
-                {uploadBusy ? 'Uploading…' : 'Browse images'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  disabled={uploadBusy}
-                  onChange={onGalleryFiles}
-                  style={{ display: 'none' }}
-                />
-              </label>
-            </div>
-            {galleryImages.length === 0 ? (
-              <p className="muted">No images yet. Choose one or more files (JPEG, PNG, WebP, GIF).</p>
-            ) : (
-              <div className="admin-gallery-strip">
-                {galleryImages.map((img) => (
-                  <div key={img.id} className="admin-gallery-thumb">
-                    <img src={img.url} alt="" />
-                    <button
-                      type="button"
-                      className="btn btn-danger"
-                      onClick={() => removeGalleryImage(img.id)}
-                      disabled={uploadBusy}
-                      aria-label="Remove image"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        ) : (
-          <p className="muted" style={{ marginTop: 0 }}>
-            Save a new product once (or click Edit on an existing row), then use Browse images to
-            add photos stored on the server and linked in the database.
-          </p>
-        )}
-      </section>
     </>
   );
 }

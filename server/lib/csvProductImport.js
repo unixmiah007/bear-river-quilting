@@ -1,4 +1,5 @@
 import { parse } from 'csv-parse/sync';
+import { normalizeProductSize } from './productSize.js';
 
 function normalizeHeaderKey(k) {
   return String(k ?? '')
@@ -85,11 +86,17 @@ function normalizeProductRow(norm) {
   const pubRaw = pickRaw(norm, ['is_published', 'published', 'live', 'visible', 'status']);
   const is_published = pubRaw ? parsePublished(pubRaw) : false;
 
-  return { id, sku, name, description, price, image_url, stock_quantity, is_published };
+  const sizeRaw = pickRaw(norm, ['product_size', 'size', 'quilt_size']);
+  const product_size = sizeRaw ? normalizeProductSize(sizeRaw) : null;
+  if (sizeRaw && !product_size) {
+    return { error: `Invalid product_size "${sizeRaw}". Use: small, large, x-large, xx-large, xxx-large` };
+  }
+
+  return { id, sku, name, description, price, image_url, stock_quantity, is_published, product_size };
 }
 
 async function applyProductRow(pool, row) {
-  const { id, sku, name, description, price, image_url, stock_quantity, is_published } = row;
+  const { id, sku, name, description, price, image_url, stock_quantity, is_published, product_size } = row;
 
   if (id) {
     const [[existing]] = await pool.query('SELECT id FROM products WHERE id = ?', [id]);
@@ -97,7 +104,7 @@ async function applyProductRow(pool, row) {
       throw new Error(`No product with id ${id}`);
     }
     await pool.query(
-      `UPDATE products SET name=?, description=?, price=?, image_url=?, is_published=?, sku=?, stock_quantity=?
+      `UPDATE products SET name=?, description=?, price=?, image_url=?, is_published=?, sku=?, stock_quantity=?, product_size=?
        WHERE id=?`,
       [
         name,
@@ -107,6 +114,7 @@ async function applyProductRow(pool, row) {
         is_published ? 1 : 0,
         sku,
         stock_quantity,
+        product_size,
         id,
       ]
     );
@@ -117,7 +125,7 @@ async function applyProductRow(pool, row) {
     const [[bySku]] = await pool.query('SELECT id FROM products WHERE sku = ?', [sku]);
     if (bySku) {
       await pool.query(
-        `UPDATE products SET name=?, description=?, price=?, image_url=?, is_published=?, sku=?, stock_quantity=?
+        `UPDATE products SET name=?, description=?, price=?, image_url=?, is_published=?, sku=?, stock_quantity=?, product_size=?
          WHERE id=?`,
         [
           name,
@@ -127,6 +135,7 @@ async function applyProductRow(pool, row) {
           is_published ? 1 : 0,
           sku,
           stock_quantity,
+          product_size,
           bySku.id,
         ]
       );
@@ -135,9 +144,9 @@ async function applyProductRow(pool, row) {
   }
 
   await pool.query(
-    `INSERT INTO products (name, description, price, image_url, is_published, sku, stock_quantity)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [name, description, price, image_url, is_published ? 1 : 0, sku, stock_quantity]
+    `INSERT INTO products (name, description, price, image_url, is_published, sku, stock_quantity, product_size)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [name, description, price, image_url, is_published ? 1 : 0, sku, stock_quantity, product_size]
   );
   return 'created';
 }
@@ -201,7 +210,7 @@ export async function importProductsFromCsv(pool, csvText) {
   return { created, updated, errors };
 }
 
-export const PRODUCT_CSV_TEMPLATE = `sku,name,description,price,stock_quantity,image_url,is_published
-BRQ-1001,Sample Heritage Quilt,Hand-stitched cotton quilt with warm tones.,249.00,15,https://example.com/quilt1.jpg,1
-BRQ-1002,Sample Loft Quilt,Lightweight modern grid pattern.,189.00,8,https://example.com/quilt2.jpg,1
+export const PRODUCT_CSV_TEMPLATE = `sku,name,description,price,stock_quantity,product_size,image_url,is_published
+BRQ-1001,Sample Heritage Quilt,Hand-stitched cotton quilt with warm tones.,249.00,15,large,https://example.com/quilt1.jpg,1
+BRQ-1002,Sample Loft Quilt,Lightweight modern grid pattern.,189.00,8,x-large,https://example.com/quilt2.jpg,1
 `;

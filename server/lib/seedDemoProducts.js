@@ -1,4 +1,4 @@
-/** Deterministic PRNG for stable “random” rows per id (re-seed = same data). */
+import { PRODUCT_SIZE_VALUES } from './productSize.js';
 function mulberry32(seed) {
   let a = seed >>> 0;
   return function next() {
@@ -135,6 +135,7 @@ function makeProduct(id, idx) {
     price,
     stock_quantity,
     imageUrl,
+    product_size: PRODUCT_SIZE_VALUES[idx % PRODUCT_SIZE_VALUES.length],
   };
 }
 
@@ -153,8 +154,8 @@ export async function seedDemoProducts(conn) {
   const products = Array.from({ length: 50 }, (_, i) => makeProduct(3001 + i, i));
   for (const p of products) {
     await conn.query(
-      `INSERT INTO products (id, sku, name, description, price, stock_quantity, image_url, is_published)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+      `INSERT INTO products (id, sku, name, description, price, stock_quantity, image_url, is_published, product_size)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
        ON DUPLICATE KEY UPDATE
          sku = VALUES(sku),
          stock_quantity = VALUES(stock_quantity),
@@ -162,8 +163,9 @@ export async function seedDemoProducts(conn) {
          description = VALUES(description),
          price = VALUES(price),
          image_url = VALUES(image_url),
-         is_published = VALUES(is_published)`,
-      [p.id, p.sku, p.name, p.description, p.price, p.stock_quantity, p.imageUrl]
+         is_published = VALUES(is_published),
+         product_size = VALUES(product_size)`,
+      [p.id, p.sku, p.name, p.description, p.price, p.stock_quantity, p.imageUrl, p.product_size]
     );
   }
 

@@ -34,6 +34,7 @@ export function CartProvider({ children }) {
               name: product.name,
               price: Number(product.price),
               image_url: product.image_url ?? null,
+              product_size: product.product_size ?? null,
               quantity: qty,
             },
           ];

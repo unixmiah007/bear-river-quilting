@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS products (
   description TEXT NULL,
   price DECIMAL(10, 2) NOT NULL DEFAULT 0,
   stock_quantity INT UNSIGNED NOT NULL DEFAULT 0,
+  product_size VARCHAR(32) NULL,
   image_url VARCHAR(512) NULL,
   is_published TINYINT(1) NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -108,7 +109,7 @@ ON DUPLICATE KEY UPDATE
   title = VALUES(title),
   body = VALUES(body);
 
-INSERT INTO products (id, sku, name, description, price, stock_quantity, image_url, is_published)
+INSERT INTO products (id, sku, name, description, price, stock_quantity, product_size, image_url, is_published)
 VALUES
   (
     2001,
@@ -117,6 +118,7 @@ VALUES
     'Soft cotton layers with a deep amber and cream patchwork pattern.',
     249.00,
     0,
+    'small',
     'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1200&q=80',
     1
   ),
@@ -127,6 +129,7 @@ VALUES
     'Breathable quilt with muted green tones and hand-stitched detail.',
     219.00,
     0,
+    'x-large',
     'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1200&q=80',
     1
   ),
@@ -137,6 +140,7 @@ VALUES
     'Contemporary black and ivory grid design in a lightweight drape.',
     189.00,
     0,
+    'xx-large',
     'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
     1
   ),
@@ -147,6 +151,7 @@ VALUES
     'Modern line-work quilting with earthy tones and plush fill.',
     205.00,
     0,
+    'xxx-large',
     'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80',
     1
   )
@@ -154,6 +159,7 @@ ON DUPLICATE KEY UPDATE
   description = VALUES(description),
   price = VALUES(price),
   stock_quantity = VALUES(stock_quantity),
+  product_size = VALUES(product_size),
   image_url = VALUES(image_url),
   is_published = VALUES(is_published);
 

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { publicApi } from '../api.js';
+import { authApi, publicApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
 import CartIcon from '../components/CartIcon.jsx';
 import { useCart } from '../context/CartContext.jsx';
+import { formatProductSizeLabel } from '../lib/productSizes.js';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -15,6 +16,7 @@ export default function ProductDetail() {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
   const [error, setError] = useState(null);
+  const [adminSession, setAdminSession] = useState(null);
   const { addItem } = useCart();
   const navigate = useNavigate();
 
@@ -36,6 +38,21 @@ export default function ProductDetail() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    authApi
+      .me()
+      .then((r) => {
+        if (!cancelled) setAdminSession(!!r?.authenticated);
+      })
+      .catch(() => {
+        if (!cancelled) setAdminSession(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const galleryUrls = useMemo(() => {
     if (!product) return [];
@@ -72,9 +89,25 @@ export default function ProductDetail() {
 
   return (
     <>
-      <p className="muted" style={{ marginBottom: '0.75rem' }}>
-        <Link to="/products">← All products</Link>
-      </p>
+      <div
+        className="row"
+        style={{
+          marginBottom: '0.75rem',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '0.5rem',
+        }}
+      >
+        <p className="muted" style={{ margin: 0 }}>
+          <Link to="/products">← All products</Link>
+        </p>
+        {adminSession ? (
+          <Link className="btn" to={`/admin/products?edit=${encodeURIComponent(product.id)}`}>
+            Edit product
+          </Link>
+        ) : null}
+      </div>
       <section className="product-detail">
         <div className="product-detail-media">
           <div className="product-gallery-main">
@@ -100,6 +133,11 @@ export default function ProductDetail() {
         </div>
         <div>
           <h1>{product.name}</h1>
+          {formatProductSizeLabel(product.product_size) ? (
+            <p className="muted" style={{ marginBottom: '0.35rem' }}>
+              Size: <strong>{formatProductSizeLabel(product.product_size)}</strong>
+            </p>
+          ) : null}
           <div className="price" style={{ fontSize: '1.35rem', marginBottom: '1rem' }}>
             {formatPrice(product.price)}
           </div>

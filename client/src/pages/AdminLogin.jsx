@@ -8,7 +8,10 @@ export default function AdminLogin() {
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || '/admin/pages';
+  const fromState = location.state?.from;
+  const from = fromState
+    ? `${fromState.pathname || '/admin'}${fromState.search || ''}`
+    : '/admin/pages';
 
   async function onSubmit(e) {
     e.preventDefault();

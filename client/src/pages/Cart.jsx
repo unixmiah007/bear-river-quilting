@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import { useCart } from '../context/CartContext.jsx';
 import ProductImage from '../components/ProductImage.jsx';
+import { formatProductSizeLabel } from '../lib/productSizes.js';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -185,6 +186,7 @@ export default function Cart() {
               <thead>
                 <tr>
                   <th scope="col">Product</th>
+                  <th scope="col">Size</th>
                   <th scope="col">Price</th>
                   <th scope="col">Qty</th>
                   <th scope="col">Total</th>
@@ -196,11 +198,21 @@ export default function Cart() {
                   <tr key={it.productId}>
                     <td>
                       <div className="cart-product-cell">
-                        <div className="cart-thumb-wrap">
-                          <ProductImage src={it.image_url} alt={it.name} />
-                        </div>
-                        <span className="cart-product-name">{it.name}</span>
+                        <Link
+                          to={`/products/${it.productId}`}
+                          className="cart-product-link"
+                        >
+                          <div className="cart-thumb-wrap">
+                            <ProductImage src={it.image_url} alt="" />
+                          </div>
+                          <span className="cart-product-name">{it.name}</span>
+                        </Link>
                       </div>
+                    </td>
+                    <td className="cart-table-size">
+                      {formatProductSizeLabel(it.product_size) ?? (
+                        <span className="muted">—</span>
+                      )}
                     </td>
                     <td className="cart-table-num">{formatPrice(it.price)}</td>
                     <td>
