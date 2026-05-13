@@ -5,6 +5,7 @@ import SiteHeroBanner from '../components/SiteHeroBanner.jsx';
 import BrandLogo from '../components/BrandLogo.jsx';
 import CartNavLink from '../components/CartNavLink.jsx';
 import AccountNavLink from '../components/AccountNavLink.jsx';
+import AdminNavLink from '../components/AdminNavLink.jsx';
 
 /** CMS pages that stay reachable via direct URL / in-page links but are hidden from header/footer nav. */
 const EXCLUDED_MAIN_NAV_PAGE_SLUGS = new Set(['heritage-quilts', 'modern-loft-quilts']);
@@ -29,7 +30,7 @@ function SiteNav({ className, pages, 'aria-label': ariaLabel }) {
           {p.title}
         </NavLink>
       ))}
-      <NavLink to="/admin/pages">Admin</NavLink>
+      <AdminNavLink />
     </nav>
   );
 }
