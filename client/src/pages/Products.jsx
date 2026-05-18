@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
+import ProductsHero from '../components/ProductsHero.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
 
@@ -76,16 +77,14 @@ export default function Products() {
     });
   }, [products, query, maxPrice, sort]);
 
-  if (loading) return <p className="muted">Loading products...</p>;
-  if (error) return <p className="error">{error}</p>;
-
   return (
     <>
-      <h1>All Products</h1>
-      <p className="page-body">
-        Discover our full published quilt catalog, from heritage patchwork to modern minimalist
-        styles.
-      </p>
+      <ProductsHero />
+      <section id="products-catalog" className="products-catalog" aria-label="Product catalog">
+      {loading ? <p className="muted">Loading products…</p> : null}
+      {error ? <p className="error">{error}</p> : null}
+      {!loading && !error ? (
+      <>
       <div className="row" style={{ marginBottom: '1rem', gap: '1rem' }}>
         <div className="field" style={{ minWidth: '220px', flex: '1 1 220px' }}>
           <label htmlFor="q">Search</label>
@@ -153,6 +152,9 @@ export default function Products() {
           ))}
         </div>
       )}
+      </>
+      ) : null}
+      </section>
     </>
   );
 }

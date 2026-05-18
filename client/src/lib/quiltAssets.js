@@ -7,3 +7,23 @@ export const SEWING_MACHINE_IMAGE = '/assets/sewing-machine.jpg';
 export const QUILT_CRAFT_DETAIL_IMAGE = '/assets/quilt-craft-detail.webp';
 export const QUILT_STUDIO_IMAGE = '/assets/quilt-studio.jpg';
 export const QUILT_MISTY_IMAGE = '/assets/quilt-misty.jpg';
+
+/** Products page hero mosaic (client/public/assets). */
+export const PRODUCTS_HERO_IMAGES = [
+  {
+    src: '/assets/products-hero-quilt-couch.jpg',
+    alt: 'Quilt top draped on a sofa in a cozy living room',
+  },
+  {
+    src: '/assets/products-hero-talk-town.jpg',
+    alt: 'Talk of the Town king-size quilt laid flat',
+  },
+  {
+    src: '/assets/products-hero-patchwork.webp',
+    alt: 'Colorful patchwork quilt with geometric blocks',
+  },
+  {
+    src: '/assets/products-hero-backslash.jpg',
+    alt: 'Handmade Backslash patchwork quilt',
+  },
+];

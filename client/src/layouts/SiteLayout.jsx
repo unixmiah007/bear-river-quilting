@@ -6,6 +6,7 @@ import BrandLogo from '../components/BrandLogo.jsx';
 import CartNavLink from '../components/CartNavLink.jsx';
 import AccountNavLink from '../components/AccountNavLink.jsx';
 import AdminNavLink from '../components/AdminNavLink.jsx';
+import SiteStickyBar from '../components/SiteStickyBar.jsx';
 
 /** CMS pages that stay reachable via direct URL / in-page links but are hidden from header/footer nav. */
 const EXCLUDED_MAIN_NAV_PAGE_SLUGS = new Set(['heritage-quilts', 'modern-loft-quilts']);
@@ -71,7 +72,7 @@ export default function SiteLayout() {
   }, []);
 
   return (
-    <div className="layout">
+    <div className="layout layout--with-sticky-bar">
       <header className="site-header">
         <div className="brand">
           <NavLink to="/" className="brand-link">
@@ -96,6 +97,7 @@ export default function SiteLayout() {
           aria-label="Footer navigation"
         />
       </footer>
+      <SiteStickyBar />
     </div>
   );
 }
