@@ -673,6 +673,74 @@ button {
   color: var(--text);
 }
 
+.nav-link-admin--signed-in .nav-link-admin__icon-wrap {
+  border: 1px solid #6ee7b7;
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.nav-link-admin__dot {
+  position: absolute;
+  top: -0.1rem;
+  right: -0.15rem;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.admin-session-dot {
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.admin-session-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+  margin: 0 0 1.25rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--radius);
+  border: 1px solid #a7f3d0;
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.admin-session-banner__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.admin-session-banner__actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-session-banner__btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.admin-session-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid #a7f3d0;
+  background: #ecfdf5;
+  color: #065f46;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* Back to top (all routes) */
 .back-to-top {
   position: fixed;

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { authApi, publicApi } from '../api.js';
+import { publicApi } from '../api.js';
+import { useAdminSession } from '../hooks/useAdminSession.js';
 import ProductImage from '../components/ProductImage.jsx';
 import CartIcon from '../components/CartIcon.jsx';
 import { useCart } from '../context/CartContext.jsx';
@@ -16,7 +17,7 @@ export default function ProductDetail() {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
   const [error, setError] = useState(null);
-  const [adminSession, setAdminSession] = useState(null);
+  const { isAdmin: adminSession } = useAdminSession();
   const { addItem } = useCart();
   const navigate = useNavigate();
 
@@ -38,21 +39,6 @@ export default function ProductDetail() {
       cancelled = true;
     };
   }, [id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    authApi
-      .me()
-      .then((r) => {
-        if (!cancelled) setAdminSession(!!r?.authenticated);
-      })
-      .catch(() => {
-        if (!cancelled) setAdminSession(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const galleryUrls = useMemo(() => {
     if (!product) return [];

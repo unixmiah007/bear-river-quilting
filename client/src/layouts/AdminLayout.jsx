@@ -36,7 +36,11 @@ export default function AdminLayout() {
         <div className="brand">
           <NavLink to="/">← Site</NavLink>
         </div>
-        <div className="row" style={{ gap: '0.75rem' }}>
+        <div className="row" style={{ gap: '0.75rem', alignItems: 'center' }}>
+          <span className="admin-session-pill" role="status">
+            <span className="admin-session-dot" aria-hidden="true" />
+            Admin signed in
+          </span>
           <nav className="admin-nav">
             <NavLink
               className={({ isActive }) => `pill${isActive ? ' active' : ''}`}

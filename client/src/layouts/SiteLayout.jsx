@@ -7,6 +7,7 @@ import CartNavLink from '../components/CartNavLink.jsx';
 import AccountNavLink from '../components/AccountNavLink.jsx';
 import AdminNavLink from '../components/AdminNavLink.jsx';
 import SiteStickyBar from '../components/SiteStickyBar.jsx';
+import { AdminSessionBanner } from '../components/AdminSessionIndicator.jsx';
 
 /** CMS pages that stay reachable via direct URL / in-page links but are hidden from header/footer nav. */
 const EXCLUDED_MAIN_NAV_PAGE_SLUGS = new Set(['heritage-quilts', 'modern-loft-quilts']);
@@ -86,6 +87,7 @@ export default function SiteLayout() {
           aria-label="Main navigation"
         />
       </header>
+      <AdminSessionBanner />
       {err && <p className="error">{err}</p>}
       {showHero ? <SiteHeroBanner /> : null}
       <Outlet />
