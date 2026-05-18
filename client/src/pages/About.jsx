@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { QUILT_MISTY_IMAGE, QUILT_STUDIO_IMAGE } from '../lib/quiltAssets.js';
 
 const TESTIMONIALS = [
   {
@@ -73,16 +74,16 @@ export default function About() {
           </p>
         </div>
         <img
-          src="https://picsum.photos/seed/bear-river-owner-studio/1200/900"
-          alt="Bear River Quilting studio with handmade quilt materials"
+          src={QUILT_STUDIO_IMAGE}
+          alt="Handmade quilt displayed in a cozy studio setting"
           loading="lazy"
         />
       </section>
 
       <section className="owner-bio">
         <img
-          src="https://picsum.photos/seed/bear-river-owner-portrait/900/1000"
-          alt="Owner portrait in quilting workshop"
+          src={QUILT_MISTY_IMAGE}
+          alt="Misty quilt pattern in soft blue and cream tones"
           loading="lazy"
         />
         <div>

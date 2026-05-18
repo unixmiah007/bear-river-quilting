@@ -119,7 +119,7 @@ VALUES
     249.00,
     0,
     'small',
-    'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1200&q=80',
+    '/assets/improv-quilting-tutorial.jpg',
     1
   ),
   (
@@ -130,7 +130,7 @@ VALUES
     219.00,
     0,
     'x-large',
-    'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1200&q=80',
+    '/assets/improv-quilt-basting.png',
     1
   ),
   (
@@ -141,7 +141,7 @@ VALUES
     189.00,
     0,
     'xx-large',
-    'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
+    '/assets/improv-quilting-tutorial-010.jpg',
     1
   ),
   (
@@ -152,7 +152,7 @@ VALUES
     205.00,
     0,
     'xxx-large',
-    'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80',
+    '/assets/improv-quilting-tutorial-020.jpg',
     1
   )
 ON DUPLICATE KEY UPDATE

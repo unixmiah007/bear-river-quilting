@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { publicApi } from '../api.js';
+import {
+  IMPROV_QUILT_BASTING_IMAGE,
+  IMPROV_QUILTING_010_IMAGE,
+  IMPROV_QUILTING_IMAGE,
+  QUILT_CRAFT_DETAIL_IMAGE,
+  SEWING_MACHINE_IMAGE,
+} from '../lib/quiltAssets.js';
 import ProductImage from '../components/ProductImage.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
@@ -117,20 +124,20 @@ export default function Home() {
           </div>
           <div className="hero-mosaic">
             <img
-              src="https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1200&q=80"
+              src={IMPROV_QUILTING_IMAGE}
               alt="Handmade quilt folded in soft warm tones"
               loading="eager"
               fetchPriority="high"
               decoding="async"
             />
             <img
-              src="https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1200&q=80"
+              src={IMPROV_QUILT_BASTING_IMAGE}
               alt="Quilted bed styling in modern neutral palette"
               loading="lazy"
               decoding="async"
             />
             <img
-              src="https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80"
+              src={IMPROV_QUILTING_010_IMAGE}
               alt="Close-up texture of handcrafted quilt stitching"
               loading="lazy"
               decoding="async"
@@ -142,8 +149,8 @@ export default function Home() {
       <section className="story-grid">
         <article className="story-card">
           <img
-            src="https://picsum.photos/seed/bear-river-story-1/1400/900"
-            alt="Layered heritage quilts in warm tones"
+            src={SEWING_MACHINE_IMAGE}
+            alt="Vintage sewing machine used for quilt craftsmanship"
             loading="lazy"
           />
           <div>
@@ -156,8 +163,8 @@ export default function Home() {
         </article>
         <article className="story-card">
           <img
-            src="https://picsum.photos/seed/bear-river-story-2/1400/900"
-            alt="Neutral modern quilt set on a styled bed"
+            src={QUILT_CRAFT_DETAIL_IMAGE}
+            alt="Handcrafted quilt detail showing stitch and fabric work"
             loading="lazy"
           />
           <div>

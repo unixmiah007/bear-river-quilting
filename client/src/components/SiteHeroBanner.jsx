@@ -1,34 +1,32 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  IMPROV_QUILT_BASTING_IMAGE,
+  IMPROV_QUILTING_010_IMAGE,
+  IMPROV_QUILTING_020_IMAGE,
+  IMPROV_QUILTING_IMAGE,
+} from '../lib/quiltAssets.js';
 
-/** Quilt / bedding photography (Unsplash), aligned with storefront product imagery. */
+/** Quilt / bedding photography, aligned with storefront product imagery. */
 const HERO_PANELS = [
   {
-    primary:
-      'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1200&q=80',
-    fallback:
-      'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80',
+    primary: IMPROV_QUILTING_IMAGE,
+    fallback: IMPROV_QUILTING_020_IMAGE,
     alt: 'Patchwork quilt in warm amber and cream tones',
   },
   {
-    primary:
-      'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1200&q=80',
-    fallback:
-      'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=1200&q=80',
+    primary: IMPROV_QUILT_BASTING_IMAGE,
+    fallback: IMPROV_QUILTING_IMAGE,
     alt: 'Hand-stitched quilt in soft sage and neutral layers',
   },
   {
-    primary:
-      'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
-    fallback:
-      'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1200&q=80',
+    primary: IMPROV_QUILTING_010_IMAGE,
+    fallback: IMPROV_QUILT_BASTING_IMAGE,
     alt: 'Quilt draped on a bed in a calm, modern bedroom',
   },
   {
-    primary:
-      'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=80',
-    fallback:
-      'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
+    primary: IMPROV_QUILTING_020_IMAGE,
+    fallback: IMPROV_QUILTING_010_IMAGE,
     alt: 'Sunlit bedroom with layered bedding and neutral tones',
   },
 ];

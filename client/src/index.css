@@ -65,9 +65,11 @@ button {
   margin-right: calc(50% - 50vw);
   margin-bottom: 2.25rem;
   overflow: hidden;
-  background: #0a0a0a;
+  background: #ffffff;
   position: relative;
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
 }
 
 .site-hero__grid {
@@ -90,15 +92,15 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  background: linear-gradient(145deg, #0a0a0a 0%, #171717 42%, #101010 100%);
-  color: #fafafa;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: #ffffff;
+  color: #111111;
+  border-right: 1px solid var(--border);
 }
 
 @media (max-width: 900px) {
   .site-hero__copy {
     border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid var(--border);
     padding: 1.75rem 1.25rem;
   }
 }
@@ -108,7 +110,7 @@ button {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.22em;
-  color: rgba(255, 255, 255, 0.52);
+  color: var(--muted);
   margin: 0 0 0.65rem;
 }
 
@@ -119,13 +121,13 @@ button {
   letter-spacing: -0.03em;
   line-height: 1.12;
   margin: 0 0 0.85rem;
-  color: #fff;
+  color: #111111;
 }
 
 .site-hero__lead {
   margin: 0 0 1.35rem;
   font-size: 0.95rem;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
   line-height: 1.55;
   max-width: 34em;
 }
@@ -150,7 +152,7 @@ button {
   font-size: 0.75rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.32);
+  color: #9ca3af;
   padding-top: 0.15rem;
   min-width: 1.4rem;
 }
@@ -159,7 +161,7 @@ button {
   display: block;
   font-weight: 600;
   font-size: 0.88rem;
-  color: #fff;
+  color: #111111;
   margin-bottom: 0.2rem;
   letter-spacing: 0.02em;
 }
@@ -167,7 +169,7 @@ button {
 .site-hero__step-text {
   display: block;
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.58);
+  color: var(--muted);
   line-height: 1.45;
 }
 
@@ -178,22 +180,22 @@ button {
 }
 
 .site-hero__btn--ghost {
-  background: transparent;
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.45);
+  background: #ffffff;
+  color: #111111;
+  border-color: var(--border);
 }
 
 .site-hero__btn--ghost:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.85);
-  color: #fff;
+  background: #f9fafb;
+  border-color: #111111;
+  color: #111111;
   text-decoration: none;
 }
 
 .site-hero__visual {
   position: relative;
   min-height: 220px;
-  background: #050505;
+  background: #ffffff;
 }
 
 .site-hero__collage {
