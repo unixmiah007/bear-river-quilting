@@ -15,7 +15,7 @@ function pagesForMainNav(data) {
   return rows.filter((p) => p?.slug && !EXCLUDED_MAIN_NAV_PAGE_SLUGS.has(p.slug));
 }
 
-function SiteNav({ className, pages, 'aria-label': ariaLabel }) {
+function SiteNav({ className, pages, showLegalLinks = false, 'aria-label': ariaLabel }) {
   return (
     <nav className={className} aria-label={ariaLabel}>
       <NavLink to="/" end>
@@ -23,6 +23,12 @@ function SiteNav({ className, pages, 'aria-label': ariaLabel }) {
       </NavLink>
       <NavLink to="/about">About Us</NavLink>
       <NavLink to="/products">Products</NavLink>
+      {showLegalLinks ? (
+        <>
+          <NavLink to="/privacy-policy">Privacy Policy</NavLink>
+          <NavLink to="/return-policy">Return Policy</NavLink>
+        </>
+      ) : null}
       <CartNavLink />
       <AccountNavLink />
       {pages.map((p) => (
@@ -86,6 +92,7 @@ export default function SiteLayout() {
         <SiteNav
           className="nav site-footer-nav"
           pages={pages}
+          showLegalLinks
           aria-label="Footer navigation"
         />
       </footer>
