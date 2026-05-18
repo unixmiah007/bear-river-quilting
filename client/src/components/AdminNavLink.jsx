@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAdminSession } from '../hooks/useAdminSession.js';
 import AdminIcon from './AdminIcon.jsx';
 
-export default function AdminNavLink() {
+export default function AdminNavLink({ onNavigate }) {
   const { pathname } = useLocation();
   const { isAdmin } = useAdminSession();
   const active = pathname.startsWith('/admin') && pathname !== '/admin/login';
@@ -10,6 +10,7 @@ export default function AdminNavLink() {
   return (
     <NavLink
       to="/admin/pages"
+      onClick={onNavigate}
       className={() =>
         `nav-link-admin${active ? ' nav-link-admin--active' : ''}${isAdmin ? ' nav-link-admin--signed-in' : ''}`
       }

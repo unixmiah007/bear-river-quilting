@@ -2,12 +2,13 @@ import { NavLink } from 'react-router-dom';
 import CartIcon from './CartIcon.jsx';
 import { useCart } from '../context/CartContext.jsx';
 
-export default function CartNavLink() {
+export default function CartNavLink({ onNavigate }) {
   const { itemCount } = useCart();
 
   return (
     <NavLink
       to="/cart"
+      onClick={onNavigate}
       className={({ isActive }) => `nav-link-cart${isActive ? ' nav-link-cart--active' : ''}`}
       aria-label={itemCount === 0 ? 'Shopping cart, empty' : `Shopping cart, ${itemCount} items`}
       title="Cart"

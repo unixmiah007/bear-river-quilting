@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom';
 import AccountIcon from './AccountIcon.jsx';
 
-export default function AccountNavLink() {
+export default function AccountNavLink({ onNavigate }) {
   return (
     <NavLink
       to="/account"
+      onClick={onNavigate}
       className={({ isActive }) =>
         `nav-link-account${isActive ? ' nav-link-account--active' : ''}`
       }
