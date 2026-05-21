@@ -39,7 +39,11 @@ export const publicApi = {
   listProducts: () => apiJsonArray('/api/products'),
   bestSellers: () => apiJsonArray('/api/products/best-sellers'),
   productById: (id) => api(`/api/products/${encodeURIComponent(id)}`),
-  createOrder: (body) => api('/api/orders', { method: 'POST', body: JSON.stringify(body) }),
+  stripeConfig: () => api('/api/config/stripe'),
+  createStripeCheckoutSession: (body) =>
+    api('/api/checkout/stripe-session', { method: 'POST', body: JSON.stringify(body) }),
+  confirmStripeCheckout: (sessionId) =>
+    api(`/api/checkout/confirm?session_id=${encodeURIComponent(sessionId)}`),
   customerOrdersLookup: (body) =>
     api('/api/customer/orders', { method: 'POST', body: JSON.stringify(body) }),
 };

@@ -17,6 +17,13 @@ import { seedDemoProducts } from './lib/seedDemoProducts.js';
 import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './lib/mail.js';
 import { verifySendGridIfConfigured } from './lib/sendgridMail.js';
 import { normalizeProductSize } from './lib/productSize.js';
+import { ensureStripeOrderColumns } from './lib/ensureStripeOrderColumns.js';
+import {
+  createStripeCheckoutSession,
+  fulfillOrderFromStripeSession,
+  getStripePublishableKey,
+  handleStripeWebhook,
+} from './lib/stripeCheckout.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameRoot = path.dirname(__filename);
@@ -36,6 +43,19 @@ app.use(
     credentials: true,
   })
 );
+
+app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  const signature = req.headers['stripe-signature'];
+  if (!signature) {
+    return res.status(400).send('Missing Stripe-Signature header');
+  }
+  const result = await handleStripeWebhook(req.body, signature);
+  if (!result.ok) {
+    return res.status(result.status ?? 400).json({ error: result.error });
+  }
+  res.json({ received: true });
+});
+
 app.use(express.json({ limit: '8mb' }));
 app.use(cookieParser());
 app.use('/uploads', express.static(UPLOAD_ROOT));
@@ -72,10 +92,6 @@ function slugify(input) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
-}
-
-function orderNumber() {
-  return `Q${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 900 + 100)}`;
 }
 
 function isMissingProductColumnError(e) {
@@ -306,172 +322,49 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-app.post('/api/orders', async (req, res) => {
-  const conn = await pool.getConnection();
-  try {
-    const { customer, shipping, billing, payment, items } = req.body ?? {};
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: 'Cart is empty' });
-    }
-    if (!customer?.name || !customer?.email) {
-      return res.status(400).json({ error: 'Customer name and email are required' });
-    }
-    if (!shipping?.address1 || !shipping?.city || !shipping?.state || !shipping?.postalCode || !shipping?.country) {
-      return res.status(400).json({ error: 'Complete shipping address is required' });
-    }
-    if (
-      !billing?.name ||
-      !billing?.address1 ||
-      !billing?.city ||
-      !billing?.state ||
-      !billing?.postalCode ||
-      !billing?.country
-    ) {
-      return res.status(400).json({ error: 'Complete billing address is required' });
-    }
-    const cardDigits = String(payment?.cardNumber ?? '').replace(/\D/g, '');
-    if (cardDigits.length < 12) {
-      return res.status(400).json({ error: 'Valid card number is required' });
-    }
-
-    const productIds = items.map((it) => Number(it.productId)).filter(Boolean);
-    if (productIds.length === 0) {
-      return res.status(400).json({ error: 'Invalid cart items' });
-    }
-
-    const [products] = await conn.query(
-      `SELECT id, name, price FROM products WHERE is_published = 1 AND id IN (${productIds
-        .map(() => '?')
-        .join(',')})`,
-      productIds
-    );
-    const productMap = new Map(products.map((p) => [p.id, p]));
-
-    const normalizedItems = [];
-    for (const raw of items) {
-      const productId = Number(raw.productId);
-      const quantity = Math.max(1, Math.min(99, Number(raw.quantity) || 1));
-      const product = productMap.get(productId);
-      if (!product) continue;
-      normalizedItems.push({
-        productId,
-        productName: product.name,
-        unitPrice: Number(product.price),
-        quantity,
-        lineTotal: Number(product.price) * quantity,
-      });
-    }
-    if (normalizedItems.length === 0) {
-      return res.status(400).json({ error: 'No purchasable products found in cart' });
-    }
-
-    const subtotal = normalizedItems.reduce((sum, it) => sum + it.lineTotal, 0);
-    const shippingMethod = String(shipping?.method ?? 'standard');
-    const shippingCostMap = { standard: 9.99, express: 19.99, pickup: 0 };
-    const shippingCost = shippingCostMap[shippingMethod] ?? 9.99;
-    const taxAmount = Number((subtotal * 0.0825).toFixed(2));
-    const total = Number((subtotal + shippingCost + taxAmount).toFixed(2));
-    const ordNo = orderNumber();
-
-    await conn.beginTransaction();
-    const [orderInsert] = await conn.query(
-      `INSERT INTO orders (
-        order_number, status, customer_name, customer_email, customer_phone,
-        shipping_address1, shipping_address2, shipping_city, shipping_state, shipping_postal_code, shipping_country,
-        shipping_method, shipping_cost,
-        billing_name, billing_address1, billing_address2, billing_city, billing_state, billing_postal_code, billing_country,
-        card_last4, subtotal, tax_amount, total
-      ) VALUES (?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        ordNo,
-        customer.name,
-        customer.email,
-        customer.phone ?? null,
-        shipping.address1,
-        shipping.address2 ?? null,
-        shipping.city,
-        shipping.state,
-        shipping.postalCode,
-        shipping.country,
-        shippingMethod,
-        shippingCost.toFixed(2),
-        billing.name,
-        billing.address1,
-        billing.address2 ?? null,
-        billing.city,
-        billing.state,
-        billing.postalCode,
-        billing.country,
-        cardDigits.slice(-4),
-        subtotal.toFixed(2),
-        taxAmount.toFixed(2),
-        total.toFixed(2),
-      ]
-    );
-    const orderId = orderInsert.insertId;
-
-    for (const item of normalizedItems) {
-      await conn.query(
-        `INSERT INTO order_items (order_id, product_id, product_name, unit_price, quantity, line_total)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [orderId, item.productId, item.productName, item.unitPrice, item.quantity, item.lineTotal.toFixed(2)]
-      );
-    }
-    await conn.commit();
-
-    console.log('[mail] Sending order emails', { orderNumber: ordNo, customerEmail: customer.email });
-    const mailResults = await Promise.allSettled([
-      sendOrderConfirmationEmail({
-        to: customer.email,
-        orderNumber: ordNo,
-        customerName: customer.name,
-        total,
-        items: normalizedItems,
-      }),
-      sendOrderStaffNotificationEmail({
-        orderNumber: ordNo,
-        customerName: customer.name,
-        customerEmail: customer.email,
-        customerPhone: customer.phone ?? null,
-        total,
-        items: normalizedItems,
-        shipping,
-        shippingMethod,
-        shippingCost,
-      }),
-    ]);
-    const [cust, staff] = mailResults;
-    if (cust.status === 'fulfilled') {
-      console.log('[mail] Customer confirmation finished', ordNo);
-    } else {
-      console.error('[mail] Customer confirmation failed:', cust.reason?.message ?? cust.reason);
-    }
-    if (staff.status === 'fulfilled') {
-      console.log('[mail] Staff notifications finished', ordNo);
-    } else {
-      console.error('[mail] Staff notification failed:', staff.reason?.message ?? staff.reason);
-    }
-
-    res.status(201).json({
-      ok: true,
-      orderId,
-      orderNumber: ordNo,
-      mail: {
-        customerOk: cust.status === 'fulfilled',
-        staffOk: staff.status === 'fulfilled',
-      },
-    });
-  } catch (e) {
-    try {
-      await conn.rollback();
-    } catch {
-      /* ignore */
-    }
-    console.error(e);
-    res.status(500).json({ error: 'Failed to create order' });
-  } finally {
-    conn.release();
+app.get('/api/config/stripe', (_req, res) => {
+  const publishableKey = getStripePublishableKey();
+  if (!publishableKey) {
+    return res.status(503).json({ error: 'Stripe is not configured' });
   }
+  res.json({ publishableKey });
+});
+
+app.post('/api/checkout/stripe-session', async (req, res) => {
+  const result = await createStripeCheckoutSession(req.body);
+  if (!result.ok) {
+    return res.status(result.status ?? 500).json({ error: result.error });
+  }
+  res.json({
+    url: result.url,
+    sessionId: result.sessionId,
+    orderNumber: result.orderNumber,
+  });
+});
+
+app.get('/api/checkout/confirm', async (req, res) => {
+  const sessionId = String(req.query.session_id ?? '').trim();
+  if (!sessionId) {
+    return res.status(400).json({ error: 'session_id is required' });
+  }
+  const result = await fulfillOrderFromStripeSession(sessionId);
+  if (!result.ok) {
+    return res.status(result.status ?? 500).json({ error: result.error });
+  }
+  res.json({
+    ok: true,
+    orderNumber: result.orderNumber,
+    customerEmail: result.customerEmail,
+    mail: result.mail,
+    alreadyFulfilled: !!result.alreadyFulfilled,
+  });
+});
+
+/** Legacy direct order API — payments now go through Stripe Checkout. */
+app.post('/api/orders', async (req, res) => {
+  res.status(410).json({
+    error: 'Card payments on this site use Stripe Checkout. Complete payment from the cart.',
+  });
 });
 
 function normalizeCustomerEmail(email) {
@@ -1160,7 +1053,14 @@ async function startServer() {
   } catch (e) {
     console.error('[ensureProductSizeColumn]', e?.message || e);
   }
+  try {
+    await ensureStripeOrderColumns(pool);
+  } catch (e) {
+    console.error('[ensureStripeOrderColumns]', e?.message || e);
+  }
   app.listen(PORT, async () => {
+    const stripeOk = !!process.env.STRIPE_SECRET_KEY;
+    console.log(`[stripe] ${stripeOk ? 'configured (test/live per secret key)' : 'not configured — set STRIPE_SECRET_KEY'}`);
     console.log(`API listening on http://localhost:${PORT}`);
     await verifySendGridIfConfigured();
   });

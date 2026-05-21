@@ -5,6 +5,7 @@ import DynamicPage from './pages/DynamicPage.jsx';
 import Products from './pages/Products.jsx';
 import ProductDetail from './pages/ProductDetail.jsx';
 import Cart from './pages/Cart.jsx';
+import CheckoutSuccess from './pages/CheckoutSuccess.jsx';
 import Account from './pages/Account.jsx';
 import About from './pages/About.jsx';
 import PrivacyPolicy from './pages/PrivacyPolicy.jsx';
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/products" element={<Products />} />
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/cart" element={<Cart />} />
+        <Route path="/checkout/success" element={<CheckoutSuccess />} />
         <Route path="/account" element={<Account />} />
         <Route path="/p/:slug" element={<DynamicPage />} />
       </Route>

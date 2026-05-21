@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import { useCart } from '../context/CartContext.jsx';
 import ProductImage from '../components/ProductImage.jsx';
@@ -12,8 +12,8 @@ function formatPrice(n) {
 }
 
 export default function Cart() {
-  const navigate = useNavigate();
-  const { items, updateQty, removeItem, clearCart, total } = useCart();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { items, updateQty, removeItem, total } = useCart();
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState(1);
@@ -39,15 +39,21 @@ export default function Cart() {
     billingState: '',
     billingPostalCode: '',
     billingCountry: 'USA',
-    cardNumber: '',
-    expiry: '',
-    cvc: '',
   });
 
   const shippingCosts = { standard: 9.99, express: 19.99, pickup: 0 };
   const shippingCost = shippingCosts[form.shippingMethod] ?? 9.99;
   const taxAmount = Number((total * 0.0825).toFixed(2));
   const grandTotal = Number((total + shippingCost + taxAmount).toFixed(2));
+
+  useEffect(() => {
+    if (searchParams.get('checkout') !== 'cancelled') return;
+    setError('Payment was cancelled. Your cart is unchanged — you can try again when ready.');
+    setStep(4);
+    const next = new URLSearchParams(searchParams);
+    next.delete('checkout');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!billingSameAsShipping) return;
@@ -120,7 +126,7 @@ export default function Cart() {
     }
   }
 
-  async function placeOrder(e) {
+  async function payWithStripe(e) {
     e.preventDefault();
     if (items.length === 0) {
       setError('Your cart is empty.');
@@ -153,22 +159,15 @@ export default function Cart() {
           postalCode: form.billingPostalCode,
           country: form.billingCountry,
         },
-        payment: { cardNumber: form.cardNumber, expiry: form.expiry, cvc: form.cvc },
         items: items.map((it) => ({ productId: it.productId, quantity: it.quantity })),
       };
-      const result = await publicApi.createOrder(payload);
-      const placedEmail = form.contactEmail;
-      const placedOrderNo = result.orderNumber;
-      clearCart();
-      setStep(1);
-      setForm((f) => ({ ...f, cardNumber: '', expiry: '', cvc: '' }));
-      navigate('/account', {
-        replace: true,
-        state: { placed: true, email: placedEmail, orderNumber: placedOrderNo },
-      });
+      const result = await publicApi.createStripeCheckoutSession(payload);
+      if (!result?.url) {
+        throw new Error('Stripe checkout URL was not returned');
+      }
+      window.location.assign(result.url);
     } catch (err) {
       setError(err.body?.error || err.message);
-    } finally {
       setBusy(false);
     }
   }
@@ -285,7 +284,7 @@ export default function Cart() {
           </span>
         ))}
       </div>
-      <form className="form" onSubmit={placeOrder}>
+      <form className="form" onSubmit={payWithStripe}>
         {step === 1 ? (
           <>
             <div className="field">
@@ -479,35 +478,11 @@ export default function Cart() {
         ) : null}
         {step === 4 ? (
           <>
-            <div className="field">
-              <label htmlFor="cn">Card number</label>
-              <input
-                id="cn"
-                value={form.cardNumber}
-                onChange={(e) => setForm({ ...form, cardNumber: e.target.value })}
-                required
-              />
-            </div>
-            <div className="row">
-              <div className="field" style={{ flex: 1 }}>
-                <label htmlFor="ex">Expiry (MM/YY)</label>
-                <input
-                  id="ex"
-                  value={form.expiry}
-                  onChange={(e) => setForm({ ...form, expiry: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="field" style={{ flex: 1 }}>
-                <label htmlFor="cv">CVC</label>
-                <input
-                  id="cv"
-                  value={form.cvc}
-                  onChange={(e) => setForm({ ...form, cvc: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
+            <p className="page-body">
+              You will be redirected to Stripe&apos;s secure checkout to pay{' '}
+              <strong>{formatPrice(grandTotal)}</strong>. Test cards work in sandbox mode (for example{' '}
+              <code>4242 4242 4242 4242</code>).
+            </p>
           </>
         ) : null}
         <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -525,7 +500,7 @@ export default function Cart() {
             </button>
           ) : (
             <button type="submit" className="btn btn-primary" disabled={busy || items.length === 0}>
-              {busy ? 'Placing order...' : 'Place order'}
+              {busy ? 'Redirecting to Stripe…' : 'Pay with Stripe'}
             </button>
           )}
         </div>
