@@ -1422,6 +1422,32 @@ h2 {
   letter-spacing: -0.01em;
 }
 
+.testimonial__quote {
+  animation: testimonial-fade-in 0.45s ease;
+}
+
+.testimonial__author {
+  animation: testimonial-fade-in 0.45s ease 0.05s both;
+}
+
+@keyframes testimonial-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .testimonial__quote,
+  .testimonial__author {
+    animation: none;
+  }
+}
+
 .about-hero {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;

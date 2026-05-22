@@ -11,6 +11,7 @@ import {
 import ProductImage from '../components/ProductImage.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
+import { HOME_TESTIMONIALS } from '../lib/homeTestimonials.js';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -25,6 +26,7 @@ export default function Home() {
   const [bestSellers, setBestSellers] = useState([]);
   const [loadingBest, setLoadingBest] = useState(true);
   const [bestStartIndex, setBestStartIndex] = useState(0);
+  const [testimonialIndex, setTestimonialIndex] = useState(0);
   const { addItem } = useCart();
   const navigate = useNavigate();
 
@@ -100,6 +102,15 @@ export default function Home() {
   }, [carouselProducts, startIndex]);
 
   const hasFeatured = visibleFeatured.length > 0;
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTestimonialIndex((i) => (i + 1) % HOME_TESTIMONIALS.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const activeTestimonial = HOME_TESTIMONIALS[testimonialIndex];
 
   return (
     <>
@@ -317,13 +328,12 @@ export default function Home() {
         </article>
       </section>
 
-      <section className="testimonial">
+      <section className="testimonial" aria-live="polite" aria-atomic="true">
         <p className="eyebrow">Customer Love</p>
-        <blockquote>
-          “Our bedroom finally looks finished. The quilt feels luxe, breathable, and somehow even
-          better after every wash.”
+        <blockquote key={testimonialIndex} className="testimonial__quote">
+          “{activeTestimonial.quote}”
         </blockquote>
-        <p className="muted">— Maya R., verified buyer</p>
+        <p className="muted testimonial__author">— {activeTestimonial.author}</p>
       </section>
     </>
   );
