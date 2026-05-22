@@ -44,20 +44,22 @@ export default function SiteLayout() {
   }, []);
 
   return (
-    <div className="layout layout--with-sticky-bar">
-      <SiteHeader pages={pages} />
-      <AdminSessionBanner />
-      {err && <p className="error">{err}</p>}
-      {showHero ? <SiteHeroBanner /> : null}
-      <Outlet />
-      <footer className="site-footer">
-        <SiteNav
-          className="nav site-footer-nav"
-          pages={pages}
-          showLegalLinks
-          aria-label="Footer navigation"
-        />
-      </footer>
+    <div className="site-shell">
+      <div className="layout">
+        <SiteHeader pages={pages} />
+        <AdminSessionBanner />
+        {err && <p className="error">{err}</p>}
+        {showHero ? <SiteHeroBanner /> : null}
+        <Outlet />
+        <footer className="site-footer">
+          <SiteNav
+            className="nav site-footer-nav"
+            pages={pages}
+            showLegalLinks
+            aria-label="Footer navigation"
+          />
+        </footer>
+      </div>
       <SiteStickyBar />
     </div>
   );

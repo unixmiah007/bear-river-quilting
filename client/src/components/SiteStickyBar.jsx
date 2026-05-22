@@ -14,7 +14,7 @@ export default function SiteStickyBar() {
   const year = new Date().getFullYear();
 
   return (
-    <aside className="site-sticky-bar" aria-label="Site information and customer care hours">
+    <aside className="site-sticky-bar" aria-label="Contact and customer care hours">
       <div className="site-sticky-bar__inner">
         <div className="site-sticky-bar__top">
           <p className="site-sticky-bar__copyright">
