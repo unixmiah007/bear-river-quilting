@@ -23,6 +23,9 @@ import {
   createCustomQuiltRequest,
   listCustomQuiltRequestsForAdmin,
 } from './lib/customQuiltRequest.js';
+import { ensureOrderTrackingColumns } from './lib/ensureOrderTrackingColumns.js';
+import { sendOrderTrackingNotification } from './lib/orderTracking.js';
+import { SHIPPING_CARRIERS } from './lib/shippingCarriers.js';
 import {
   createStripeCheckoutSession,
   fulfillOrderFromStripeSession,
@@ -960,7 +963,8 @@ app.get('/api/admin/orders/:id', authMiddleware, async (req, res) => {
               shipping_address1, shipping_address2, shipping_city, shipping_state, shipping_postal_code, shipping_country,
               shipping_method, shipping_cost,
               billing_name, billing_address1, billing_address2, billing_city, billing_state, billing_postal_code, billing_country,
-              card_last4, subtotal, tax_amount, total, created_at
+              card_last4, subtotal, tax_amount, total, created_at,
+              tracking_carrier, tracking_number, tracking_notified_at
        FROM orders WHERE id = ?`,
       [id]
     );
@@ -974,6 +978,34 @@ app.get('/api/admin/orders/:id', authMiddleware, async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to load order details' });
+  }
+});
+
+app.get('/api/admin/shipping-carriers', authMiddleware, (_req, res) => {
+  res.json(SHIPPING_CARRIERS.map(({ id, label }) => ({ id, label })));
+});
+
+app.post('/api/admin/orders/:id/tracking', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const result = await sendOrderTrackingNotification(id, {
+      carrier: req.body?.carrier,
+      trackingNumber: req.body?.trackingNumber,
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 500).json({ error: result.error });
+    }
+    res.json({
+      ok: true,
+      orderNumber: result.orderNumber,
+      carrier: result.carrier,
+      trackingNumber: result.trackingNumber,
+      trackingUrl: result.trackingUrl,
+      status: result.status,
+    });
+  } catch (e) {
+    console.error('[tracking] notify failed:', e);
+    res.status(500).json({ error: 'Failed to send tracking notification' });
   }
 });
 
@@ -1097,6 +1129,11 @@ async function startServer() {
     await ensureCustomQuiltRequestsTable(pool);
   } catch (e) {
     console.error('[ensureCustomQuiltRequestsTable]', e?.message || e);
+  }
+  try {
+    await ensureOrderTrackingColumns(pool);
+  } catch (e) {
+    console.error('[ensureOrderTrackingColumns]', e?.message || e);
   }
   app.listen(PORT, async () => {
     const stripeOk = !!process.env.STRIPE_SECRET_KEY;

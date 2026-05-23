@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../api.js';
+import { labelForCarrier, SHIPPING_CARRIER_OPTIONS } from '../lib/shippingCarriers.js';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -12,6 +13,9 @@ export default function AdminOrders() {
   const [selected, setSelected] = useState(null);
   const [details, setDetails] = useState(null);
   const [error, setError] = useState(null);
+  const [trackingMsg, setTrackingMsg] = useState(null);
+  const [trackingBusy, setTrackingBusy] = useState(false);
+  const [trackingForm, setTrackingForm] = useState({ carrier: 'usps', trackingNumber: '' });
 
   async function refresh() {
     setError(null);
@@ -25,11 +29,39 @@ export default function AdminOrders() {
 
   async function loadDetails(id) {
     setSelected(id);
+    setTrackingMsg(null);
     try {
       const data = await adminApi.orderById(id);
       setDetails(data);
+      setTrackingForm({
+        carrier: data.order.tracking_carrier || 'usps',
+        trackingNumber: data.order.tracking_number || '',
+      });
     } catch (e) {
       setError(e.body?.error || e.message);
+    }
+  }
+
+  async function sendTrackingEmail(e) {
+    e.preventDefault();
+    if (!details?.order?.id) return;
+    setTrackingBusy(true);
+    setTrackingMsg(null);
+    setError(null);
+    try {
+      const result = await adminApi.sendOrderTracking(details.order.id, {
+        carrier: trackingForm.carrier,
+        trackingNumber: trackingForm.trackingNumber.trim(),
+      });
+      setTrackingMsg(
+        `Tracking email sent to ${details.order.customer_email} (${result.carrier}: ${result.trackingNumber}).`
+      );
+      await refresh();
+      await loadDetails(details.order.id);
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setTrackingBusy(false);
     }
   }
 
@@ -98,6 +130,60 @@ export default function AdminOrders() {
             {details.order.billing_city}, {details.order.billing_state} {details.order.billing_postal_code},{' '}
             {details.order.billing_country} • Card ending {details.order.card_last4}
           </p>
+          {details.order.tracking_number ? (
+            <p className="muted" style={{ margin: '0.75rem 0 0' }}>
+              Last tracking: {labelForCarrier(details.order.tracking_carrier)} ·{' '}
+              <strong>{details.order.tracking_number}</strong>
+              {details.order.tracking_notified_at
+                ? ` · emailed ${new Date(details.order.tracking_notified_at).toLocaleString()}`
+                : null}
+            </p>
+          ) : null}
+
+          <form className="form admin-tracking-form" onSubmit={sendTrackingEmail}>
+            <h4 className="admin-tracking-form__title">Email customer tracking</h4>
+            <p className="muted admin-tracking-form__hint">
+              Sends a shipment notification to <strong>{details.order.customer_email}</strong>.
+              Orders marked <em>paid</em> are set to <em>fulfilled</em> when tracking is sent.
+            </p>
+            <div className="row admin-tracking-form__fields">
+              <div className="field" style={{ flex: 1, minWidth: '10rem' }}>
+                <label htmlFor="tracking-carrier">Shipper</label>
+                <select
+                  id="tracking-carrier"
+                  value={trackingForm.carrier}
+                  onChange={(e) =>
+                    setTrackingForm((f) => ({ ...f, carrier: e.target.value }))
+                  }
+                  required
+                >
+                  {SHIPPING_CARRIER_OPTIONS.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field" style={{ flex: 2, minWidth: '12rem' }}>
+                <label htmlFor="tracking-number">Tracking number</label>
+                <input
+                  id="tracking-number"
+                  value={trackingForm.trackingNumber}
+                  onChange={(e) =>
+                    setTrackingForm((f) => ({ ...f, trackingNumber: e.target.value }))
+                  }
+                  placeholder="e.g. 9400111899223344556677"
+                  required
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+            {trackingMsg ? <p className="page-body" style={{ color: '#065f46' }}>{trackingMsg}</p> : null}
+            <button type="submit" className="btn btn-primary" disabled={trackingBusy}>
+              {trackingBusy ? 'Sending…' : 'Email tracking to customer'}
+            </button>
+          </form>
+
           <div className="row">
             {['pending', 'paid', 'fulfilled', 'cancelled'].map((status) => (
               <button

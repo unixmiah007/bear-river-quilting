@@ -122,5 +122,10 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify({ status }),
     }),
+  sendOrderTracking: (id, body) =>
+    api(`/api/admin/orders/${id}/tracking`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   customQuiltRequests: () => apiJsonArray('/api/admin/custom-quilt-requests'),
 };
