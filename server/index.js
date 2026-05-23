@@ -417,7 +417,8 @@ app.post('/api/customer/orders', async (req, res) => {
                 shipping_address1, shipping_address2, shipping_city, shipping_state, shipping_postal_code, shipping_country,
                 shipping_method, shipping_cost,
                 billing_name, billing_address1, billing_address2, billing_city, billing_state, billing_postal_code, billing_country,
-                card_last4, subtotal, tax_amount, total, created_at
+                card_last4, subtotal, tax_amount, total, created_at,
+                tracking_carrier, tracking_number, tracking_notified_at
          FROM orders WHERE order_number = ? AND LOWER(TRIM(customer_email)) = ?`,
         [orderNumber, email]
       );
@@ -435,7 +436,8 @@ app.post('/api/customer/orders', async (req, res) => {
       return res.json({ mode: 'detail', order, items });
     }
     const [orders] = await pool.query(
-      `SELECT id, order_number, status, customer_name, total, created_at, card_last4, shipping_method
+      `SELECT id, order_number, status, customer_name, total, created_at, card_last4, shipping_method,
+              tracking_carrier, tracking_number
        FROM orders WHERE LOWER(TRIM(customer_email)) = ?
        ORDER BY created_at DESC`,
       [email]
@@ -1002,6 +1004,8 @@ app.post('/api/admin/orders/:id/tracking', authMiddleware, async (req, res) => {
       trackingNumber: result.trackingNumber,
       trackingUrl: result.trackingUrl,
       status: result.status,
+      emailSent: !!result.emailSent,
+      warning: result.warning ?? null,
     });
   } catch (e) {
     console.error('[tracking] notify failed:', e);

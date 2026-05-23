@@ -1,11 +1,31 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import CartIcon from '../components/CartIcon.jsx';
+import OrderTrackingDisplay from '../components/OrderTrackingDisplay.jsx';
 import { publicApi } from '../api.js';
+import { buildTrackingUrl, labelForCarrier } from '../lib/shippingCarriers.js';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
     Number(n)
+  );
+}
+
+function TrackingListCell({ carrier, trackingNumber }) {
+  const num = String(trackingNumber ?? '').trim();
+  if (!num) return <span className="muted">—</span>;
+  const url = buildTrackingUrl(carrier, num);
+  if (url) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        Track
+      </a>
+    );
+  }
+  return (
+    <span className="muted" title={num}>
+      {labelForCarrier(carrier)}
+    </span>
   );
 }
 
@@ -187,6 +207,7 @@ export default function Account() {
                     <th>Total</th>
                     <th>Placed</th>
                     <th>Card</th>
+                    <th>Tracking</th>
                     <th />
                   </tr>
                 </thead>
@@ -200,6 +221,12 @@ export default function Account() {
                       <td>{formatPrice(o.total)}</td>
                       <td className="muted">{new Date(o.created_at).toLocaleString()}</td>
                       <td className="muted">····{o.card_last4}</td>
+                      <td>
+                        <TrackingListCell
+                          carrier={o.tracking_carrier}
+                          trackingNumber={o.tracking_number}
+                        />
+                      </td>
                       <td>
                         <button type="button" className="btn" onClick={() => openOrder(o.order_number)}>
                           View details
@@ -252,6 +279,21 @@ export default function Account() {
             <br />
             {order.shipping_country}
           </p>
+
+          <h3 style={{ marginTop: '1.25rem', marginBottom: '0.35rem' }}>Shipment tracking</h3>
+          {order.tracking_number ? (
+            <OrderTrackingDisplay
+              carrier={order.tracking_carrier}
+              trackingNumber={order.tracking_number}
+              notifiedAt={order.tracking_notified_at}
+            />
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>
+              {order.status === 'fulfilled' || order.status === 'paid'
+                ? 'Tracking has not been added yet. Check back soon or contact customer care.'
+                : 'Tracking will appear here once your order ships.'}
+            </p>
+          )}
 
           <h3 style={{ marginTop: '1.25rem', marginBottom: '0.35rem' }}>Billing</h3>
           <p className="muted" style={{ margin: 0 }}>

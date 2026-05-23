@@ -53,9 +53,16 @@ export default function AdminOrders() {
         carrier: trackingForm.carrier,
         trackingNumber: trackingForm.trackingNumber.trim(),
       });
-      setTrackingMsg(
-        `Tracking email sent to ${details.order.customer_email} (${result.carrier}: ${result.trackingNumber}).`
-      );
+      if (result.emailSent) {
+        setTrackingMsg(
+          `Tracking saved and emailed to ${details.order.customer_email} (${result.carrier}: ${result.trackingNumber}).`
+        );
+      } else {
+        setTrackingMsg(
+          result.warning ||
+            `Tracking saved (${result.carrier}: ${result.trackingNumber}). Email was not sent — check SendGrid in server/.env.`
+        );
+      }
       await refresh();
       await loadDetails(details.order.id);
     } catch (err) {
@@ -143,8 +150,9 @@ export default function AdminOrders() {
           <form className="form admin-tracking-form" onSubmit={sendTrackingEmail}>
             <h4 className="admin-tracking-form__title">Email customer tracking</h4>
             <p className="muted admin-tracking-form__hint">
-              Sends a shipment notification to <strong>{details.order.customer_email}</strong>.
-              Orders marked <em>paid</em> are set to <em>fulfilled</em> when tracking is sent.
+              Saves tracking on the order (visible on <strong>/account</strong>) and emails{' '}
+              <strong>{details.order.customer_email}</strong> when SendGrid is configured. Orders
+              marked <em>paid</em> are set to <em>fulfilled</em>.
             </p>
             <div className="row admin-tracking-form__fields">
               <div className="field" style={{ flex: 1, minWidth: '10rem' }}>
@@ -180,7 +188,7 @@ export default function AdminOrders() {
             </div>
             {trackingMsg ? <p className="page-body" style={{ color: '#065f46' }}>{trackingMsg}</p> : null}
             <button type="submit" className="btn btn-primary" disabled={trackingBusy}>
-              {trackingBusy ? 'Sending…' : 'Email tracking to customer'}
+              {trackingBusy ? 'Saving…' : 'Save tracking & notify customer'}
             </button>
           </form>
 

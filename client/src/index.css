@@ -2237,6 +2237,11 @@ tr:last-child td {
   margin-bottom: 0.85rem;
 }
 
+.order-tracking__link {
+  font-weight: 600;
+  word-break: break-all;
+}
+
 .wizard-progress {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
