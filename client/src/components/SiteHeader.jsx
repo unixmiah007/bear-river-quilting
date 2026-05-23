@@ -36,6 +36,9 @@ export function SiteNav({
           <NavLink to="/types-of-quilting" {...linkProps}>
             Types of quilting
           </NavLink>
+          <NavLink to="/customize" {...linkProps}>
+            Customize
+          </NavLink>
         </>
       ) : null}
       <CartNavLink onNavigate={onNavigate} />

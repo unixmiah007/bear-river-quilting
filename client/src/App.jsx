@@ -11,12 +11,14 @@ import About from './pages/About.jsx';
 import PrivacyPolicy from './pages/PrivacyPolicy.jsx';
 import ReturnPolicy from './pages/ReturnPolicy.jsx';
 import TypesOfQuilting from './pages/TypesOfQuilting.jsx';
+import Customize from './pages/Customize.jsx';
 import AdminLayout from './layouts/AdminLayout.jsx';
 import AdminLogin from './pages/AdminLogin.jsx';
 import AdminPages from './pages/AdminPages.jsx';
 import AdminProducts from './pages/AdminProducts.jsx';
 import AdminPageProducts from './pages/AdminPageProducts.jsx';
 import AdminOrders from './pages/AdminOrders.jsx';
+import AdminCustomizeRequests from './pages/AdminCustomizeRequests.jsx';
 
 export default function App() {
   return (
@@ -27,6 +29,7 @@ export default function App() {
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/return-policy" element={<ReturnPolicy />} />
         <Route path="/types-of-quilting" element={<TypesOfQuilting />} />
+        <Route path="/customize" element={<Customize />} />
         <Route path="/products" element={<Products />} />
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/cart" element={<Cart />} />
@@ -40,6 +43,7 @@ export default function App() {
         <Route path="/admin/pages" element={<AdminPages />} />
         <Route path="/admin/products" element={<AdminProducts />} />
         <Route path="/admin/orders" element={<AdminOrders />} />
+        <Route path="/admin/customize-requests" element={<AdminCustomizeRequests />} />
         <Route path="/admin/pages/:id/products" element={<AdminPageProducts />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

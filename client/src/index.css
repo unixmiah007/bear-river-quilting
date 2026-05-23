@@ -2239,6 +2239,207 @@ tr:last-child td {
   color: var(--text);
 }
 
+.customize-page__header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.customize-wizard__progress {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 1.25rem;
+}
+
+.customize-step h2 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 400;
+  margin: 0 0 0.5rem;
+}
+
+.design-palette {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.design-palette__card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.design-palette__card:hover {
+  border-color: #9ca3af;
+}
+
+.design-palette__card--selected {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.12);
+}
+
+.design-palette__card img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+.design-palette__name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0 0.65rem;
+}
+
+.design-palette__desc {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  padding: 0 0.65rem;
+}
+
+.design-palette__price {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0 0.65rem 0.65rem;
+}
+
+.customize-choices {
+  margin-bottom: 1.75rem;
+}
+
+.customize-choices__heading {
+  margin: 0 0 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.customize-choices__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.75rem;
+}
+
+.customize-choices__card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.customize-choices__card:hover {
+  border-color: #9ca3af;
+}
+
+.customize-choices__card--selected {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.12);
+}
+
+.customize-choices__card img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+.customize-choices__label {
+  font-weight: 600;
+  font-size: 0.88rem;
+  padding: 0 0.55rem;
+  line-height: 1.25;
+}
+
+.customize-choices__hint {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  padding: 0 0.55rem 0.55rem;
+}
+
+.customize-review__design {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 1rem;
+  align-items: start;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.customize-review__design img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.customize-review__design h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.1rem;
+}
+
+.customize-review__dl {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.customize-review__dl > div {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.customize-review__dl dt {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.customize-review__dl dd {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.customize-review__fine {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
+.customize-form__nav {
+  margin-top: 1.5rem;
+  justify-content: space-between;
+}
+
 @media (max-width: 720px) {
   .admin-two-col {
     grid-template-columns: 1fr;
@@ -2271,6 +2472,19 @@ tr:last-child td {
 
   .wizard-progress {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .customize-wizard__progress {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .customize-review__design {
+    grid-template-columns: 1fr;
+  }
+
+  .customize-review__dl > div {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
   }
 
   .featured-carousel-grid {

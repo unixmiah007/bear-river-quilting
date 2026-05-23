@@ -60,6 +60,12 @@ export default function AdminLayout() {
             >
               Orders
             </NavLink>
+            <NavLink
+              className={({ isActive }) => `pill${isActive ? ' active' : ''}`}
+              to="/admin/customize-requests"
+            >
+              Customize
+            </NavLink>
           </nav>
           <button type="button" className="btn" onClick={signOut}>
             Sign out

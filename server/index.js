@@ -18,6 +18,11 @@ import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './l
 import { verifySendGridIfConfigured } from './lib/sendgridMail.js';
 import { normalizeProductSize } from './lib/productSize.js';
 import { ensureStripeOrderColumns } from './lib/ensureStripeOrderColumns.js';
+import { ensureCustomQuiltRequestsTable } from './lib/ensureCustomQuiltRequestsTable.js';
+import {
+  createCustomQuiltRequest,
+  listCustomQuiltRequestsForAdmin,
+} from './lib/customQuiltRequest.js';
 import {
   createStripeCheckoutSession,
   fulfillOrderFromStripeSession,
@@ -358,6 +363,24 @@ app.get('/api/checkout/confirm', async (req, res) => {
     mail: result.mail,
     alreadyFulfilled: !!result.alreadyFulfilled,
   });
+});
+
+app.post('/api/custom-quilt-requests', async (req, res) => {
+  try {
+    const result = await createCustomQuiltRequest(req.body);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.status(201).json({
+      ok: true,
+      requestNumber: result.requestNumber,
+      requestId: result.requestId,
+      mail: result.mail,
+    });
+  } catch (e) {
+    console.error('[custom-quilt] create failed:', e);
+    res.status(500).json({ error: 'Failed to submit custom quilt request' });
+  }
 });
 
 /** Legacy direct order API — payments now go through Stripe Checkout. */
@@ -901,6 +924,18 @@ app.put('/api/admin/pages/:id/products', authMiddleware, async (req, res) => {
   }
 });
 
+// --- Admin: custom quilt requests ---
+
+app.get('/api/admin/custom-quilt-requests', authMiddleware, async (_req, res) => {
+  try {
+    const rows = await listCustomQuiltRequestsForAdmin();
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to list custom quilt requests' });
+  }
+});
+
 // --- Admin: orders ---
 
 app.get('/api/admin/orders', authMiddleware, async (_req, res) => {
@@ -1057,6 +1092,11 @@ async function startServer() {
     await ensureStripeOrderColumns(pool);
   } catch (e) {
     console.error('[ensureStripeOrderColumns]', e?.message || e);
+  }
+  try {
+    await ensureCustomQuiltRequestsTable(pool);
+  } catch (e) {
+    console.error('[ensureCustomQuiltRequestsTable]', e?.message || e);
   }
   app.listen(PORT, async () => {
     const stripeOk = !!process.env.STRIPE_SECRET_KEY;

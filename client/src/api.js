@@ -46,6 +46,8 @@ export const publicApi = {
     api(`/api/checkout/confirm?session_id=${encodeURIComponent(sessionId)}`),
   customerOrdersLookup: (body) =>
     api('/api/customer/orders', { method: 'POST', body: JSON.stringify(body) }),
+  submitCustomQuiltRequest: (body) =>
+    api('/api/custom-quilt-requests', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export const authApi = {
@@ -120,4 +122,5 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify({ status }),
     }),
+  customQuiltRequests: () => apiJsonArray('/api/admin/custom-quilt-requests'),
 };
