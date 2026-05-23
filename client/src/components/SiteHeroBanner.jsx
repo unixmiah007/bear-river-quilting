@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import HomeHeroBackdrop from './HomeHeroBackdrop.jsx';
 import {
   IMPROV_QUILT_BASTING_IMAGE,
   IMPROV_QUILTING_010_IMAGE,
@@ -72,6 +73,7 @@ const STEPS = [
 export default function SiteHeroBanner() {
   return (
     <section className="site-hero" aria-labelledby="site-hero-heading">
+      <HomeHeroBackdrop variant="site" />
       <div className="site-hero__grid">
         <div className="site-hero__copy">
           <p className="site-hero__eyebrow">How it&apos;s made</p>

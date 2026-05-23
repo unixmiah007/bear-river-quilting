@@ -12,6 +12,7 @@ import ProductImage from '../components/ProductImage.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
 import { HOME_TESTIMONIALS } from '../lib/homeTestimonials.js';
+import HomeHeroBackdrop from '../components/HomeHeroBackdrop.jsx';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -114,8 +115,9 @@ export default function Home() {
 
   return (
     <>
-      <section className="hero">
-        <div className="hero-grid">
+      <section className="hero hero--quilt-bg">
+        <HomeHeroBackdrop variant="home" />
+        <div className="hero-grid hero__content">
           <div>
             <p className="eyebrow">New Season Drop</p>
             <h1>Quilts that feel handcrafted and modern</h1>

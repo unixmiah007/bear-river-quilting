@@ -5,6 +5,7 @@ import SiteHeroBanner from '../components/SiteHeroBanner.jsx';
 import SiteHeader, { SiteNav } from '../components/SiteHeader.jsx';
 import SiteStickyBar from '../components/SiteStickyBar.jsx';
 import { AdminSessionBanner } from '../components/AdminSessionIndicator.jsx';
+import { HomeHeroBackgroundProvider } from '../context/HomeHeroBackgroundContext.jsx';
 
 /** CMS pages that stay reachable via direct URL / in-page links but are hidden from header/footer nav. */
 const EXCLUDED_MAIN_NAV_PAGE_SLUGS = new Set(['heritage-quilts', 'modern-loft-quilts']);
@@ -19,6 +20,14 @@ export default function SiteLayout() {
   const [err, setErr] = useState(null);
   const { pathname } = useLocation();
   const showHero = pathname === '/';
+  const isHome = pathname === '/';
+
+  const mainContent = (
+    <>
+      {showHero ? <SiteHeroBanner /> : null}
+      <Outlet />
+    </>
+  );
 
   useEffect(() => {
     publicApi
@@ -49,8 +58,11 @@ export default function SiteLayout() {
         <SiteHeader pages={pages} />
         <AdminSessionBanner />
         {err && <p className="error">{err}</p>}
-        {showHero ? <SiteHeroBanner /> : null}
-        <Outlet />
+        {isHome ? (
+          <HomeHeroBackgroundProvider>{mainContent}</HomeHeroBackgroundProvider>
+        ) : (
+          mainContent
+        )}
         <footer className="site-footer">
           <SiteNav
             className="nav site-footer-nav"

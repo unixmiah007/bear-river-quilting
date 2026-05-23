@@ -33,6 +33,9 @@ export function SiteNav({
           <NavLink to="/return-policy" {...linkProps}>
             Return Policy
           </NavLink>
+          <NavLink to="/types-of-quilting" {...linkProps}>
+            Types of quilting
+          </NavLink>
         </>
       ) : null}
       <CartNavLink onNavigate={onNavigate} />

@@ -10,6 +10,7 @@ import Account from './pages/Account.jsx';
 import About from './pages/About.jsx';
 import PrivacyPolicy from './pages/PrivacyPolicy.jsx';
 import ReturnPolicy from './pages/ReturnPolicy.jsx';
+import TypesOfQuilting from './pages/TypesOfQuilting.jsx';
 import AdminLayout from './layouts/AdminLayout.jsx';
 import AdminLogin from './pages/AdminLogin.jsx';
 import AdminPages from './pages/AdminPages.jsx';
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/about" element={<About />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/return-policy" element={<ReturnPolicy />} />
+        <Route path="/types-of-quilting" element={<TypesOfQuilting />} />
         <Route path="/products" element={<Products />} />
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/cart" element={<Cart />} />
