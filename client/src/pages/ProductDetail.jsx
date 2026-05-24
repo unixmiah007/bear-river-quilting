@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import { useAdminSession } from '../hooks/useAdminSession.js';
 import ProductImage from '../components/ProductImage.jsx';
+import ProductImageLightbox from '../components/ProductImageLightbox.jsx';
 import CartIcon from '../components/CartIcon.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
@@ -48,6 +49,7 @@ export default function ProductDetail() {
   }, [product]);
 
   const [activeIdx, setActiveIdx] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   useEffect(() => {
     setActiveIdx(0);
@@ -72,6 +74,11 @@ export default function ProductDetail() {
   }
 
   const mainSrc = galleryUrls[activeIdx] ?? galleryUrls[0];
+  const canOpenLightbox = Boolean(mainSrc);
+
+  function openLightbox() {
+    if (canOpenLightbox) setLightboxOpen(true);
+  }
 
   return (
     <>
@@ -96,9 +103,15 @@ export default function ProductDetail() {
       </div>
       <section className="product-detail">
         <div className="product-detail-media">
-          <div className="product-gallery-main">
+          <button
+            type="button"
+            className="product-gallery-main product-gallery-main--zoomable"
+            onClick={openLightbox}
+            disabled={!canOpenLightbox}
+            aria-label={canOpenLightbox ? `View full size image for ${product.name}` : undefined}
+          >
             <ProductImage key={mainSrc || 'none'} src={mainSrc} alt={product.name} />
-          </div>
+          </button>
           {galleryUrls.length > 1 ? (
             <div className="product-gallery-thumbs" role="list">
               {galleryUrls.map((u, i) => (
@@ -151,6 +164,17 @@ export default function ProductDetail() {
           </div>
         </div>
       </section>
+      {lightboxOpen && mainSrc ? (
+        <ProductImageLightbox
+          src={mainSrc}
+          alt={product.name}
+          onClose={() => setLightboxOpen(false)}
+          hasPrev={activeIdx > 0}
+          hasNext={activeIdx < galleryUrls.length - 1}
+          onPrev={() => setActiveIdx((i) => Math.max(0, i - 1))}
+          onNext={() => setActiveIdx((i) => Math.min(galleryUrls.length - 1, i + 1))}
+        />
+      ) : null}
     </>
   );
 }
