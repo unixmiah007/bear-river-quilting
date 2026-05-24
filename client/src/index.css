@@ -1743,6 +1743,33 @@ h2 {
   gap: 0.65rem;
 }
 
+.admin-product-list-thumb {
+  width: 72px;
+  height: 54px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.admin-product-list-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  aspect-ratio: auto;
+}
+
+.admin-product-list-thumb .featured-no-image {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+  font-size: 0.62rem;
+  padding: 0.25rem;
+}
+
 .admin-gallery-thumb {
   position: relative;
   width: 88px;

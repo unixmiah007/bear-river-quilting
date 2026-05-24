@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { adminApi } from '../api.js';
+import ProductImage from '../components/ProductImage.jsx';
 import { PRODUCT_SIZE_OPTIONS } from '../lib/productSizes.js';
 
 const emptyForm = {
@@ -504,6 +505,7 @@ export default function AdminProducts() {
         <table>
           <thead>
             <tr>
+              <th scope="col">Image</th>
               <th>SKU</th>
               <th>Name</th>
               <th>Size</th>
@@ -516,7 +518,7 @@ export default function AdminProducts() {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7}>
+                <td colSpan={8}>
                   <p className="muted" style={{ marginBottom: '0.75rem' }}>
                     No products in the database yet. Use the button below to add the demo quilt
                     catalog (50 handmade placeholders, published), or run{' '}
@@ -536,6 +538,11 @@ export default function AdminProducts() {
             ) : (
               rows.map((p) => (
                 <tr key={p.id}>
+                  <td>
+                    <div className="admin-product-list-thumb">
+                      <ProductImage src={p.image_url} alt={p.name} />
+                    </div>
+                  </td>
                   <td className="muted">{p.sku || '—'}</td>
                   <td>{p.name}</td>
                   <td className="muted">
