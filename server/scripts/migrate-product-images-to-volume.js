@@ -24,7 +24,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import https from 'node:https';
 import http from 'node:http';
-import { fileURLToPath } from 'node:url';
 import mysql from 'mysql2/promise';
 
 // ---------------------------------------------------------------------------
@@ -35,9 +34,8 @@ const LIVE_SITE_URL =
   (process.env.LIVE_SITE_URL ?? 'https://bear-river-quilting-production-5ec2.up.railway.app')
     .replace(/\/$/, '');
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Resolve relative to the script so it works from any cwd.
-const UPLOAD_ROOT = path.resolve(__dirname, '..', 'uploads');
+// Use absolute path /app/server/uploads in production, or relative path for local dev
+const UPLOAD_ROOT = process.env.UPLOAD_ROOT || path.resolve(process.cwd(), 'server', 'uploads');
 
 function normalizedPassword(raw) {
   if (!raw || raw === 'your_password') return '';
