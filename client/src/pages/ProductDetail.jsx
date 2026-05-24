@@ -42,9 +42,18 @@ export default function ProductDetail() {
 
   const galleryUrls = useMemo(() => {
     if (!product) return [];
-    const fromGallery = (product.images || []).map((i) => i.url).filter(Boolean);
+    const toUploadUrl = (rawPath) => {
+      if (!rawPath) return null;
+      const filename = rawPath.split('/').pop();
+      if (!filename) return null;
+      return `/uploads/products/${product.id}/${filename}`;
+    };
+    const fromGallery = (product.images || [])
+      .map((i) => toUploadUrl(i.url))
+      .filter(Boolean);
     if (fromGallery.length) return fromGallery;
-    return product.image_url ? [product.image_url] : [];
+    const fallback = toUploadUrl(product.image_url);
+    return fallback ? [fallback] : [];
   }, [product]);
 
   const [activeIdx, setActiveIdx] = useState(0);
