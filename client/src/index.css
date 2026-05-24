@@ -1698,6 +1698,13 @@ h2 {
   margin-bottom: 0.65rem;
 }
 
+.product-gallery-main--open {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  cursor: zoom-in;
+}
+
 .product-gallery-main .featured-no-image,
 .product-gallery-main img {
   width: 100%;

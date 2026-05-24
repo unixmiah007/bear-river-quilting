@@ -105,9 +105,21 @@ export default function ProductDetail() {
       </div>
       <section className="product-detail">
         <div className="product-detail-media">
-          <div className="product-gallery-main">
-            <ProductImage key={mainSrc || 'none'} src={mainSrc} alt={product.name} />
-          </div>
+          {mainSrc ? (
+            <a
+              href={mainSrc}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="product-gallery-main product-gallery-main--open"
+              aria-label={`Open full size image for ${product.name} in a new tab`}
+            >
+              <ProductImage key={mainSrc} src={mainSrc} alt={product.name} />
+            </a>
+          ) : (
+            <div className="product-gallery-main">
+              <ProductImage key="none" src={mainSrc} alt={product.name} />
+            </div>
+          )}
           {galleryUrls.length > 1 ? (
             <div className="product-gallery-thumbs" role="list">
               {galleryUrls.map((u, i) => (
