@@ -13,7 +13,8 @@
  *   npm run migrate:product-images -w server
  *
  * Environment variables (same as the main server):
- *   MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE
+ *   MYSQL_PUBLIC_URL  — preferred; full connection string (mysql://user:pass@host:port/db)
+ *   MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE  — fallback
  *
  * The live website base URL can be overridden with:
  *   LIVE_SITE_URL=https://bear-river-quilting-production-5ec2.up.railway.app
@@ -146,13 +147,30 @@ async function main() {
   console.log('');
 
   // -- DB connection --
-  const conn = await mysql.createConnection({
-    host: process.env.MYSQL_HOST ?? '127.0.0.1',
-    port: Number(process.env.MYSQL_PORT ?? 3306),
-    user: process.env.MYSQL_USER ?? 'root',
-    password: normalizedPassword(process.env.MYSQL_PASSWORD),
-    database: process.env.MYSQL_DATABASE ?? 'cms_store',
-  });
+  // Prefer MYSQL_PUBLIC_URL (TCP proxy) so the script works in the Railway
+  // shell even when private DNS (mysql.railway.internal) is unavailable.
+  let connConfig;
+  if (process.env.MYSQL_PUBLIC_URL) {
+    const u = new URL(process.env.MYSQL_PUBLIC_URL);
+    connConfig = {
+      host: u.hostname,
+      port: Number(u.port) || 3306,
+      user: decodeURIComponent(u.username),
+      password: normalizedPassword(decodeURIComponent(u.password)),
+      database: u.pathname.replace(/^\//, ''),
+    };
+    console.log(`DB: using MYSQL_PUBLIC_URL (${u.hostname}:${u.port})`);
+  } else {
+    connConfig = {
+      host: process.env.MYSQL_HOST ?? '127.0.0.1',
+      port: Number(process.env.MYSQL_PORT ?? 3306),
+      user: process.env.MYSQL_USER ?? 'root',
+      password: normalizedPassword(process.env.MYSQL_PASSWORD),
+      database: process.env.MYSQL_DATABASE ?? 'cms_store',
+    };
+    console.log(`DB: using MYSQL_HOST (${connConfig.host}:${connConfig.port})`);
+  }
+  const conn = await mysql.createConnection(connConfig);
 
   let rows;
   try {
