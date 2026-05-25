@@ -17,6 +17,59 @@ const emptyForm = {
 
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
 
+const SORTABLE_COLUMNS = ['sku', 'name', 'size', 'price', 'stock', 'published'];
+
+function getSortValue(product, key) {
+  switch (key) {
+    case 'sku':
+      return (product.sku ?? '').toLowerCase();
+    case 'name':
+      return (product.name ?? '').toLowerCase();
+    case 'size':
+      return (product.product_size ?? '').toLowerCase();
+    case 'price':
+      return Number(product.price) || 0;
+    case 'stock':
+      return Number(product.stock_quantity) || 0;
+    case 'published':
+      return product.is_published ? 1 : 0;
+    default:
+      return '';
+  }
+}
+
+function compareProducts(a, b, key, dir) {
+  const va = getSortValue(a, key);
+  const vb = getSortValue(b, key);
+  let cmp = 0;
+  if (typeof va === 'number' && typeof vb === 'number') {
+    cmp = va - vb;
+  } else {
+    cmp = String(va).localeCompare(String(vb), undefined, { numeric: true, sensitivity: 'base' });
+  }
+  if (cmp === 0) cmp = Number(a.id) - Number(b.id);
+  return dir === 'asc' ? cmp : -cmp;
+}
+
+function SortableTh({ label, column, sortKey, sortDir, onSort }) {
+  const active = sortKey === column;
+  return (
+    <th scope="col">
+      <button
+        type="button"
+        className={`admin-table-sort${active ? ' admin-table-sort--active' : ''}`}
+        onClick={() => onSort(column)}
+        aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      >
+        <span>{label}</span>
+        <span className="admin-table-sort__icon" aria-hidden="true">
+          {active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
+        </span>
+      </button>
+    </th>
+  );
+}
+
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
     Number(n)
@@ -41,18 +94,35 @@ export default function AdminProducts() {
   const editSectionRef = useRef(null);
   const [pageSize, setPageSize] = useState(15);
   const [page, setPage] = useState(1);
+  const [sortKey, setSortKey] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
+
+  const sortedRows = useMemo(() => {
+    if (!SORTABLE_COLUMNS.includes(sortKey)) return rows;
+    return [...rows].sort((a, b) => compareProducts(a, b, sortKey, sortDir));
+  }, [rows, sortKey, sortDir]);
 
   const totalPages = useMemo(() => {
-    if (pageSize === 'all' || rows.length === 0) return 1;
-    return Math.max(1, Math.ceil(rows.length / pageSize));
-  }, [rows.length, pageSize]);
+    if (pageSize === 'all' || sortedRows.length === 0) return 1;
+    return Math.max(1, Math.ceil(sortedRows.length / pageSize));
+  }, [sortedRows.length, pageSize]);
 
   const paginatedRows = useMemo(() => {
-    if (rows.length === 0) return [];
-    if (pageSize === 'all') return rows;
+    if (sortedRows.length === 0) return [];
+    if (pageSize === 'all') return sortedRows;
     const start = (page - 1) * pageSize;
-    return rows.slice(start, start + pageSize);
-  }, [rows, page, pageSize]);
+    return sortedRows.slice(start, start + pageSize);
+  }, [sortedRows, page, pageSize]);
+
+  function handleSort(column) {
+    setPage(1);
+    if (sortKey === column) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(column);
+      setSortDir('asc');
+    }
+  }
 
   const listRange = useMemo(() => {
     if (rows.length === 0) return { start: 0, end: 0 };
@@ -64,7 +134,7 @@ export default function AdminProducts() {
 
   useEffect(() => {
     setPage(1);
-  }, [pageSize]);
+  }, [pageSize, sortKey, sortDir]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -606,13 +676,49 @@ export default function AdminProducts() {
           <thead>
             <tr>
               <th scope="col">Image</th>
-              <th>SKU</th>
-              <th>Name</th>
-              <th>Size</th>
-              <th>Price</th>
-              <th>Stock</th>
-              <th>Published</th>
-              <th />
+              <SortableTh
+                label="SKU"
+                column="sku"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              <SortableTh
+                label="Name"
+                column="name"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              <SortableTh
+                label="Size"
+                column="size"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              <SortableTh
+                label="Price"
+                column="price"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              <SortableTh
+                label="Stock"
+                column="stock"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              <SortableTh
+                label="Published"
+                column="published"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              <th scope="col" />
             </tr>
           </thead>
           <tbody>

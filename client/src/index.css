@@ -1812,6 +1812,38 @@ h2 {
   white-space: nowrap;
 }
 
+.admin-table-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-table-sort:hover {
+  color: var(--accent);
+}
+
+.admin-table-sort--active {
+  color: var(--accent);
+}
+
+.admin-table-sort__icon {
+  font-size: 0.75rem;
+  opacity: 0.55;
+  line-height: 1;
+}
+
+.admin-table-sort--active .admin-table-sort__icon {
+  opacity: 1;
+}
+
 .admin-gallery-strip {
   display: flex;
   flex-wrap: wrap;
