@@ -3,12 +3,28 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 const CartContext = createContext(null);
 const STORAGE_KEY = 'cms_cart_v1';
 
+export function cartLineKey(productId, productSize) {
+  const size = productSize == null || String(productSize).trim() === '' ? '' : String(productSize).trim();
+  return `${productId}:${size}`;
+}
+
+function normalizeStoredItem(item) {
+  const productId = item.productId;
+  const product_size = item.product_size ?? null;
+  return {
+    ...item,
+    productId,
+    product_size,
+    key: item.key ?? cartLineKey(productId, product_size),
+  };
+}
+
 function loadStored() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : [];
+    return Array.isArray(data) ? data.map(normalizeStoredItem) : [];
   } catch {
     return [];
   }
@@ -24,17 +40,20 @@ export function CartProvider({ children }) {
   const api = useMemo(() => {
     function addItem(product, quantity = 1) {
       const qty = Math.max(1, Math.min(99, Number(quantity) || 1));
+      const product_size = product.product_size ?? null;
+      const key = cartLineKey(product.id, product_size);
       setItems((prev) => {
-        const idx = prev.findIndex((x) => x.productId === product.id);
+        const idx = prev.findIndex((x) => x.key === key);
         if (idx === -1) {
           return [
             ...prev,
             {
+              key,
               productId: product.id,
               name: product.name,
               price: Number(product.price),
               image_url: product.image_url ?? null,
-              product_size: product.product_size ?? null,
+              product_size,
               quantity: qty,
             },
           ];
@@ -45,13 +64,13 @@ export function CartProvider({ children }) {
       });
     }
 
-    function updateQty(productId, quantity) {
+    function updateQty(lineKey, quantity) {
       const qty = Math.max(1, Math.min(99, Number(quantity) || 1));
-      setItems((prev) => prev.map((x) => (x.productId === productId ? { ...x, quantity: qty } : x)));
+      setItems((prev) => prev.map((x) => (x.key === lineKey ? { ...x, quantity: qty } : x)));
     }
 
-    function removeItem(productId) {
-      setItems((prev) => prev.filter((x) => x.productId !== productId));
+    function removeItem(lineKey) {
+      setItems((prev) => prev.filter((x) => x.key !== lineKey));
     }
 
     function clearCart() {

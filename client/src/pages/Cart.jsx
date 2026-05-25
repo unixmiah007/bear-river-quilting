@@ -159,7 +159,11 @@ export default function Cart() {
           postalCode: form.billingPostalCode,
           country: form.billingCountry,
         },
-        items: items.map((it) => ({ productId: it.productId, quantity: it.quantity })),
+        items: items.map((it) => ({
+          productId: it.productId,
+          quantity: it.quantity,
+          productSize: it.product_size ?? undefined,
+        })),
       };
       const result = await publicApi.createStripeCheckoutSession(payload);
       if (!result?.url) {
@@ -194,7 +198,7 @@ export default function Cart() {
               </thead>
               <tbody>
                 {items.map((it) => (
-                  <tr key={it.productId}>
+                  <tr key={it.key}>
                     <td>
                       <div className="cart-product-cell">
                         <Link
@@ -216,12 +220,12 @@ export default function Cart() {
                     <td className="cart-table-num">{formatPrice(it.price)}</td>
                     <td>
                       <input
-                        id={`qty-${it.productId}`}
+                        id={`qty-${it.key}`}
                         type="number"
                         min="1"
                         max="99"
                         value={it.quantity}
-                        onChange={(e) => updateQty(it.productId, e.target.value)}
+                        onChange={(e) => updateQty(it.key, e.target.value)}
                         className="cart-qty-input"
                         aria-label={`Quantity for ${it.name}`}
                       />
@@ -233,7 +237,7 @@ export default function Cart() {
                       <button
                         type="button"
                         className="btn btn-danger"
-                        onClick={() => removeItem(it.productId)}
+                        onClick={() => removeItem(it.key)}
                       >
                         Remove
                       </button>

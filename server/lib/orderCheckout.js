@@ -1,3 +1,19 @@
+import { normalizeProductSize, priceForProductSize } from './productSize.js';
+
+const SIZE_LABELS = {
+  small: 'Small',
+  large: 'Large',
+  'x-large': 'X-Large',
+  'xx-large': 'XX-Large',
+  'xxx-large': 'XXX-Large',
+};
+
+function productNameWithSize(name, productSize) {
+  if (!productSize) return name;
+  const label = SIZE_LABELS[productSize] ?? productSize;
+  return `${name} (${label})`;
+}
+
 export function orderNumber() {
   return `Q${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 900 + 100)}`;
 }
@@ -50,12 +66,22 @@ export async function buildCheckoutFromBody(conn, body) {
     const quantity = Math.max(1, Math.min(99, Number(raw.quantity) || 1));
     const product = productMap.get(productId);
     if (!product) continue;
+    const sizeRaw = raw.productSize ?? raw.product_size;
+    const productSize = sizeRaw ? normalizeProductSize(sizeRaw) : null;
+    if (sizeRaw && !productSize) {
+      return {
+        ok: false,
+        status: 400,
+        error: 'Invalid product size in cart. Please update your cart and try again.',
+      };
+    }
+    const unitPrice = priceForProductSize(product.price, productSize);
     normalizedItems.push({
       productId,
-      productName: product.name,
-      unitPrice: Number(product.price),
+      productName: productNameWithSize(product.name, productSize),
+      unitPrice,
       quantity,
-      lineTotal: Number(product.price) * quantity,
+      lineTotal: unitPrice * quantity,
     });
   }
   if (normalizedItems.length === 0) {

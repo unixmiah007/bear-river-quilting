@@ -5,7 +5,7 @@ import { useAdminSession } from '../hooks/useAdminSession.js';
 import ProductImage from '../components/ProductImage.jsx';
 import CartIcon from '../components/CartIcon.jsx';
 import { useCart } from '../context/CartContext.jsx';
-import { formatProductSizeLabel } from '../lib/productSizes.js';
+import { CUSTOMER_SIZE_OPTIONS, priceForProductSize } from '../lib/productSizes.js';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -57,10 +57,21 @@ export default function ProductDetail() {
   }, [product]);
 
   const [activeIdx, setActiveIdx] = useState(0);
+  const [selectedSize, setSelectedSize] = useState('');
 
   useEffect(() => {
     setActiveIdx(0);
   }, [id, galleryUrls.join('|')]);
+
+  useEffect(() => {
+    if (!product) {
+      setSelectedSize('');
+      return;
+    }
+    const preset = product.product_size ? String(product.product_size).trim().toLowerCase() : '';
+    const valid = CUSTOMER_SIZE_OPTIONS.some((o) => o.value === preset);
+    setSelectedSize(valid ? preset : '');
+  }, [product?.id, product?.product_size]);
 
   useEffect(() => {
     if (activeIdx >= galleryUrls.length) setActiveIdx(0);
@@ -81,6 +92,10 @@ export default function ProductDetail() {
   }
 
   const mainSrc = galleryUrls[activeIdx] ?? galleryUrls[0];
+  const sizeReady = CUSTOMER_SIZE_OPTIONS.some((o) => o.value === selectedSize);
+  const displayPrice = product
+    ? priceForProductSize(product.price, sizeReady ? selectedSize : 'small')
+    : 0;
 
   return (
     <>
@@ -140,13 +155,31 @@ export default function ProductDetail() {
         </div>
         <div>
           <h1>{product.name}</h1>
-          {formatProductSizeLabel(product.product_size) ? (
-            <p className="muted" style={{ marginBottom: '0.35rem' }}>
-              Size: <strong>{formatProductSizeLabel(product.product_size)}</strong>
-            </p>
-          ) : null}
+          <div className="field product-detail-size" style={{ marginBottom: '1rem' }}>
+            <label htmlFor="product-size">Size</label>
+            <select
+              id="product-size"
+              value={selectedSize}
+              onChange={(e) => setSelectedSize(e.target.value)}
+              required
+              aria-required="true"
+            >
+              <option value="">Select a size</option>
+              {CUSTOMER_SIZE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label} — {formatPrice(priceForProductSize(product.price, o.value))}
+                </option>
+              ))}
+            </select>
+            {!sizeReady ? (
+              <p className="muted" style={{ margin: '0.35rem 0 0', fontSize: '0.9rem' }}>
+                Choose a size before adding to cart. Prices start at {formatPrice(product.price)}{' '}
+                (Small) and increase by $30 for each larger size.
+              </p>
+            ) : null}
+          </div>
           <div className="price" style={{ fontSize: '1.35rem', marginBottom: '1rem' }}>
-            {formatPrice(product.price)}
+            {formatPrice(displayPrice)}
           </div>
           {product.description ? (
             <p className="page-body" style={{ whiteSpace: 'normal' }}>
@@ -159,8 +192,17 @@ export default function ProductDetail() {
             <button
               type="button"
               className="btn btn-primary"
+              disabled={!sizeReady}
               onClick={() => {
-                addItem(product, 1);
+                if (!sizeReady) return;
+                addItem(
+                  {
+                    ...product,
+                    product_size: selectedSize,
+                    price: priceForProductSize(product.price, selectedSize),
+                  },
+                  1
+                );
                 navigate('/cart');
               }}
             >
