@@ -8,17 +8,10 @@ import {
   QUILT_CRAFT_DETAIL_IMAGE,
   SEWING_MACHINE_IMAGE,
 } from '../lib/quiltAssets.js';
-import ProductImage from '../components/ProductImage.jsx';
+import ProductCard from '../components/ProductCard.jsx';
 import { useCart } from '../context/CartContext.jsx';
-import { formatProductSizeLabel } from '../lib/productSizes.js';
 import { HOME_TESTIMONIALS } from '../lib/homeTestimonials.js';
 import HomeHeroBackdrop from '../components/HomeHeroBackdrop.jsx';
-
-function formatPrice(n) {
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
-    Number(n)
-  );
-}
 
 export default function Home() {
   const [carouselProducts, setCarouselProducts] = useState([]);
@@ -201,37 +194,21 @@ export default function Home() {
           <>
             <div className="card-grid featured-carousel-grid">
               {visibleBestSellers.map((p) => (
-                <article key={p.id} className="card featured-card">
-                  <ProductImage src={p.image_url} alt={p.name} />
-                  {p.units_sold != null && Number(p.units_sold) > 0 ? (
-                    <p className="eyebrow" style={{ margin: '0 0 0.35rem' }}>
-                      {Number(p.units_sold)} sold
-                    </p>
-                  ) : null}
-                  <h3>{p.name}</h3>
-                  {formatProductSizeLabel(p.product_size) ? (
-                    <p className="muted" style={{ margin: '0.2rem 0' }}>
-                      Size: {formatProductSizeLabel(p.product_size)}
-                    </p>
-                  ) : null}
-                  {p.description ? <p className="muted">{p.description}</p> : null}
-                  <div className="price">{formatPrice(p.price)}</div>
-                  <div className="row card-actions">
-                    <Link className="btn" to={`/products/${p.id}`}>
-                      View
-                    </Link>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => {
-                        addItem(p, 1);
-                        navigate('/cart');
-                      }}
-                    >
-                      Add to cart
-                    </button>
-                  </div>
-                </article>
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  onAddToCart={(item) => {
+                    addItem(item, 1);
+                    navigate('/cart');
+                  }}
+                  badge={
+                    p.units_sold != null && Number(p.units_sold) > 0 ? (
+                      <p className="eyebrow" style={{ margin: '0 0 0.35rem' }}>
+                        {Number(p.units_sold)} sold
+                      </p>
+                    ) : null
+                  }
+                />
               ))}
             </div>
             <p className="muted" style={{ marginTop: '0.65rem' }}>
@@ -254,34 +231,16 @@ export default function Home() {
         ) : hasFeatured ? (
           <>
             <div className="card-grid featured-carousel-grid">
-            {visibleFeatured.map((p) => (
-              <article key={p.id} className="card featured-card">
-                <ProductImage src={p.image_url} alt={p.name} />
-                <h3>{p.name}</h3>
-                {formatProductSizeLabel(p.product_size) ? (
-                  <p className="muted" style={{ margin: '0.2rem 0' }}>
-                    Size: {formatProductSizeLabel(p.product_size)}
-                  </p>
-                ) : null}
-                {p.description ? <p className="muted">{p.description}</p> : null}
-                <div className="price">{formatPrice(p.price)}</div>
-                <div className="row card-actions">
-                  <Link className="btn" to={`/products/${p.id}`}>
-                    View
-                  </Link>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => {
-                      addItem(p, 1);
-                      navigate('/cart');
-                    }}
-                  >
-                    Add to cart
-                  </button>
-                </div>
-              </article>
-            ))}
+              {visibleFeatured.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  onAddToCart={(item) => {
+                    addItem(item, 1);
+                    navigate('/cart');
+                  }}
+                />
+              ))}
             </div>
             <p className="muted" style={{ marginTop: '0.65rem' }}>
               Showing 3 at a time from a rotating set of up to 20 products.

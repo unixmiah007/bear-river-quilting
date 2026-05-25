@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { adminApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
@@ -14,6 +14,8 @@ const emptyForm = {
   image_url: '',
   is_published: false,
 };
+
+const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -36,6 +38,37 @@ export default function AdminProducts() {
   const [uploadBusy, setUploadBusy] = useState(false);
   /** Bumps when gallery is updated locally so stale product GETs cannot overwrite. */
   const gallerySyncGeneration = useRef(0);
+  const editSectionRef = useRef(null);
+  const [pageSize, setPageSize] = useState(15);
+  const [page, setPage] = useState(1);
+
+  const totalPages = useMemo(() => {
+    if (pageSize === 'all' || rows.length === 0) return 1;
+    return Math.max(1, Math.ceil(rows.length / pageSize));
+  }, [rows.length, pageSize]);
+
+  const paginatedRows = useMemo(() => {
+    if (rows.length === 0) return [];
+    if (pageSize === 'all') return rows;
+    const start = (page - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, page, pageSize]);
+
+  const listRange = useMemo(() => {
+    if (rows.length === 0) return { start: 0, end: 0 };
+    if (pageSize === 'all') return { start: 1, end: rows.length };
+    const start = (page - 1) * pageSize + 1;
+    const end = Math.min(page * pageSize, rows.length);
+    return { start, end };
+  }, [rows.length, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   useEffect(() => {
     if (!editingId) {
@@ -119,6 +152,14 @@ export default function AdminProducts() {
       is_published: !!p.is_published,
     });
   }, []);
+
+  useEffect(() => {
+    if (!editingId) return undefined;
+    const frame = requestAnimationFrame(() => {
+      editSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editingId]);
 
   useEffect(() => {
     if (loading) return;
@@ -282,7 +323,15 @@ export default function AdminProducts() {
       {error ? <p className="error">{error}</p> : null}
       {info ? <p className="muted">{info}</p> : null}
 
-      <h2 style={{ marginTop: 0 }}>{editingId ? 'Edit product' : 'New product'}</h2>
+      <section
+        ref={editSectionRef}
+        id="admin-product-edit"
+        className="admin-product-edit-section"
+        aria-labelledby="admin-product-edit-heading"
+      >
+      <h2 id="admin-product-edit-heading" style={{ marginTop: 0 }}>
+        {editingId ? 'Edit product' : 'New product'}
+      </h2>
       <form className="form" onSubmit={editingId ? onUpdate : onCreate}>
         <div className="field">
           <label htmlFor="sku">SKU</label>
@@ -443,6 +492,7 @@ export default function AdminProducts() {
           </p>
         )}
       </section>
+      </section>
 
       <section className="card" style={{ marginBottom: '1.5rem' }}>
         <h2 style={{ marginTop: 0 }}>Import from CSV</h2>
@@ -501,6 +551,56 @@ export default function AdminProducts() {
         ) : null}
       </section>
 
+      {rows.length > 0 ? (
+        <div className="admin-pagination">
+          <div className="admin-pagination__size">
+            <label htmlFor="admin-products-page-size">Show</label>
+            <select
+              id="admin-products-page-size"
+              value={String(pageSize)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setPageSize(v === 'all' ? 'all' : Number(v));
+              }}
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={String(n)}>
+                  {n === 'all' ? 'All' : n}
+                </option>
+              ))}
+            </select>
+            <span className="muted">
+              {pageSize === 'all'
+                ? `All ${rows.length} product${rows.length === 1 ? '' : 's'}`
+                : `Showing ${listRange.start}–${listRange.end} of ${rows.length}`}
+            </span>
+          </div>
+          {pageSize !== 'all' && totalPages > 1 ? (
+            <div className="admin-pagination__nav row">
+              <button
+                type="button"
+                className="btn"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </button>
+              <span className="muted admin-pagination__status">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                className="btn"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="table-wrap" style={{ marginBottom: '2rem' }}>
         <table>
           <thead>
@@ -536,7 +636,7 @@ export default function AdminProducts() {
                 </td>
               </tr>
             ) : (
-              rows.map((p) => (
+              paginatedRows.map((p) => (
                 <tr key={p.id}>
                   <td>
                     <div className="admin-product-list-thumb">

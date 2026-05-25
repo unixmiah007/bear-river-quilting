@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { adminApi } from '../api.js';
 import { labelForCarrier, SHIPPING_CARRIER_OPTIONS } from '../lib/shippingCarriers.js';
 
@@ -16,6 +16,7 @@ export default function AdminOrders() {
   const [trackingMsg, setTrackingMsg] = useState(null);
   const [trackingBusy, setTrackingBusy] = useState(false);
   const [trackingForm, setTrackingForm] = useState({ carrier: 'usps', trackingNumber: '' });
+  const orderDetailRef = useRef(null);
 
   async function refresh() {
     setError(null);
@@ -26,6 +27,14 @@ export default function AdminOrders() {
   useEffect(() => {
     refresh().catch((e) => setError(e.body?.error || e.message));
   }, []);
+
+  useEffect(() => {
+    if (!details) return undefined;
+    const frame = requestAnimationFrame(() => {
+      orderDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [details, selected]);
 
   async function loadDetails(id) {
     setSelected(id);
@@ -117,8 +126,15 @@ export default function AdminOrders() {
         </table>
       </div>
       {details ? (
-        <div className="card">
-          <h3 style={{ margin: 0 }}>Order {details.order.order_number}</h3>
+        <div
+          ref={orderDetailRef}
+          id="admin-order-detail"
+          className="card admin-order-detail-section"
+          aria-labelledby="admin-order-detail-heading"
+        >
+          <h3 id="admin-order-detail-heading" style={{ margin: 0 }}>
+            Order {details.order.order_number}
+          </h3>
           <p className="muted" style={{ margin: 0 }}>
             {details.order.customer_name} • {details.order.customer_email}
           </p>

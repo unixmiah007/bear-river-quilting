@@ -1491,6 +1491,32 @@ h2 {
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
 }
 
+.featured-card--clickable {
+  display: flex;
+  flex-direction: column;
+}
+
+.featured-card__body {
+  display: block;
+  flex: 1;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.featured-card__body:hover {
+  text-decoration: none;
+}
+
+.featured-card__body:hover h3 {
+  text-decoration: underline;
+}
+
+.featured-card__body .featured-no-image,
+.featured-card__body img {
+  pointer-events: none;
+}
+
 .featured-no-image {
   aspect-ratio: 4/3;
   display: grid;
@@ -1742,6 +1768,48 @@ h2 {
   display: block;
   aspect-ratio: auto;
   border-radius: 0;
+}
+
+.admin-product-edit-section,
+.admin-order-detail-section {
+  scroll-margin-top: 1rem;
+}
+
+.admin-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-pagination__size {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.65rem;
+}
+
+.admin-pagination__size label {
+  margin: 0;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.9rem;
+}
+
+.admin-pagination__size select {
+  min-width: 4.5rem;
+}
+
+.admin-pagination__nav {
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.admin-pagination__status {
+  margin: 0;
+  white-space: nowrap;
 }
 
 .admin-gallery-strip {
