@@ -84,6 +84,7 @@ export default function AdminProducts() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [importBusy, setImportBusy] = useState(false);
+  const [exportCsvBusy, setExportCsvBusy] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [seedBusy, setSeedBusy] = useState(false);
   const [info, setInfo] = useState(null);
@@ -343,25 +344,52 @@ export default function AdminProducts() {
     }
   }
 
-  async function downloadCsvTemplate() {
+  async function downloadCsvAttachment(url, filename, busyLabel) {
     setError(null);
+    setExportCsvBusy(true);
     try {
-      const res = await fetch('/api/admin/products/csv-template', { credentials: 'include' });
+      const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(text || res.statusText);
+        let msg = text;
+        try {
+          const parsed = JSON.parse(text);
+          msg = parsed?.error || msg;
+        } catch {
+          /* plain text */
+        }
+        throw new Error(msg || res.statusText);
       }
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = 'products-import-template.csv';
+      a.href = objectUrl;
+      a.download = filename;
       a.rel = 'noopener';
       a.click();
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(objectUrl);
     } catch (err) {
-      setError(err.message || 'Could not download template');
+      setError(err.message || busyLabel);
+    } finally {
+      setExportCsvBusy(false);
     }
+  }
+
+  function downloadCsvTemplate() {
+    return downloadCsvAttachment(
+      '/api/admin/products/csv-template',
+      'products-import-template.csv',
+      'Could not download template'
+    );
+  }
+
+  function downloadProductsCsv() {
+    const stamp = new Date().toISOString().slice(0, 10);
+    return downloadCsvAttachment(
+      '/api/admin/products/export.csv',
+      `products-export-${stamp}.csv`,
+      'Could not download products CSV'
+    );
   }
 
   async function onCsvFile(e) {
@@ -567,12 +595,11 @@ export default function AdminProducts() {
       <section className="card" style={{ marginBottom: '1.5rem' }}>
         <h2 style={{ marginTop: 0 }}>Import from CSV</h2>
         <p className="muted" style={{ marginTop: 0 }}>
-          Upload a spreadsheet exported as CSV. Required column: <strong>name</strong> (or{' '}
-          <strong>title</strong>). Use <strong>sku</strong> to create new rows or update existing
-          products with the same SKU. Use numeric <strong>id</strong> to update a specific product.
-          Optional: description, price, stock_quantity (or stock / quantity / available), product_size
-          (small, large, x-large, xx-large, xxx-large), image_url
-          (or image), is_published (1/0, yes/no).
+          Download all products as CSV, edit in a spreadsheet, then upload. Required column on import:{' '}
+          <strong>name</strong> (or <strong>title</strong>). Use <strong>id</strong> or <strong>sku</strong>{' '}
+          to update existing rows; omit <strong>id</strong> for new products. Columns: id, sku, name,
+          description, price, stock_quantity, product_size (small, large, x-large, xx-large,
+          xxx-large), image_url, is_published (1/0).
         </p>
         <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
           <label className="btn" style={{ cursor: importBusy ? 'wait' : 'pointer' }}>
@@ -580,12 +607,25 @@ export default function AdminProducts() {
             <input
               type="file"
               accept=".csv,text/csv"
-              disabled={importBusy}
+              disabled={importBusy || exportCsvBusy}
               onChange={onCsvFile}
               style={{ display: 'none' }}
             />
           </label>
-          <button type="button" className="btn" onClick={downloadCsvTemplate} disabled={importBusy}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={downloadProductsCsv}
+            disabled={importBusy || exportCsvBusy || rows.length === 0}
+          >
+            {exportCsvBusy ? 'Preparing…' : 'Download CSV'}
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={downloadCsvTemplate}
+            disabled={importBusy || exportCsvBusy}
+          >
             Download template
           </button>
         </div>

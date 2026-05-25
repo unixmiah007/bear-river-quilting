@@ -8,7 +8,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import multer from 'multer';
 import pool from './db.js';
-import { importProductsFromCsv, PRODUCT_CSV_TEMPLATE } from './lib/csvProductImport.js';
+import {
+  importProductsFromCsv,
+  PRODUCT_CSV_TEMPLATE,
+  productsToCsv,
+} from './lib/csvProductImport.js';
 import { ensureProductInventoryColumns } from './lib/ensureProductInventoryColumns.js';
 import { ensureProductImagesTable } from './lib/ensureProductImagesTable.js';
 import { ensureProductSizeColumn } from './lib/ensureProductSizeColumn.js';
@@ -588,6 +592,21 @@ app.get('/api/admin/products/csv-template', authMiddleware, (_req, res) => {
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="products-import-template.csv"');
   res.send(PRODUCT_CSV_TEMPLATE);
+});
+
+app.get('/api/admin/products/export.csv', authMiddleware, async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, sku, name, description, price, stock_quantity, product_size, image_url, is_published
+       FROM products ORDER BY id ASC`
+    );
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="products-export.csv"');
+    res.send(productsToCsv(rows));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to export products' });
+  }
 });
 
 app.post('/api/admin/products/import', authMiddleware, async (req, res) => {

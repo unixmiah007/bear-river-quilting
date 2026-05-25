@@ -210,6 +210,48 @@ export async function importProductsFromCsv(pool, csvText) {
   return { created, updated, errors };
 }
 
+export const PRODUCT_CSV_HEADERS = [
+  'id',
+  'sku',
+  'name',
+  'description',
+  'price',
+  'stock_quantity',
+  'product_size',
+  'image_url',
+  'is_published',
+];
+
+function escapeCsvCell(val) {
+  if (val == null) return '';
+  const s = String(val);
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+/** Build a CSV string from product rows (round-trip safe with import). */
+export function productsToCsv(products) {
+  const lines = [PRODUCT_CSV_HEADERS.join(',')];
+  for (const p of products) {
+    const price = Number(p.price);
+    const priceStr = Number.isFinite(price) ? price.toFixed(2) : '0.00';
+    lines.push(
+      [
+        p.id ?? '',
+        escapeCsvCell(p.sku),
+        escapeCsvCell(p.name),
+        escapeCsvCell(p.description),
+        priceStr,
+        p.stock_quantity ?? 0,
+        escapeCsvCell(p.product_size),
+        escapeCsvCell(p.image_url),
+        p.is_published ? 1 : 0,
+      ].join(',')
+    );
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 export const PRODUCT_CSV_TEMPLATE = `sku,name,description,price,stock_quantity,product_size,image_url,is_published
 BRQ-1001,Sample Heritage Quilt,Hand-stitched cotton quilt with warm tones.,249.00,15,large,https://example.com/quilt1.jpg,1
 BRQ-1002,Sample Loft Quilt,Lightweight modern grid pattern.,189.00,8,x-large,https://example.com/quilt2.jpg,1
