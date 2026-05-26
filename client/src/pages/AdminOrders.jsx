@@ -1,11 +1,86 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { adminApi } from '../api.js';
 import { labelForCarrier, SHIPPING_CARRIER_OPTIONS } from '../lib/shippingCarriers.js';
+
+const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
+const SORTABLE_COLUMNS = ['order', 'customer', 'status', 'total', 'created'];
+
+function getOrderSortValue(order, key) {
+  switch (key) {
+    case 'order':
+      return (order.order_number ?? '').toLowerCase();
+    case 'customer':
+      return (order.customer_name ?? '').toLowerCase();
+    case 'status':
+      return (order.status ?? '').toLowerCase();
+    case 'total':
+      return Number(order.total) || 0;
+    case 'created':
+      return new Date(order.created_at).getTime() || 0;
+    default:
+      return '';
+  }
+}
+
+function compareOrders(a, b, key, dir) {
+  const va = getOrderSortValue(a, key);
+  const vb = getOrderSortValue(b, key);
+  let cmp = 0;
+  if (typeof va === 'number' && typeof vb === 'number') {
+    cmp = va - vb;
+  } else {
+    cmp = String(va).localeCompare(String(vb), undefined, { numeric: true, sensitivity: 'base' });
+  }
+  if (cmp === 0) cmp = Number(a.id) - Number(b.id);
+  return dir === 'asc' ? cmp : -cmp;
+}
+
+function SortableTh({ label, column, sortKey, sortDir, onSort }) {
+  const active = sortKey === column;
+  return (
+    <th scope="col">
+      <button
+        type="button"
+        className={`admin-table-sort${active ? ' admin-table-sort--active' : ''}`}
+        onClick={() => onSort(column)}
+        aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      >
+        <span>{label}</span>
+        <span className="admin-table-sort__icon" aria-hidden="true">
+          {active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
+        </span>
+      </button>
+    </th>
+  );
+}
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
     Number(n)
   );
+}
+
+function orderSearchText(order) {
+  const created = order.created_at ? new Date(order.created_at) : null;
+  const parts = [
+    order.order_number,
+    order.customer_name,
+    order.status,
+    String(order.total ?? ''),
+    formatPrice(order.total),
+    created ? created.toLocaleString() : '',
+    created ? created.toLocaleDateString() : '',
+    created ? created.toISOString() : '',
+  ];
+  return parts
+    .filter((p) => p != null && String(p).trim() !== '')
+    .join(' ')
+    .toLowerCase();
+}
+
+function orderMatchesSearch(order, term) {
+  if (!term) return true;
+  return orderSearchText(order).includes(term);
 }
 
 export default function AdminOrders() {
@@ -17,6 +92,60 @@ export default function AdminOrders() {
   const [trackingBusy, setTrackingBusy] = useState(false);
   const [trackingForm, setTrackingForm] = useState({ carrier: 'usps', trackingNumber: '' });
   const orderDetailRef = useRef(null);
+  const [pageSize, setPageSize] = useState(15);
+  const [page, setPage] = useState(1);
+  const [sortKey, setSortKey] = useState('created');
+  const [sortDir, setSortDir] = useState('desc');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredOrders = useMemo(() => {
+    const term = searchQuery.trim().toLowerCase();
+    if (!term) return orders;
+    return orders.filter((o) => orderMatchesSearch(o, term));
+  }, [orders, searchQuery]);
+
+  const sortedOrders = useMemo(() => {
+    if (!SORTABLE_COLUMNS.includes(sortKey)) return filteredOrders;
+    return [...filteredOrders].sort((a, b) => compareOrders(a, b, sortKey, sortDir));
+  }, [filteredOrders, sortKey, sortDir]);
+
+  const totalPages = useMemo(() => {
+    if (pageSize === 'all' || sortedOrders.length === 0) return 1;
+    return Math.max(1, Math.ceil(sortedOrders.length / pageSize));
+  }, [sortedOrders.length, pageSize]);
+
+  const paginatedOrders = useMemo(() => {
+    if (sortedOrders.length === 0) return [];
+    if (pageSize === 'all') return sortedOrders;
+    const start = (page - 1) * pageSize;
+    return sortedOrders.slice(start, start + pageSize);
+  }, [sortedOrders, page, pageSize]);
+
+  const listRange = useMemo(() => {
+    if (sortedOrders.length === 0) return { start: 0, end: 0 };
+    if (pageSize === 'all') return { start: 1, end: sortedOrders.length };
+    const start = (page - 1) * pageSize + 1;
+    const end = Math.min(page * pageSize, sortedOrders.length);
+    return { start, end };
+  }, [sortedOrders.length, page, pageSize]);
+
+  function handleSort(column) {
+    setPage(1);
+    if (sortKey === column) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(column);
+      setSortDir(column === 'created' ? 'desc' : 'asc');
+    }
+  }
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize, sortKey, sortDir, searchQuery]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   async function refresh() {
     setError(null);
@@ -95,20 +224,134 @@ export default function AdminOrders() {
     <>
       <h1 style={{ marginTop: 0 }}>Orders</h1>
       {error ? <p className="error">{error}</p> : null}
+
+      {orders.length > 0 ? (
+        <div className="field admin-orders-search" style={{ marginBottom: '1rem', maxWidth: '32rem' }}>
+          <label htmlFor="admin-orders-search">Search</label>
+          <input
+            id="admin-orders-search"
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Order, customer, status, total, created…"
+            autoComplete="off"
+          />
+        </div>
+      ) : null}
+
+      {orders.length > 0 ? (
+        <div className="admin-pagination">
+          <div className="admin-pagination__size">
+            <label htmlFor="admin-orders-page-size">Show</label>
+            <select
+              id="admin-orders-page-size"
+              value={String(pageSize)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setPageSize(v === 'all' ? 'all' : Number(v));
+              }}
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={String(n)}>
+                  {n === 'all' ? 'All' : n}
+                </option>
+              ))}
+            </select>
+            <span className="muted">
+              {searchQuery.trim() && filteredOrders.length !== orders.length
+                ? `${filteredOrders.length} of ${orders.length} order${orders.length === 1 ? '' : 's'} match`
+                : null}
+              {searchQuery.trim() && filteredOrders.length !== orders.length ? ' · ' : null}
+              {pageSize === 'all'
+                ? sortedOrders.length === 0
+                  ? 'No matching orders'
+                  : `All ${sortedOrders.length} shown`
+                : sortedOrders.length === 0
+                  ? 'No matching orders'
+                  : `Showing ${listRange.start}–${listRange.end} of ${sortedOrders.length}`}
+            </span>
+          </div>
+          {pageSize !== 'all' && totalPages > 1 ? (
+            <div className="admin-pagination__nav row">
+              <button
+                type="button"
+                className="btn"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </button>
+              <span className="muted admin-pagination__status">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                className="btn"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="table-wrap" style={{ marginBottom: '1.25rem' }}>
         <table>
           <thead>
             <tr>
-              <th>Order</th>
-              <th>Customer</th>
-              <th>Status</th>
-              <th>Total</th>
-              <th>Created</th>
-              <th />
+              <SortableTh
+                label="Order"
+                column="order"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              <SortableTh
+                label="Customer"
+                column="customer"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              <SortableTh
+                label="Status"
+                column="status"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              <SortableTh
+                label="Total"
+                column="total"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              <SortableTh
+                label="Created"
+                column="created"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              <th scope="col" />
             </tr>
           </thead>
           <tbody>
-            {orders.map((o) => (
+            {paginatedOrders.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="muted">
+                  {orders.length === 0
+                    ? 'No orders yet.'
+                    : searchQuery.trim()
+                      ? 'No orders match your search.'
+                      : 'No orders yet.'}
+                </td>
+              </tr>
+            ) : (
+              paginatedOrders.map((o) => (
               <tr key={o.id}>
                 <td>{o.order_number}</td>
                 <td>{o.customer_name}</td>
@@ -121,7 +364,8 @@ export default function AdminOrders() {
                   </button>
                 </td>
               </tr>
-            ))}
+              ))
+            )}
           </tbody>
         </table>
       </div>
