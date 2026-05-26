@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import CartIcon from '../components/CartIcon.jsx';
 import OrderTrackingDisplay from '../components/OrderTrackingDisplay.jsx';
+import ProductCard from '../components/ProductCard.jsx';
 import { publicApi } from '../api.js';
+import { useCart } from '../context/CartContext.jsx';
+import { useFavorites } from '../context/FavoritesContext.jsx';
 import { buildTrackingUrl, labelForCarrier } from '../lib/shippingCarriers.js';
 
 function formatPrice(n) {
@@ -40,6 +43,11 @@ function statusLabel(s) {
 
 export default function Account() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { addItem } = useCart();
+  const { favoriteIds, removeFavorite } = useFavorites();
+  const [favoriteProducts, setFavoriteProducts] = useState([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
   const [loading, setLoading] = useState(false);
@@ -48,6 +56,37 @@ export default function Account() {
   const [mode, setMode] = useState(null);
   const [list, setList] = useState([]);
   const [detail, setDetail] = useState(null);
+
+  const favoriteIdsKey = favoriteIds.join(',');
+
+  useEffect(() => {
+    if (favoriteIds.length === 0) {
+      setFavoriteProducts([]);
+      setFavoritesLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setFavoritesLoading(true);
+    publicApi
+      .listProducts()
+      .then((rows) => {
+        if (cancelled) return;
+        const byId = new Map((Array.isArray(rows) ? rows : []).map((p) => [Number(p.id), p]));
+        const ordered = favoriteIds.map((id) => byId.get(id)).filter(Boolean);
+        setFavoriteProducts(ordered);
+      })
+      .catch(() => {
+        if (!cancelled) setFavoriteProducts([]);
+      })
+      .finally(() => {
+        if (!cancelled) setFavoritesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [favoriteIdsKey]);
+
+  const favoritesEmpty = favoriteIds.length === 0;
 
   useEffect(() => {
     const st = location.state;
@@ -161,6 +200,49 @@ export default function Account() {
           Thanks—your order was placed. Details below when available.
         </p>
       ) : null}
+
+      <section className="card account-favorites" style={{ marginBottom: '1.5rem' }}>
+        <h2 style={{ marginTop: 0 }}>Saved favorites</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Products you mark as favorites on their detail page are saved in this browser (local
+          storage) so you can find them here when you return.
+        </p>
+        {favoritesEmpty ? (
+          <p className="muted" style={{ marginBottom: 0 }}>
+            No favorites yet.{' '}
+            <Link to="/products">Browse products</Link> and use <strong>Add to favorites</strong> on
+            any item.
+          </p>
+        ) : favoritesLoading ? (
+          <p className="muted">Loading favorites…</p>
+        ) : favoriteProducts.length === 0 ? (
+          <p className="muted" style={{ marginBottom: 0 }}>
+            Your saved items are no longer available.{' '}
+            <Link to="/products">Browse products</Link> to add new favorites.
+          </p>
+        ) : (
+          <div className="card-grid account-favorites-grid">
+            {favoriteProducts.map((p) => (
+              <div key={p.id} className="account-favorite-item">
+                <ProductCard
+                  product={p}
+                  onAddToCart={(item) => {
+                    addItem(item, 1);
+                    navigate('/cart');
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn account-favorite-remove"
+                  onClick={() => removeFavorite(p.id)}
+                >
+                  Remove from favorites
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="card" style={{ marginBottom: '1.5rem' }}>
         <h2 style={{ marginTop: 0 }}>Look up orders</h2>

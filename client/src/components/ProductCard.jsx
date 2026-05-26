@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import FavoriteProductButton from './FavoriteProductButton.jsx';
 import ProductImage from './ProductImage.jsx';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
 
@@ -8,11 +9,21 @@ function formatPrice(n) {
   );
 }
 
-export default function ProductCard({ product, onAddToCart, badge }) {
+export default function ProductCard({ product, onAddToCart, badge, showFavorite = false }) {
   const detailPath = `/products/${product.id}`;
 
   return (
-    <article className="card featured-card featured-card--clickable">
+    <article
+      className={`card featured-card featured-card--clickable${showFavorite ? ' featured-card--has-favorite' : ''}`}
+    >
+      {showFavorite ? (
+        <FavoriteProductButton
+          variant="icon"
+          productId={product.id}
+          productName={product.name}
+          className="featured-card__favorite"
+        />
+      ) : null}
       <Link className="featured-card__body" to={detailPath}>
         <ProductImage src={product.image_url} alt={product.name} />
         {badge}

@@ -4,6 +4,7 @@ import { publicApi } from '../api.js';
 import { useAdminSession } from '../hooks/useAdminSession.js';
 import ProductImage from '../components/ProductImage.jsx';
 import CartIcon from '../components/CartIcon.jsx';
+import FavoriteProductButton from '../components/FavoriteProductButton.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { CUSTOMER_SIZE_OPTIONS, priceForProductSize } from '../lib/productSizes.js';
 
@@ -154,7 +155,10 @@ export default function ProductDetail() {
           ) : null}
         </div>
         <div>
-          <h1>{product.name}</h1>
+          <div className="product-detail-title-row">
+            <h1>{product.name}</h1>
+            <FavoriteProductButton productId={product.id} productName={product.name} />
+          </div>
           <div className="field product-detail-size" style={{ marginBottom: '1rem' }}>
             <label htmlFor="product-size">Size</label>
             <select

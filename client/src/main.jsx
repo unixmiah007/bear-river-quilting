@@ -5,6 +5,7 @@ import App from './App.jsx';
 import BackToTop from './components/BackToTop.jsx';
 import FloatingCartWidget from './components/FloatingCartWidget.jsx';
 import { CartProvider } from './context/CartContext.jsx';
+import { FavoritesProvider } from './context/FavoritesContext.jsx';
 import RootErrorBoundary from './RootErrorBoundary.jsx';
 import './index.css';
 
@@ -18,9 +19,11 @@ ReactDOM.createRoot(rootEl).render(
     <RootErrorBoundary>
       <BrowserRouter>
         <CartProvider>
-          <App />
-          <FloatingCartWidget />
-          <BackToTop />
+          <FavoritesProvider>
+            <App />
+            <FloatingCartWidget />
+            <BackToTop />
+          </FavoritesProvider>
         </CartProvider>
       </BrowserRouter>
     </RootErrorBoundary>

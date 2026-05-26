@@ -119,6 +119,7 @@ export default function Products() {
             <ProductCard
               key={p.id}
               product={p}
+              showFavorite
               onAddToCart={(item) => {
                 addItem(item, 1);
                 navigate('/cart');

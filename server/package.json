@@ -12,6 +12,8 @@
     "db:retheme-images": "node scripts/retheme-product-images.js",
     "db:migrate-products-csv": "node scripts/add-product-inventory-columns.js",
     "db:migrate-product-images": "node scripts/add-product-images-table.js",
+    "db:import-railway-prod": "node scripts/import-railway-prod.js",
+    "uploads:sync-prod": "node scripts/sync-uploads-from-prod.js",
     "mail:test": "node scripts/send-test-email.js",
     "mail:test:notify": "node scripts/send-test-email.js --notify"
   },
