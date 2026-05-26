@@ -1,6 +1,4 @@
-/** Fictional toll-free line for demo / storefront contact. */
-const SUPPORT_PHONE_DISPLAY = '1-800-472-7849';
-const SUPPORT_PHONE_TEL = '18004727849';
+import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from '../lib/siteContact.js';
 
 const WEEKDAY_HOURS = [
   { day: 'Monday', hours: '7:00 AM – 7:00 PM' },

@@ -4,6 +4,7 @@ import { publicApi } from '../api.js';
 import SiteHeroBanner from '../components/SiteHeroBanner.jsx';
 import SiteHeader, { SiteFooterPageLinks, SiteNav } from '../components/SiteHeader.jsx';
 import SiteStickyBar from '../components/SiteStickyBar.jsx';
+import SiteTopBar from '../components/SiteTopBar.jsx';
 import { AdminSessionBanner } from '../components/AdminSessionIndicator.jsx';
 import { HomeHeroBackgroundProvider } from '../context/HomeHeroBackgroundContext.jsx';
 
@@ -54,6 +55,7 @@ export default function SiteLayout() {
 
   return (
     <div className="site-shell">
+      <SiteTopBar />
       <div className="layout">
         <SiteHeader />
         <AdminSessionBanner />
