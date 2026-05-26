@@ -20,6 +20,16 @@ export function buildCustomerOrderAccountUrl(email, orderNumber) {
   return `${CLIENT_ORIGIN}/account?${params.toString()}`;
 }
 
+/** Admin orders page — opens order detail after sign-in when not authenticated. */
+export function buildAdminOrderUrl(orderId) {
+  const id = Number(orderId);
+  if (!Number.isFinite(id) || id <= 0) {
+    return `${CLIENT_ORIGIN}/admin/orders`;
+  }
+  const params = new URLSearchParams({ order: String(id) });
+  return `${CLIENT_ORIGIN}/admin/orders?${params.toString()}`;
+}
+
 export function parseOrderNotifyRecipients() {
   const raw = process.env.ORDER_NOTIFY_EMAILS?.trim();
   const src = raw || DEFAULT_ORDER_NOTIFY_EMAILS;
@@ -118,6 +128,7 @@ ${items
  * Notifies internal recipients when a new order is placed (SendGrid).
  */
 export async function sendOrderStaffNotificationEmail({
+  orderId,
   orderNumber,
   customerName,
   customerEmail,
@@ -142,6 +153,11 @@ export async function sendOrderStaffNotificationEmail({
   const notifyTo = parseOrderNotifyRecipients();
   if (notifyTo.length === 0) return;
 
+  const adminOrderUrl = buildAdminOrderUrl(orderId);
+  const orderNumberHtml = orderId
+    ? `<a href="${escapeHtml(adminOrderUrl)}">${escapeHtml(orderNumber)}</a>`
+    : escapeHtml(orderNumber);
+
   const lines = items.map(
     (it) => `  - ${it.productName} × ${it.quantity}  $${Number(it.lineTotal).toFixed(2)}`
   );
@@ -155,6 +171,7 @@ export async function sendOrderStaffNotificationEmail({
 
   const text = [
     `New order ${orderNumber}`,
+    orderId ? `View in admin: ${adminOrderUrl}` : null,
     '',
     `Customer: ${customerName}`,
     `Email: ${customerEmail}`,
@@ -172,7 +189,8 @@ export async function sendOrderStaffNotificationEmail({
     .join('\n');
 
   const html = `
-<p><strong>New order ${escapeHtml(orderNumber)}</strong></p>
+<p><strong>New order ${orderNumberHtml}</strong></p>
+${orderId ? `<p><a href="${escapeHtml(adminOrderUrl)}">View order in admin</a></p>` : ''}
 <p>${escapeHtml(customerName)}<br>
 <a href="mailto:${escapeHtml(customerEmail)}">${escapeHtml(customerEmail)}</a>
 ${customerPhone ? `<br>${escapeHtml(customerPhone)}` : ''}</p>

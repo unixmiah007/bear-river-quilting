@@ -150,6 +150,7 @@ async function sendOrderEmails(order, items) {
       items,
     }),
     sendOrderStaffNotificationEmail({
+      orderId: order.id,
       orderNumber: order.order_number,
       customerName: order.customer_name,
       customerEmail: order.customer_email,

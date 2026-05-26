@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { adminApi } from '../api.js';
 import ShippingLabelPanel from '../components/admin/ShippingLabelPanel.jsx';
 import { labelForCarrier, SHIPPING_CARRIER_OPTIONS } from '../lib/shippingCarriers.js';
@@ -85,7 +86,9 @@ function orderMatchesSearch(order, term) {
 }
 
 export default function AdminOrders() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
+  const [ordersLoaded, setOrdersLoaded] = useState(false);
   const [selected, setSelected] = useState(null);
   const [details, setDetails] = useState(null);
   const [error, setError] = useState(null);
@@ -155,8 +158,40 @@ export default function AdminOrders() {
   }
 
   useEffect(() => {
-    refresh().catch((e) => setError(e.body?.error || e.message));
+    refresh()
+      .catch((e) => setError(e.body?.error || e.message))
+      .finally(() => setOrdersLoaded(true));
   }, []);
+
+  useEffect(() => {
+    if (!ordersLoaded) return undefined;
+    const raw = searchParams.get('order');
+    if (raw == null || String(raw).trim() === '') return undefined;
+    const orderId = Number(raw);
+    if (!Number.isFinite(orderId) || orderId <= 0) {
+      setSearchParams(
+        (sp) => {
+          const n = new URLSearchParams(sp);
+          n.delete('order');
+          return n;
+        },
+        { replace: true }
+      );
+      return undefined;
+    }
+
+    setSearchParams(
+      (sp) => {
+        const n = new URLSearchParams(sp);
+        n.delete('order');
+        return n;
+      },
+      { replace: true }
+    );
+
+    loadDetails(orderId);
+    return undefined;
+  }, [ordersLoaded, searchParams, setSearchParams, loadDetails]);
 
   useEffect(() => {
     if (!details) return undefined;
