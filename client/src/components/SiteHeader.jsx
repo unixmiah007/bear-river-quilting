@@ -7,7 +7,6 @@ import AdminNavLink from './AdminNavLink.jsx';
 
 export function SiteNav({
   className,
-  pages,
   showLegalLinks = false,
   onNavigate,
   'aria-label': ariaLabel,
@@ -43,12 +42,23 @@ export function SiteNav({
       ) : null}
       <CartNavLink onNavigate={onNavigate} />
       <AccountNavLink onNavigate={onNavigate} />
+      <AdminNavLink onNavigate={onNavigate} />
+    </nav>
+  );
+}
+
+/** CMS collection pages — footer only, below main footer navigation. */
+export function SiteFooterPageLinks({ pages, onNavigate }) {
+  if (!pages?.length) return null;
+  const linkProps = onNavigate ? { onClick: onNavigate } : {};
+
+  return (
+    <nav className="nav site-footer-page-links" aria-label="Collection pages">
       {pages.map((p) => (
         <NavLink key={p.id} to={`/p/${p.slug}`} {...linkProps}>
           {p.title}
         </NavLink>
       ))}
-      <AdminNavLink onNavigate={onNavigate} />
     </nav>
   );
 }
@@ -89,7 +99,7 @@ function BurgerIcon({ open }) {
   );
 }
 
-export default function SiteHeader({ pages }) {
+export default function SiteHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
 
@@ -132,11 +142,7 @@ export default function SiteHeader({ pages }) {
           <BurgerIcon open={menuOpen} />
           <span className="nav-burger__label">{menuOpen ? 'Close menu' : 'Open menu'}</span>
         </button>
-        <SiteNav
-          className="nav nav--desktop"
-          pages={pages}
-          aria-label="Main navigation"
-        />
+        <SiteNav className="nav nav--desktop" aria-label="Main navigation" />
       </div>
 
       <div
@@ -155,7 +161,6 @@ export default function SiteHeader({ pages }) {
           <p className="nav-mobile-panel__title">Menu</p>
           <SiteNav
             className="nav nav--mobile"
-            pages={pages}
             onNavigate={closeMenu}
             aria-label="Mobile navigation"
           />

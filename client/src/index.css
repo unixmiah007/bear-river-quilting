@@ -571,6 +571,15 @@ button {
   justify-content: center;
 }
 
+.site-footer-page-links {
+  justify-content: center;
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+}
+
 .site-sticky-bar {
   margin-top: auto;
   flex-shrink: 0;
@@ -2507,6 +2516,87 @@ tr:last-child td {
   display: grid;
   gap: 1.5rem;
   grid-template-columns: 1fr 1fr;
+}
+
+.admin-page-builder__subhead {
+  margin: 0 0 0.65rem;
+  font-size: 1rem;
+}
+
+.admin-dnd-palette__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.35rem;
+  border-radius: 6px;
+  cursor: grab;
+}
+
+.admin-dnd-palette__item:active {
+  cursor: grabbing;
+}
+
+.admin-dnd-palette__grip {
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: -0.12em;
+  user-select: none;
+}
+
+.admin-dnd-palette__label {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+}
+
+.admin-dnd-dropzone {
+  min-height: 140px;
+  padding: 0.75rem;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  background: #f9fafb;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.admin-dnd-dropzone--active {
+  border-color: #111111;
+  background: #f3f4f6;
+}
+
+.admin-dnd-dropzone__hint {
+  margin: 0;
+  text-align: center;
+  padding: 2rem 0.5rem;
+}
+
+.admin-dnd-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.admin-dnd-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: grab;
+}
+
+.admin-dnd-chip:active {
+  cursor: grabbing;
+}
+
+.admin-dnd-chip .btn-danger {
+  margin-left: auto;
+  padding: 0.15rem 0.45rem;
+  min-width: 2rem;
 }
 
 .admin-tracking-form {
