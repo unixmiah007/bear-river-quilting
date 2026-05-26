@@ -37,6 +37,7 @@ export const publicApi = {
   listPages: () => apiJsonArray('/api/pages'),
   pageBySlug: (slug) => api(`/api/pages/by-slug/${encodeURIComponent(slug)}`),
   listProducts: () => apiJsonArray('/api/products'),
+  featuredProducts: () => apiJsonArray('/api/products/featured'),
   bestSellers: () => apiJsonArray('/api/products/best-sellers'),
   productById: (id) => api(`/api/products/${encodeURIComponent(id)}`),
   stripeConfig: () => api('/api/config/stripe'),

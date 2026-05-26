@@ -86,17 +86,42 @@ function normalizeProductRow(norm) {
   const pubRaw = pickRaw(norm, ['is_published', 'published', 'live', 'visible', 'status']);
   const is_published = pubRaw ? parsePublished(pubRaw) : false;
 
+  const featuredRaw = pickRaw(norm, ['is_featured', 'featured', 'spotlight', 'hero']);
+  const is_featured = featuredRaw ? parsePublished(featuredRaw) : false;
+
   const sizeRaw = pickRaw(norm, ['product_size', 'size', 'quilt_size']);
   const product_size = sizeRaw ? normalizeProductSize(sizeRaw) : null;
   if (sizeRaw && !product_size) {
     return { error: `Invalid product_size "${sizeRaw}". Use: small, large, x-large, xx-large, xxx-large` };
   }
 
-  return { id, sku, name, description, price, image_url, stock_quantity, is_published, product_size };
+  return {
+    id,
+    sku,
+    name,
+    description,
+    price,
+    image_url,
+    stock_quantity,
+    is_published,
+    is_featured,
+    product_size,
+  };
 }
 
 async function applyProductRow(pool, row) {
-  const { id, sku, name, description, price, image_url, stock_quantity, is_published, product_size } = row;
+  const {
+    id,
+    sku,
+    name,
+    description,
+    price,
+    image_url,
+    stock_quantity,
+    is_published,
+    is_featured,
+    product_size,
+  } = row;
 
   if (id) {
     const [[existing]] = await pool.query('SELECT id FROM products WHERE id = ?', [id]);
@@ -104,7 +129,7 @@ async function applyProductRow(pool, row) {
       throw new Error(`No product with id ${id}`);
     }
     await pool.query(
-      `UPDATE products SET name=?, description=?, price=?, image_url=?, is_published=?, sku=?, stock_quantity=?, product_size=?
+      `UPDATE products SET name=?, description=?, price=?, image_url=?, is_published=?, is_featured=?, sku=?, stock_quantity=?, product_size=?
        WHERE id=?`,
       [
         name,
@@ -112,6 +137,7 @@ async function applyProductRow(pool, row) {
         price,
         image_url,
         is_published ? 1 : 0,
+        is_featured ? 1 : 0,
         sku,
         stock_quantity,
         product_size,
@@ -125,7 +151,7 @@ async function applyProductRow(pool, row) {
     const [[bySku]] = await pool.query('SELECT id FROM products WHERE sku = ?', [sku]);
     if (bySku) {
       await pool.query(
-        `UPDATE products SET name=?, description=?, price=?, image_url=?, is_published=?, sku=?, stock_quantity=?, product_size=?
+        `UPDATE products SET name=?, description=?, price=?, image_url=?, is_published=?, is_featured=?, sku=?, stock_quantity=?, product_size=?
          WHERE id=?`,
         [
           name,
@@ -133,6 +159,7 @@ async function applyProductRow(pool, row) {
           price,
           image_url,
           is_published ? 1 : 0,
+          is_featured ? 1 : 0,
           sku,
           stock_quantity,
           product_size,
@@ -144,9 +171,19 @@ async function applyProductRow(pool, row) {
   }
 
   await pool.query(
-    `INSERT INTO products (name, description, price, image_url, is_published, sku, stock_quantity, product_size)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [name, description, price, image_url, is_published ? 1 : 0, sku, stock_quantity, product_size]
+    `INSERT INTO products (name, description, price, image_url, is_published, is_featured, sku, stock_quantity, product_size)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      name,
+      description,
+      price,
+      image_url,
+      is_published ? 1 : 0,
+      is_featured ? 1 : 0,
+      sku,
+      stock_quantity,
+      product_size,
+    ]
   );
   return 'created';
 }
@@ -220,6 +257,7 @@ export const PRODUCT_CSV_HEADERS = [
   'product_size',
   'image_url',
   'is_published',
+  'is_featured',
 ];
 
 function escapeCsvCell(val) {
@@ -246,6 +284,7 @@ export function productsToCsv(products) {
         escapeCsvCell(p.product_size),
         escapeCsvCell(p.image_url),
         p.is_published ? 1 : 0,
+        p.is_featured ? 1 : 0,
       ].join(',')
     );
   }

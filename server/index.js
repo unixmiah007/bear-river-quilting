@@ -16,6 +16,7 @@ import {
 import { ensureProductInventoryColumns } from './lib/ensureProductInventoryColumns.js';
 import { ensureProductImagesTable } from './lib/ensureProductImagesTable.js';
 import { ensureProductSizeColumn } from './lib/ensureProductSizeColumn.js';
+import { ensureProductFeaturedColumn } from './lib/ensureProductFeaturedColumn.js';
 import { ensurePagesTable } from './lib/ensurePagesTable.js';
 import { seedDemoProducts } from './lib/seedDemoProducts.js';
 import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './lib/mail.js';
@@ -248,6 +249,38 @@ app.get('/api/products', async (_req, res) => {
       return sendProductSchemaMismatch(res);
     }
     res.status(500).json({ error: 'Failed to list products' });
+  }
+});
+
+/** Up to 4 published products marked featured (products page hero). */
+app.get('/api/products/featured', async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, name, description, price, image_url, stock_quantity, product_size
+       FROM products
+       WHERE is_published = 1 AND is_featured = 1
+       ORDER BY updated_at DESC, name ASC
+       LIMIT 4`
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    if (isMissingProductColumnError(e)) {
+      try {
+        const [rows] = await pool.query(
+          `SELECT id, name, description, price, image_url, stock_quantity, product_size
+           FROM products
+           WHERE is_published = 1
+           ORDER BY updated_at DESC, name ASC
+           LIMIT 4`
+        );
+        return res.json(rows);
+      } catch (e2) {
+        console.error(e2);
+        return res.json([]);
+      }
+    }
+    res.status(500).json({ error: 'Failed to load featured products' });
   }
 });
 
@@ -597,7 +630,7 @@ app.get('/api/admin/products/csv-template', authMiddleware, (_req, res) => {
 app.get('/api/admin/products/export.csv', authMiddleware, async (_req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id, sku, name, description, price, stock_quantity, product_size, image_url, is_published
+      `SELECT id, sku, name, description, price, stock_quantity, product_size, image_url, is_published, is_featured
        FROM products ORDER BY id ASC`
     );
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -632,7 +665,7 @@ app.post('/api/admin/products/import', authMiddleware, async (req, res) => {
 app.get('/api/admin/products', authMiddleware, async (_req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, sku, name, description, price, stock_quantity, product_size, image_url, is_published, updated_at FROM products ORDER BY name ASC'
+      'SELECT id, sku, name, description, price, stock_quantity, product_size, image_url, is_published, is_featured, updated_at FROM products ORDER BY name ASC'
     );
     res.json(rows);
   } catch (e) {
@@ -651,7 +684,7 @@ app.get('/api/admin/products/by-id/:id', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Invalid product id' });
     }
     const [[product]] = await pool.query(
-      `SELECT id, sku, name, description, price, stock_quantity, product_size, image_url, is_published, updated_at
+      `SELECT id, sku, name, description, price, stock_quantity, product_size, image_url, is_published, is_featured, updated_at
        FROM products WHERE id = ?`,
       [id]
     );
@@ -782,7 +815,7 @@ app.delete(
 
 app.post('/api/admin/products', authMiddleware, async (req, res) => {
   try {
-    const { name, description, price, image_url, is_published, sku, stock_quantity, product_size } =
+    const { name, description, price, image_url, is_published, is_featured, sku, stock_quantity, product_size } =
       req.body ?? {};
     if (!name) {
       return res.status(400).json({ error: 'name is required' });
@@ -794,13 +827,14 @@ app.post('/api/admin/products', authMiddleware, async (req, res) => {
     const skuVal = sku != null && String(sku).trim() !== '' ? String(sku).trim().slice(0, 64) : null;
     const stock = Math.max(0, Math.min(9999999, Math.floor(Number(stock_quantity) || 0)));
     const [result] = await pool.query(
-      'INSERT INTO products (name, description, price, image_url, is_published, sku, stock_quantity, product_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO products (name, description, price, image_url, is_published, is_featured, sku, stock_quantity, product_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         name,
         description ?? null,
         Number(price) || 0,
         image_url ?? null,
         is_published ? 1 : 0,
+        is_featured ? 1 : 0,
         skuVal,
         stock,
         sizeParsed.value,
@@ -819,7 +853,7 @@ app.post('/api/admin/products', authMiddleware, async (req, res) => {
 app.put('/api/admin/products/:id', authMiddleware, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { name, description, price, image_url, is_published, sku, stock_quantity, product_size } =
+    const { name, description, price, image_url, is_published, is_featured, sku, stock_quantity, product_size } =
       req.body ?? {};
     if (!name) {
       return res.status(400).json({ error: 'name is required' });
@@ -831,13 +865,14 @@ app.put('/api/admin/products/:id', authMiddleware, async (req, res) => {
     const skuVal = sku != null && String(sku).trim() !== '' ? String(sku).trim().slice(0, 64) : null;
     const stock = Math.max(0, Math.min(9999999, Math.floor(Number(stock_quantity) || 0)));
     const [result] = await pool.query(
-      'UPDATE products SET name = ?, description = ?, price = ?, image_url = ?, is_published = ?, sku = ?, stock_quantity = ?, product_size = ? WHERE id = ?',
+      'UPDATE products SET name = ?, description = ?, price = ?, image_url = ?, is_published = ?, is_featured = ?, sku = ?, stock_quantity = ?, product_size = ? WHERE id = ?',
       [
         name,
         description ?? null,
         Number(price) || 0,
         image_url ?? null,
         is_published ? 1 : 0,
+        is_featured ? 1 : 0,
         skuVal,
         stock,
         sizeParsed.value,
@@ -1142,6 +1177,11 @@ async function startServer() {
     await ensureProductSizeColumn(pool);
   } catch (e) {
     console.error('[ensureProductSizeColumn]', e?.message || e);
+  }
+  try {
+    await ensureProductFeaturedColumn(pool);
+  } catch (e) {
+    console.error('[ensureProductFeaturedColumn]', e?.message || e);
   }
   try {
     await ensureStripeOrderColumns(pool);

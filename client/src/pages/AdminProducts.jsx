@@ -13,6 +13,7 @@ const emptyForm = {
   product_size: '',
   image_url: '',
   is_published: false,
+  is_featured: false,
 };
 
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
@@ -84,6 +85,7 @@ function productSearchText(product) {
   const published = product.is_published
     ? 'live published yes 1 true'
     : 'draft unpublished no 0 false';
+  const featured = product.is_featured ? 'featured spotlight hero yes 1' : 'not featured';
   const parts = [
     product.sku,
     product.name,
@@ -92,6 +94,7 @@ function productSearchText(product) {
     String(product.price ?? ''),
     formatPrice(product.price),
     published,
+    featured,
   ];
   return parts
     .filter((p) => p != null && String(p).trim() !== '')
@@ -126,6 +129,8 @@ export default function AdminProducts() {
   const [sortKey, setSortKey] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const [searchQuery, setSearchQuery] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const filteredRows = useMemo(() => {
     const term = searchQuery.trim().toLowerCase();
@@ -237,6 +242,7 @@ export default function AdminProducts() {
         price: form.price,
         stock_quantity: form.stock_quantity,
         is_published: !!form.is_published,
+        is_featured: !!form.is_featured,
       });
       setEditingId(id);
       await refresh();
@@ -256,6 +262,7 @@ export default function AdminProducts() {
       product_size: p.product_size ?? '',
       image_url: p.image_url ?? '',
       is_published: !!p.is_published,
+      is_featured: !!p.is_featured,
     });
   }, []);
 
@@ -324,6 +331,7 @@ export default function AdminProducts() {
         price: form.price,
         stock_quantity: form.stock_quantity,
         is_published: !!form.is_published,
+        is_featured: !!form.is_featured,
       });
       setEditingId(null);
       setForm(emptyForm);
@@ -368,14 +376,41 @@ export default function AdminProducts() {
     }
   }
 
-  async function onDelete(id) {
-    if (!window.confirm('Delete this product?')) return;
+  function openDeleteConfirm(product) {
+    setDeleteTarget({ id: product.id, name: product.name });
+  }
+
+  function closeDeleteConfirm() {
+    if (deleteBusy) return;
+    setDeleteTarget(null);
+  }
+
+  useEffect(() => {
+    if (!deleteTarget) return undefined;
+    function onKeyDown(e) {
+      if (e.key === 'Escape' && !deleteBusy) setDeleteTarget(null);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [deleteTarget, deleteBusy]);
+
+  async function confirmDeleteProduct() {
+    if (!deleteTarget || deleteBusy) return;
+    setDeleteBusy(true);
     setError(null);
     try {
-      await adminApi.deleteProduct(id);
+      await adminApi.deleteProduct(deleteTarget.id);
+      if (editingId === deleteTarget.id) {
+        setEditingId(null);
+        setForm(emptyForm);
+        setGalleryImages([]);
+      }
+      setDeleteTarget(null);
       await refresh();
     } catch (err) {
       setError(err.body?.error || err.message);
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -550,6 +585,20 @@ export default function AdminProducts() {
             Published (visible on public pages when linked)
           </label>
         </div>
+        <div className="field row">
+          <input
+            id="featured"
+            type="checkbox"
+            checked={!!form.is_featured}
+            onChange={(e) => setForm((f) => ({ ...f, is_featured: e.target.checked }))}
+          />
+          <label
+            htmlFor="featured"
+            style={{ margin: 0, textTransform: 'none', letterSpacing: 'normal' }}
+          >
+            Featured (shown in the /products catalog hero — up to 4, published only)
+          </label>
+        </div>
         <div className="row">
           {editingId ? (
             <>
@@ -634,7 +683,7 @@ export default function AdminProducts() {
           <strong>name</strong> (or <strong>title</strong>). Use <strong>id</strong> or <strong>sku</strong>{' '}
           to update existing rows; omit <strong>id</strong> for new products. Columns: id, sku, name,
           description, price, stock_quantity, product_size (small, large, x-large, xx-large,
-          xxx-large), image_url, is_published (1/0).
+          xxx-large), image_url, is_published (1/0), is_featured (1/0).
         </p>
         <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
           <label className="btn" style={{ cursor: importBusy ? 'wait' : 'pointer' }}>
@@ -863,9 +912,16 @@ export default function AdminProducts() {
                   <td>{formatPrice(p.price)}</td>
                   <td>{Number(p.stock_quantity ?? 0)}</td>
                   <td>
-                    <span className={p.is_published ? 'badge badge-on' : 'badge badge-off'}>
-                      {p.is_published ? 'Live' : 'Draft'}
-                    </span>
+                    <div className="admin-product-badges">
+                      <span className={p.is_published ? 'badge badge-on' : 'badge badge-off'}>
+                        {p.is_published ? 'Live' : 'Draft'}
+                      </span>
+                      {p.is_featured ? (
+                        <span className="badge badge-on" style={{ marginLeft: '0.35rem' }}>
+                          Featured
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                   <td>
                     <div className="row" style={{ justifyContent: 'flex-end' }}>
@@ -885,7 +941,11 @@ export default function AdminProducts() {
                       <button type="button" className="btn" onClick={() => startEdit(p)}>
                         Edit
                       </button>
-                      <button type="button" className="btn btn-danger" onClick={() => onDelete(p.id)}>
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={() => openDeleteConfirm(p)}
+                      >
                         Delete
                       </button>
                     </div>
@@ -896,6 +956,49 @@ export default function AdminProducts() {
           </tbody>
         </table>
       </div>
+
+      {deleteTarget ? (
+        <div
+          className="confirm-dialog-backdrop"
+          role="presentation"
+          onClick={closeDeleteConfirm}
+        >
+          <div
+            className="confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-product-title"
+            aria-describedby="delete-product-desc"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="delete-product-title" className="confirm-dialog__title">
+              Delete product?
+            </h2>
+            <p id="delete-product-desc" className="muted confirm-dialog__body">
+              <strong>{deleteTarget.name}</strong> will be removed permanently. This cannot be
+              undone.
+            </p>
+            <div className="row confirm-dialog__actions">
+              <button
+                type="button"
+                className="btn"
+                onClick={closeDeleteConfirm}
+                disabled={deleteBusy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={confirmDeleteProduct}
+                disabled={deleteBusy}
+              >
+                {deleteBusy ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

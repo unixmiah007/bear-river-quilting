@@ -7,6 +7,7 @@ import { useCart } from '../context/CartContext.jsx';
 
 export default function Products() {
   const [products, setProducts] = useState([]);
+  const [featuredProducts, setFeaturedProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
@@ -17,10 +18,12 @@ export default function Products() {
 
   useEffect(() => {
     let cancelled = false;
-    publicApi
-      .listProducts()
-      .then((rows) => {
-        if (!cancelled) setProducts(Array.isArray(rows) ? rows : []);
+    Promise.all([publicApi.listProducts(), publicApi.featuredProducts()])
+      .then(([rows, featured]) => {
+        if (!cancelled) {
+          setProducts(Array.isArray(rows) ? rows : []);
+          setFeaturedProducts(Array.isArray(featured) ? featured : []);
+        }
       })
       .catch((e) => {
         if (!cancelled) {
@@ -72,7 +75,7 @@ export default function Products() {
 
   return (
     <>
-      <ProductsHero />
+      <ProductsHero featuredProducts={featuredProducts} />
       <section id="products-catalog" className="products-catalog" aria-label="Product catalog">
       {loading ? <p className="muted">Loading products…</p> : null}
       {error ? <p className="error">{error}</p> : null}

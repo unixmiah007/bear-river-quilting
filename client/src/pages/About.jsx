@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { publicApi } from '../api.js';
+import ProductCard from '../components/ProductCard.jsx';
+import { useCart } from '../context/CartContext.jsx';
 import { QUILT_MISTY_IMAGE, QUILT_STUDIO_IMAGE } from '../lib/quiltAssets.js';
 
 const TESTIMONIALS = [
@@ -47,6 +51,31 @@ const TESTIMONIALS = [
 
 export default function About() {
   const [startIndex, setStartIndex] = useState(0);
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+  const [featuredError, setFeaturedError] = useState(null);
+  const { addItem } = useCart();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let cancelled = false;
+    publicApi
+      .featuredProducts()
+      .then((rows) => {
+        if (!cancelled) setFeaturedProducts(Array.isArray(rows) ? rows : []);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setFeaturedError(e?.body?.error || e?.message || 'Failed to load featured products.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setFeaturedLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -100,6 +129,34 @@ export default function About() {
             up beautifully through everyday life.
           </p>
         </div>
+      </section>
+
+      <section className="featured about-featured">
+        <div className="featured-head">
+          <h2>Featured quilts</h2>
+          <Link to="/products">Shop all products</Link>
+        </div>
+        {featuredLoading ? (
+          <p className="muted">Loading featured quilts…</p>
+        ) : featuredError ? (
+          <p className="error">{featuredError}</p>
+        ) : featuredProducts.length === 0 ? (
+          <p className="muted">No featured products yet. Mark items as featured in Admin.</p>
+        ) : (
+          <div className="card-grid">
+            {featuredProducts.map((p) => (
+              <ProductCard
+                key={p.id}
+                product={p}
+                showFavorite
+                onAddToCart={(item) => {
+                  addItem(item, 1);
+                  navigate('/cart');
+                }}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="about-testimonials">

@@ -1,7 +1,15 @@
 import { Link } from 'react-router-dom';
-import { PRODUCTS_HERO_IMAGES } from '../lib/quiltAssets.js';
+import ProductImage from './ProductImage.jsx';
 
-export default function ProductsHero() {
+function formatPrice(n) {
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
+    Number(n)
+  );
+}
+
+export default function ProductsHero({ featuredProducts = [] }) {
+  const tiles = featuredProducts.slice(0, 4);
+
   return (
     <section className="hero products-hero" aria-labelledby="products-hero-heading">
       <div className="hero-grid">
@@ -21,17 +29,26 @@ export default function ProductsHero() {
             </Link>
           </div>
         </div>
-        <div className="hero-mosaic hero-mosaic--four">
-          {PRODUCTS_HERO_IMAGES.map((img, i) => (
-            <img
-              key={img.src}
-              src={img.src}
-              alt={img.alt}
-              loading={i === 0 ? 'eager' : 'lazy'}
-              decoding="async"
-              fetchPriority={i === 0 ? 'high' : undefined}
-            />
-          ))}
+        <div className="hero-mosaic hero-mosaic--four hero-mosaic--products" aria-label="Featured products">
+          {tiles.length > 0 ? (
+            tiles.map((p) => (
+              <Link
+                key={p.id}
+                to={`/products/${p.id}`}
+                className="products-hero-tile"
+              >
+                <ProductImage src={p.image_url} alt={p.name} />
+                <span className="products-hero-tile__meta">
+                  <span className="products-hero-tile__name">{p.name}</span>
+                  <span className="products-hero-tile__price">{formatPrice(p.price)}</span>
+                </span>
+              </Link>
+            ))
+          ) : (
+            <p className="muted products-hero-tile products-hero-tile--empty">
+              Mark products as <strong>Featured</strong> in Admin to highlight them here.
+            </p>
+          )}
         </div>
       </div>
     </section>
