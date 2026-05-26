@@ -76,6 +76,34 @@ function formatPrice(n) {
   );
 }
 
+function productSearchText(product) {
+  const sizeLabel = product.product_size
+    ? PRODUCT_SIZE_OPTIONS.find((o) => o.value === product.product_size)?.label ??
+      product.product_size
+    : '';
+  const published = product.is_published
+    ? 'live published yes 1 true'
+    : 'draft unpublished no 0 false';
+  const parts = [
+    product.sku,
+    product.name,
+    sizeLabel,
+    product.product_size,
+    String(product.price ?? ''),
+    formatPrice(product.price),
+    published,
+  ];
+  return parts
+    .filter((p) => p != null && String(p).trim() !== '')
+    .join(' ')
+    .toLowerCase();
+}
+
+function productMatchesSearch(product, term) {
+  if (!term) return true;
+  return productSearchText(product).includes(term);
+}
+
 export default function AdminProducts() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
@@ -97,11 +125,18 @@ export default function AdminProducts() {
   const [page, setPage] = useState(1);
   const [sortKey, setSortKey] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredRows = useMemo(() => {
+    const term = searchQuery.trim().toLowerCase();
+    if (!term) return rows;
+    return rows.filter((p) => productMatchesSearch(p, term));
+  }, [rows, searchQuery]);
 
   const sortedRows = useMemo(() => {
-    if (!SORTABLE_COLUMNS.includes(sortKey)) return rows;
-    return [...rows].sort((a, b) => compareProducts(a, b, sortKey, sortDir));
-  }, [rows, sortKey, sortDir]);
+    if (!SORTABLE_COLUMNS.includes(sortKey)) return filteredRows;
+    return [...filteredRows].sort((a, b) => compareProducts(a, b, sortKey, sortDir));
+  }, [filteredRows, sortKey, sortDir]);
 
   const totalPages = useMemo(() => {
     if (pageSize === 'all' || sortedRows.length === 0) return 1;
@@ -126,16 +161,16 @@ export default function AdminProducts() {
   }
 
   const listRange = useMemo(() => {
-    if (rows.length === 0) return { start: 0, end: 0 };
-    if (pageSize === 'all') return { start: 1, end: rows.length };
+    if (sortedRows.length === 0) return { start: 0, end: 0 };
+    if (pageSize === 'all') return { start: 1, end: sortedRows.length };
     const start = (page - 1) * pageSize + 1;
-    const end = Math.min(page * pageSize, rows.length);
+    const end = Math.min(page * pageSize, sortedRows.length);
     return { start, end };
-  }, [rows.length, page, pageSize]);
+  }, [sortedRows.length, page, pageSize]);
 
   useEffect(() => {
     setPage(1);
-  }, [pageSize, sortKey, sortDir]);
+  }, [pageSize, sortKey, sortDir, searchQuery]);
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -662,6 +697,20 @@ export default function AdminProducts() {
       </section>
 
       {rows.length > 0 ? (
+        <div className="field admin-products-search" style={{ marginBottom: '1rem', maxWidth: '32rem' }}>
+          <label htmlFor="admin-products-search">Search products</label>
+          <input
+            id="admin-products-search"
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="SKU, name, size, price, published…"
+            autoComplete="off"
+          />
+        </div>
+      ) : null}
+
+      {rows.length > 0 ? (
         <div className="admin-pagination">
           <div className="admin-pagination__size">
             <label htmlFor="admin-products-page-size">Show</label>
@@ -680,9 +729,17 @@ export default function AdminProducts() {
               ))}
             </select>
             <span className="muted">
+              {searchQuery.trim() && filteredRows.length !== rows.length
+                ? `${filteredRows.length} of ${rows.length} product${rows.length === 1 ? '' : 's'} match`
+                : null}
+              {searchQuery.trim() && filteredRows.length !== rows.length ? ' · ' : null}
               {pageSize === 'all'
-                ? `All ${rows.length} product${rows.length === 1 ? '' : 's'}`
-                : `Showing ${listRange.start}–${listRange.end} of ${rows.length}`}
+                ? sortedRows.length === 0
+                  ? 'No matching products'
+                  : `All ${sortedRows.length} shown`
+                : sortedRows.length === 0
+                  ? 'No matching products'
+                  : `Showing ${listRange.start}–${listRange.end} of ${sortedRows.length}`}
             </span>
           </div>
           {pageSize !== 'all' && totalPages > 1 ? (
@@ -779,6 +836,12 @@ export default function AdminProducts() {
                   >
                     {seedBusy ? 'Loading…' : 'Load example products'}
                   </button>
+                </td>
+              </tr>
+            ) : paginatedRows.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="muted">
+                  No products match your search.
                 </td>
               </tr>
             ) : (

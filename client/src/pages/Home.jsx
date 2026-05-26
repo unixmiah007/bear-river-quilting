@@ -197,6 +197,7 @@ export default function Home() {
                 <ProductCard
                   key={p.id}
                   product={p}
+                  showFavorite
                   onAddToCart={(item) => {
                     addItem(item, 1);
                     navigate('/cart');
@@ -235,6 +236,7 @@ export default function Home() {
                 <ProductCard
                   key={p.id}
                   product={p}
+                  showFavorite
                   onAddToCart={(item) => {
                     addItem(item, 1);
                     navigate('/cart');
