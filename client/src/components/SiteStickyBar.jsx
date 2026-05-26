@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import BrandLogo from './BrandLogo.jsx';
 import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from '../lib/siteContact.js';
 
 const WEEKDAY_HOURS = [
@@ -15,9 +17,14 @@ export default function SiteStickyBar() {
     <aside className="site-sticky-bar" aria-label="Contact and customer care hours">
       <div className="site-sticky-bar__inner">
         <div className="site-sticky-bar__top">
-          <p className="site-sticky-bar__copyright">
-            © {year} Bear River Quilting. All rights reserved.
-          </p>
+          <div className="site-sticky-bar__brand-row">
+            <Link to="/" className="site-sticky-bar__logo-link" aria-label="Bear River Quilting home">
+              <BrandLogo className="site-sticky-bar__logo" />
+            </Link>
+            <p className="site-sticky-bar__copyright">
+              © {year} Bear River Quilting. All rights reserved.
+            </p>
+          </div>
           <p className="site-sticky-bar__phone">
             <a href={`tel:${SUPPORT_PHONE_TEL}`}>{SUPPORT_PHONE_DISPLAY}</a>
           </p>
