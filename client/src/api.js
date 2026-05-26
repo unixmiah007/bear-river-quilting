@@ -36,7 +36,11 @@ async function apiJsonArray(path) {
 export const publicApi = {
   listPages: () => apiJsonArray('/api/pages'),
   pageBySlug: (slug) => api(`/api/pages/by-slug/${encodeURIComponent(slug)}`),
-  listProducts: () => apiJsonArray('/api/products'),
+  listProducts: (categorySlug) => {
+    const q = categorySlug ? `?category=${encodeURIComponent(categorySlug)}` : '';
+    return apiJsonArray(`/api/products${q}`);
+  },
+  listProductCategories: () => apiJsonArray('/api/product-categories'),
   featuredProducts: () => apiJsonArray('/api/products/featured'),
   bestSellers: () => apiJsonArray('/api/products/best-sellers'),
   productById: (id) => api(`/api/products/${encodeURIComponent(id)}`),
@@ -109,6 +113,27 @@ export const adminApi = {
   updateProduct: (id, body) =>
     api(`/api/admin/products/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteProduct: (id) => api(`/api/admin/products/${id}`, { method: 'DELETE' }),
+  productCategoriesForProduct: (productId) =>
+    apiJsonArray(`/api/admin/products/${encodeURIComponent(productId)}/categories`),
+  setProductCategories: (productId, categoryIds) =>
+    api(`/api/admin/products/${encodeURIComponent(productId)}/categories`, {
+      method: 'PUT',
+      body: JSON.stringify({ categoryIds }),
+    }),
+
+  productCategories: () => apiJsonArray('/api/admin/product-categories'),
+  createProductCategory: (body) =>
+    api('/api/admin/product-categories', { method: 'POST', body: JSON.stringify(body) }),
+  updateProductCategory: (id, body) =>
+    api(`/api/admin/product-categories/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteProductCategory: (id) => api(`/api/admin/product-categories/${id}`, { method: 'DELETE' }),
+  categoryProducts: (categoryId) =>
+    apiJsonArray(`/api/admin/product-categories/${categoryId}/products`),
+  setCategoryProducts: (categoryId, productIds) =>
+    api(`/api/admin/product-categories/${categoryId}/products`, {
+      method: 'PUT',
+      body: JSON.stringify({ productIds }),
+    }),
 
   pageProducts: (pageId) => apiJsonArray(`/api/admin/pages/${pageId}/products`),
   setPageProducts: (pageId, productIds) =>

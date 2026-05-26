@@ -4,9 +4,11 @@ import BrandLogo from './BrandLogo.jsx';
 import CartNavLink from './CartNavLink.jsx';
 import AccountNavLink from './AccountNavLink.jsx';
 import AdminNavLink from './AdminNavLink.jsx';
+import ProductsNavLink from './ProductsNavLink.jsx';
 
 export function SiteNav({
   className,
+  categories = [],
   showLegalLinks = false,
   onNavigate,
   'aria-label': ariaLabel,
@@ -21,9 +23,11 @@ export function SiteNav({
       <NavLink to="/about" {...linkProps}>
         About Us
       </NavLink>
-      <NavLink to="/products" {...linkProps}>
-        Products
-      </NavLink>
+      <ProductsNavLink
+        categories={categories}
+        onNavigate={onNavigate}
+        variant={className?.includes('nav--mobile') ? 'mobile' : 'desktop'}
+      />
       {showLegalLinks ? (
         <>
           <NavLink to="/privacy-policy" {...linkProps}>
@@ -99,7 +103,7 @@ function BurgerIcon({ open }) {
   );
 }
 
-export default function SiteHeader() {
+export default function SiteHeader({ categories = [] }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { pathname } = useLocation();
 
@@ -142,7 +146,11 @@ export default function SiteHeader() {
           <BurgerIcon open={menuOpen} />
           <span className="nav-burger__label">{menuOpen ? 'Close menu' : 'Open menu'}</span>
         </button>
-        <SiteNav className="nav nav--desktop" aria-label="Main navigation" />
+        <SiteNav
+          className="nav nav--desktop"
+          categories={categories}
+          aria-label="Main navigation"
+        />
       </div>
 
       <div
@@ -161,6 +169,7 @@ export default function SiteHeader() {
           <p className="nav-mobile-panel__title">Menu</p>
           <SiteNav
             className="nav nav--mobile"
+            categories={categories}
             onNavigate={closeMenu}
             aria-label="Mobile navigation"
           />

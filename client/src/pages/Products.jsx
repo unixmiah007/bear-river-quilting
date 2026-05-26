@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import ProductCard from '../components/ProductCard.jsx';
 import ProductsHero from '../components/ProductsHero.jsx';
 import { useCart } from '../context/CartContext.jsx';
 
 export default function Products() {
+  const [searchParams] = useSearchParams();
+  const categorySlug = searchParams.get('category')?.trim() || '';
   const [products, setProducts] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
@@ -16,9 +19,29 @@ export default function Products() {
   const { addItem } = useCart();
   const navigate = useNavigate();
 
+  const activeCategory = useMemo(
+    () => categories.find((c) => c.slug === categorySlug),
+    [categories, categorySlug]
+  );
+
   useEffect(() => {
     let cancelled = false;
-    Promise.all([publicApi.listProducts(), publicApi.featuredProducts()])
+    publicApi.listProductCategories().then((rows) => {
+      if (!cancelled) setCategories(Array.isArray(rows) ? rows : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      publicApi.listProducts(categorySlug || undefined),
+      publicApi.featuredProducts(),
+    ])
       .then(([rows, featured]) => {
         if (!cancelled) {
           setProducts(Array.isArray(rows) ? rows : []);
@@ -49,7 +72,7 @@ export default function Products() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [categorySlug]);
 
   const visibleProducts = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -77,6 +100,14 @@ export default function Products() {
     <>
       <ProductsHero featuredProducts={featuredProducts} />
       <section id="products-catalog" className="products-catalog" aria-label="Product catalog">
+      {activeCategory ? (
+        <h2 className="products-catalog__heading" style={{ marginTop: 0 }}>
+          {activeCategory.name}
+        </h2>
+      ) : null}
+      {activeCategory?.description ? (
+        <p className="muted products-catalog__intro">{activeCategory.description}</p>
+      ) : null}
       {loading ? <p className="muted">Loading products…</p> : null}
       {error ? <p className="error">{error}</p> : null}
       {!loading && !error ? (
@@ -113,7 +144,11 @@ export default function Products() {
         </div>
       </div>
       {products.length === 0 ? (
-        <div className="empty">No published products yet.</div>
+        <div className="empty">
+          {activeCategory
+            ? `No published products in “${activeCategory.name}” yet.`
+            : 'No published products yet.'}
+        </div>
       ) : visibleProducts.length === 0 ? (
         <div className="empty">No products match your filters.</div>
       ) : (

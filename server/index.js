@@ -18,6 +18,7 @@ import { ensureProductImagesTable } from './lib/ensureProductImagesTable.js';
 import { ensureProductSizeColumn } from './lib/ensureProductSizeColumn.js';
 import { ensureProductFeaturedColumn } from './lib/ensureProductFeaturedColumn.js';
 import { ensurePagesTable } from './lib/ensurePagesTable.js';
+import { ensureProductCategories } from './lib/ensureProductCategories.js';
 import { seedDemoProducts } from './lib/seedDemoProducts.js';
 import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './lib/mail.js';
 import { verifySendGridIfConfigured } from './lib/sendgridMail.js';
@@ -228,8 +229,44 @@ app.get('/api/pages/by-slug/:slug', async (req, res) => {
   }
 });
 
-app.get('/api/products', async (_req, res) => {
+app.get('/api/product-categories', async (_req, res) => {
   try {
+    const [rows] = await pool.query(
+      `SELECT id, slug, name, description, sort_order
+       FROM product_categories
+       ORDER BY sort_order ASC, name ASC`
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    if (e.code === 'ER_NO_SUCH_TABLE') {
+      return res.json([]);
+    }
+    res.status(500).json({ error: 'Failed to list product categories' });
+  }
+});
+
+app.get('/api/products', async (req, res) => {
+  try {
+    const categorySlug = String(req.query.category ?? '').trim();
+    if (categorySlug) {
+      const [[cat]] = await pool.query(
+        'SELECT id FROM product_categories WHERE slug = ?',
+        [categorySlug]
+      );
+      if (!cat) {
+        return res.json([]);
+      }
+      const [rows] = await pool.query(
+        `SELECT p.id, p.name, p.description, p.price, p.image_url, p.stock_quantity, p.product_size
+         FROM products p
+         INNER JOIN product_category_products pcp ON pcp.product_id = p.id
+         WHERE pcp.category_id = ? AND p.is_published = 1
+         ORDER BY pcp.sort_order ASC, p.name ASC`,
+        [cat.id]
+      );
+      return res.json(rows);
+    }
     const [rows] = await pool.query(
       `SELECT id, name, description, price, image_url, stock_quantity, product_size
        FROM products
@@ -601,6 +638,140 @@ app.delete('/api/admin/pages/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// --- Admin: product categories ---
+
+app.get('/api/admin/product-categories', authMiddleware, async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, slug, name, description, sort_order, updated_at
+       FROM product_categories
+       ORDER BY sort_order ASC, name ASC`
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to list categories' });
+  }
+});
+
+app.post('/api/admin/product-categories', authMiddleware, async (req, res) => {
+  try {
+    const { name, slug, description, sort_order } = req.body ?? {};
+    if (!name) {
+      return res.status(400).json({ error: 'name is required' });
+    }
+    const finalSlug = slugify(slug || name);
+    const sort = Number.isFinite(Number(sort_order)) ? Number(sort_order) : 0;
+    const [result] = await pool.query(
+      'INSERT INTO product_categories (slug, name, description, sort_order) VALUES (?, ?, ?, ?)',
+      [finalSlug, name, description ?? null, sort]
+    );
+    res.status(201).json({ id: result.insertId, slug: finalSlug });
+  } catch (e) {
+    if (e.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Slug already exists' });
+    }
+    console.error(e);
+    res.status(500).json({ error: 'Failed to create category' });
+  }
+});
+
+app.put('/api/admin/product-categories/:id', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { name, slug, description, sort_order } = req.body ?? {};
+    if (!name) {
+      return res.status(400).json({ error: 'name is required' });
+    }
+    const finalSlug = slugify(slug || name);
+    const sort = Number.isFinite(Number(sort_order)) ? Number(sort_order) : 0;
+    const [result] = await pool.query(
+      'UPDATE product_categories SET slug = ?, name = ?, description = ?, sort_order = ? WHERE id = ?',
+      [finalSlug, name, description ?? null, sort, id]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    res.json({ ok: true, slug: finalSlug });
+  } catch (e) {
+    if (e.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Slug already exists' });
+    }
+    console.error(e);
+    res.status(500).json({ error: 'Failed to update category' });
+  }
+});
+
+app.delete('/api/admin/product-categories/:id', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [result] = await pool.query('DELETE FROM product_categories WHERE id = ?', [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to delete category' });
+  }
+});
+
+app.get('/api/admin/product-categories/:id/products', authMiddleware, async (req, res) => {
+  try {
+    const categoryId = Number(req.params.id);
+    const [rows] = await pool.query(
+      `SELECT p.id, p.name, p.is_published, pcp.sort_order
+       FROM product_category_products pcp
+       INNER JOIN products p ON p.id = pcp.product_id
+       WHERE pcp.category_id = ?
+       ORDER BY pcp.sort_order ASC, p.name ASC`,
+      [categoryId]
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to load category products' });
+  }
+});
+
+app.put('/api/admin/product-categories/:id/products', authMiddleware, async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const categoryId = Number(req.params.id);
+    const { productIds } = req.body ?? {};
+    if (!Array.isArray(productIds)) {
+      return res.status(400).json({ error: 'productIds must be an array' });
+    }
+    const [[cat]] = await conn.query('SELECT id FROM product_categories WHERE id = ?', [categoryId]);
+    if (!cat) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    await conn.beginTransaction();
+    await conn.query('DELETE FROM product_category_products WHERE category_id = ?', [categoryId]);
+    let sort = 0;
+    for (const pid of productIds) {
+      const id = Number(pid);
+      if (!id) continue;
+      await conn.query(
+        'INSERT INTO product_category_products (category_id, product_id, sort_order) VALUES (?, ?, ?)',
+        [categoryId, id, sort++]
+      );
+    }
+    await conn.commit();
+    res.json({ ok: true });
+  } catch (e) {
+    try {
+      await conn.rollback();
+    } catch {
+      /* ignore */
+    }
+    console.error(e);
+    res.status(500).json({ error: 'Failed to save category products' });
+  } finally {
+    conn.release();
+  }
+});
+
 // --- Admin: products ---
 
 app.post('/api/admin/products/seed-examples', authMiddleware, async (_req, res) => {
@@ -847,6 +1018,68 @@ app.post('/api/admin/products', authMiddleware, async (req, res) => {
     }
     console.error(e);
     res.status(500).json({ error: 'Failed to create product' });
+  }
+});
+
+app.get('/api/admin/products/:id/categories', authMiddleware, async (req, res) => {
+  try {
+    const productId = Number(req.params.id);
+    const [rows] = await pool.query(
+      `SELECT c.id, c.slug, c.name
+       FROM product_categories c
+       INNER JOIN product_category_products pcp ON pcp.category_id = c.id
+       WHERE pcp.product_id = ?
+       ORDER BY c.sort_order ASC, c.name ASC`,
+      [productId]
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to load product categories' });
+  }
+});
+
+app.put('/api/admin/products/:id/categories', authMiddleware, async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const productId = Number(req.params.id);
+    const { categoryIds } = req.body ?? {};
+    if (!Array.isArray(categoryIds)) {
+      return res.status(400).json({ error: 'categoryIds must be an array' });
+    }
+    const [[product]] = await conn.query('SELECT id FROM products WHERE id = ?', [productId]);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    await conn.beginTransaction();
+    await conn.query('DELETE FROM product_category_products WHERE product_id = ?', [productId]);
+    for (const rawId of categoryIds) {
+      const categoryId = Number(rawId);
+      if (!categoryId) continue;
+      const [[cat]] = await conn.query('SELECT id FROM product_categories WHERE id = ?', [categoryId]);
+      if (!cat) continue;
+      const [[maxRow]] = await conn.query(
+        'SELECT COALESCE(MAX(sort_order), -1) AS mx FROM product_category_products WHERE category_id = ?',
+        [categoryId]
+      );
+      const sort = Number(maxRow.mx) + 1;
+      await conn.query(
+        'INSERT INTO product_category_products (category_id, product_id, sort_order) VALUES (?, ?, ?)',
+        [categoryId, productId, sort]
+      );
+    }
+    await conn.commit();
+    res.json({ ok: true });
+  } catch (e) {
+    try {
+      await conn.rollback();
+    } catch {
+      /* ignore */
+    }
+    console.error(e);
+    res.status(500).json({ error: 'Failed to save product categories' });
+  } finally {
+    conn.release();
   }
 });
 
@@ -1182,6 +1415,11 @@ async function startServer() {
     await ensureProductFeaturedColumn(pool);
   } catch (e) {
     console.error('[ensureProductFeaturedColumn]', e?.message || e);
+  }
+  try {
+    await ensureProductCategories(pool);
+  } catch (e) {
+    console.error('[ensureProductCategories]', e?.message || e);
   }
   try {
     await ensureStripeOrderColumns(pool);

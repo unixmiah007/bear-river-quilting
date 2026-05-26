@@ -131,6 +131,8 @@ export default function AdminProducts() {
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [allCategories, setAllCategories] = useState([]);
+  const [formCategoryIds, setFormCategoryIds] = useState([]);
 
   const filteredRows = useMemo(() => {
     const term = searchQuery.trim().toLowerCase();
@@ -211,12 +213,55 @@ export default function AdminProducts() {
   }
 
   useEffect(() => {
-    refresh()
-      .catch((e) =>
-        setError([e.body?.error, e.body?.hint].filter(Boolean).join(' ') || e.message)
-      )
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    (async () => {
+      try {
+        await refresh();
+        const categories = await adminApi.productCategories().catch(() => []);
+        if (!cancelled) setAllCategories(Array.isArray(categories) ? categories : []);
+      } catch (e) {
+        if (!cancelled) {
+          setError([e.body?.error, e.body?.hint].filter(Boolean).join(' ') || e.message);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!editingId) {
+      setFormCategoryIds([]);
+      return undefined;
+    }
+    let cancelled = false;
+    adminApi
+      .productCategoriesForProduct(editingId)
+      .then((rows) => {
+        if (!cancelled) {
+          setFormCategoryIds((Array.isArray(rows) ? rows : []).map((c) => c.id));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFormCategoryIds([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editingId]);
+
+  function toggleCategory(categoryId) {
+    setFormCategoryIds((ids) =>
+      ids.includes(categoryId) ? ids.filter((id) => id !== categoryId) : [...ids, categoryId]
+    );
+  }
+
+  async function saveProductCategories(productId) {
+    await adminApi.setProductCategories(productId, formCategoryIds);
+  }
 
   async function loadExamples() {
     setError(null);
@@ -244,6 +289,7 @@ export default function AdminProducts() {
         is_published: !!form.is_published,
         is_featured: !!form.is_featured,
       });
+      await saveProductCategories(id);
       setEditingId(id);
       await refresh();
     } catch (err) {
@@ -333,8 +379,10 @@ export default function AdminProducts() {
         is_published: !!form.is_published,
         is_featured: !!form.is_featured,
       });
+      await saveProductCategories(editingId);
       setEditingId(null);
       setForm(emptyForm);
+      setFormCategoryIds([]);
       setGalleryImages([]);
       await refresh();
     } catch (err) {
@@ -599,6 +647,33 @@ export default function AdminProducts() {
             Featured (shown in the /products catalog hero — up to 4, published only)
           </label>
         </div>
+        <fieldset className="field admin-category-field">
+          <legend>Product categories</legend>
+          <p className="muted" style={{ margin: '0 0 0.65rem', fontSize: '0.88rem' }}>
+            Checked categories include this product in the storefront{' '}
+            <strong>Products</strong> menu dropdown and on{' '}
+            <code>/products?category=…</code> when published.
+          </p>
+          {allCategories.length === 0 ? (
+            <p className="muted" style={{ margin: 0 }}>
+              No categories yet.{' '}
+              <Link to="/admin/categories">Create product categories</Link>
+            </p>
+          ) : (
+            <div className="admin-category-checks">
+              {allCategories.map((c) => (
+                <label key={c.id} className="admin-category-check">
+                  <input
+                    type="checkbox"
+                    checked={formCategoryIds.includes(c.id)}
+                    onChange={() => toggleCategory(c.id)}
+                  />
+                  <span>{c.name}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </fieldset>
         <div className="row">
           {editingId ? (
             <>
@@ -611,6 +686,7 @@ export default function AdminProducts() {
                 onClick={() => {
                   setEditingId(null);
                   setForm(emptyForm);
+                  setFormCategoryIds([]);
                   setGalleryImages([]);
                 }}
               >

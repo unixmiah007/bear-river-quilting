@@ -617,6 +617,103 @@ button {
   color: var(--text);
 }
 
+.nav-products {
+  position: relative;
+}
+
+.nav-products > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.nav-products__caret {
+  font-size: 0.65rem;
+  opacity: 0.65;
+  line-height: 1;
+}
+
+.nav-products__menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 130;
+  min-width: 11rem;
+  margin: 0;
+  padding: 0.35rem 0;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    visibility 0.18s;
+  pointer-events: none;
+}
+
+.nav-products:hover .nav-products__menu,
+.nav-products:focus-within .nav-products__menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.nav-products__menu a {
+  display: block;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.nav-products__menu a:hover,
+.nav-products__menu a.active {
+  background: rgba(17, 17, 17, 0.05);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.nav-products--mobile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.15rem;
+}
+
+.nav-products--mobile > a {
+  display: block;
+  padding: 0.65rem 0.5rem;
+  border-radius: 8px;
+}
+
+.nav-products__sub {
+  list-style: none;
+  margin: 0 0 0.35rem;
+  padding: 0 0 0 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.nav-products__sub a {
+  display: block;
+  padding: 0.45rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.92rem;
+}
+
+.nav--mobile .nav-products__sub a:hover,
+.nav--mobile .nav-products__sub a.active {
+  background: rgba(17, 17, 17, 0.05);
+  color: var(--text);
+  text-decoration: none;
+}
+
 .site-footer {
   margin-top: 3rem;
   padding-top: 1.5rem;
@@ -2696,6 +2793,42 @@ tr:last-child td {
   margin-left: auto;
   padding: 0.15rem 0.45rem;
   min-width: 2rem;
+}
+
+.admin-category-field {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem 1rem;
+  margin: 0;
+}
+
+.admin-category-field legend {
+  padding: 0 0.35rem;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.admin-category-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+
+.admin-category-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.92rem;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+
+.admin-category-check input {
+  margin: 0;
 }
 
 .admin-tracking-form {

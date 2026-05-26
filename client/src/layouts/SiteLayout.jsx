@@ -18,6 +18,7 @@ function pagesForFooter(data) {
 
 export default function SiteLayout() {
   const [pages, setPages] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [err, setErr] = useState(null);
   const { pathname } = useLocation();
   const showHero = pathname === '/';
@@ -31,6 +32,10 @@ export default function SiteLayout() {
   );
 
   useEffect(() => {
+    publicApi.listProductCategories().then((data) => {
+      setCategories(Array.isArray(data) ? data : []);
+    }).catch(() => setCategories([]));
+
     publicApi
       .listPages()
       .then((data) => setPages(pagesForFooter(data)))
@@ -57,7 +62,7 @@ export default function SiteLayout() {
     <div className="site-shell">
       <SiteTopBar />
       <div className="layout">
-        <SiteHeader />
+        <SiteHeader categories={categories} />
         <AdminSessionBanner />
         {err && <p className="error">{err}</p>}
         {isHome ? (

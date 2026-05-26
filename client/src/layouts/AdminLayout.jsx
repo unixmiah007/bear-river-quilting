@@ -56,6 +56,12 @@ export default function AdminLayout() {
             </NavLink>
             <NavLink
               className={({ isActive }) => `pill${isActive ? ' active' : ''}`}
+              to="/admin/categories"
+            >
+              Product categories
+            </NavLink>
+            <NavLink
+              className={({ isActive }) => `pill${isActive ? ' active' : ''}`}
               to="/admin/orders"
             >
               Orders
