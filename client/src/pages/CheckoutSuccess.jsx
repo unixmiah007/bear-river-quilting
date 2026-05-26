@@ -78,12 +78,16 @@ export default function CheckoutSuccess() {
         <button
           type="button"
           className="btn btn-primary"
-          onClick={() =>
-            navigate('/account', {
+          onClick={() => {
+            const params = new URLSearchParams({
+              email: String(state.email ?? '').trim(),
+              order: String(state.orderNumber ?? '').trim(),
+            });
+            navigate(`/account?${params.toString()}`, {
               replace: true,
               state: { placed: true, email: state.email, orderNumber: state.orderNumber },
-            })
-          }
+            });
+          }}
         >
           View order details
         </button>

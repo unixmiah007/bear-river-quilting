@@ -9,6 +9,17 @@ import {
 const DEFAULT_ORDER_NOTIFY_EMAILS =
   'shaj.k.miah@gmail.com,tracyalto@brqllc.com,nadimamin101@gmail.com';
 
+const CLIENT_ORIGIN = (process.env.CLIENT_ORIGIN ?? 'http://localhost:5173').replace(/\/$/, '');
+
+/** Public account page deep link — opens order status when email + order match checkout. */
+export function buildCustomerOrderAccountUrl(email, orderNumber) {
+  const params = new URLSearchParams({
+    email: String(email ?? '').trim().toLowerCase(),
+    order: String(orderNumber ?? '').trim(),
+  });
+  return `${CLIENT_ORIGIN}/account?${params.toString()}`;
+}
+
 export function parseOrderNotifyRecipients() {
   const raw = process.env.ORDER_NOTIFY_EMAILS?.trim();
   const src = raw || DEFAULT_ORDER_NOTIFY_EMAILS;
@@ -53,6 +64,8 @@ export async function sendOrderConfirmationEmail({ to, orderNumber, customerName
     return;
   }
 
+  const orderStatusUrl = buildCustomerOrderAccountUrl(toAddr, orderNumber);
+
   const lines = items.map(
     (it) => `  - ${it.productName} × ${it.quantity}  $${Number(it.lineTotal).toFixed(2)}`
   );
@@ -61,6 +74,7 @@ export async function sendOrderConfirmationEmail({ to, orderNumber, customerName
     `Hi ${customerName},`,
     '',
     `Thanks for your order. Your order number is ${orderNumber}.`,
+    `View order status: ${orderStatusUrl}`,
     '',
     'Items:',
     ...lines,
@@ -70,7 +84,8 @@ export async function sendOrderConfirmationEmail({ to, orderNumber, customerName
 
   const html = `
 <p>Hi ${escapeHtml(customerName)},</p>
-<p>Thanks for your order. Your order number is <strong>${escapeHtml(orderNumber)}</strong>.</p>
+<p>Thanks for your order. Your order number is <strong><a href="${escapeHtml(orderStatusUrl)}">${escapeHtml(orderNumber)}</a></strong>.</p>
+<p><a href="${escapeHtml(orderStatusUrl)}">View order status and details</a></p>
 <table cellpadding="6" cellspacing="0" border="1" style="border-collapse:collapse">
 <thead><tr><th>Item</th><th>Qty</th><th>Line</th></tr></thead><tbody>
 ${items

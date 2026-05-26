@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import CartIcon from '../components/CartIcon.jsx';
 import OrderTrackingDisplay from '../components/OrderTrackingDisplay.jsx';
 import ProductCard from '../components/ProductCard.jsx';
@@ -41,8 +41,19 @@ function statusLabel(s) {
   return s || '—';
 }
 
+function readOrderDeepLink(locationState, searchParams) {
+  const qEmail = searchParams.get('email')?.trim();
+  const qOrder =
+    searchParams.get('order')?.trim() || searchParams.get('orderNumber')?.trim() || '';
+  const email = locationState?.email?.trim() || qEmail || '';
+  const orderNumber = locationState?.orderNumber?.trim() || qOrder || '';
+  const placed = Boolean(locationState?.placed);
+  return { email, orderNumber, placed, hasDeepLink: Boolean(email && orderNumber) };
+}
+
 export default function Account() {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { addItem } = useCart();
   const { favoriteIds, removeFavorite } = useFavorites();
@@ -89,21 +100,27 @@ export default function Account() {
   const favoritesEmpty = favoriteIds.length === 0;
 
   useEffect(() => {
-    const st = location.state;
-    if (!st?.email || !st?.orderNumber) return undefined;
+    const { email: linkEmail, orderNumber: linkOrder, placed, hasDeepLink } = readOrderDeepLink(
+      location.state,
+      searchParams
+    );
+    if (!hasDeepLink) return undefined;
 
-    setEmail(st.email);
-    setOrderNumber(st.orderNumber);
-    if (st.placed) setPlacedBanner(true);
+    setEmail(linkEmail);
+    setOrderNumber(linkOrder);
+    if (placed) setPlacedBanner(true);
 
     let cancelled = false;
     (async () => {
       setLoading(true);
       setError(null);
+      setDetail(null);
+      setList([]);
+      setMode(null);
       try {
         const data = await publicApi.customerOrdersLookup({
-          email: String(st.email).trim(),
-          orderNumber: String(st.orderNumber).trim(),
+          email: linkEmail,
+          orderNumber: linkOrder,
         });
         if (cancelled) return;
         setMode('detail');
@@ -124,7 +141,7 @@ export default function Account() {
     return () => {
       cancelled = true;
     };
-  }, [location.state]);
+  }, [location.state, searchParams]);
 
   async function submit(e) {
     e.preventDefault();
