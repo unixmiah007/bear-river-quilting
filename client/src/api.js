@@ -153,5 +153,11 @@ export const adminApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  orderShippingLabel: (id) => api(`/api/admin/orders/${encodeURIComponent(id)}/shipping-label`),
+  updateOrderShippingLabel: (id, body) =>
+    api(`/api/admin/orders/${encodeURIComponent(id)}/shipping-label`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
   customQuiltRequests: () => apiJsonArray('/api/admin/custom-quilt-requests'),
 };

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { adminApi } from '../api.js';
+import ShippingLabelPanel from '../components/admin/ShippingLabelPanel.jsx';
 import { labelForCarrier, SHIPPING_CARRIER_OPTIONS } from '../lib/shippingCarriers.js';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
@@ -406,6 +407,20 @@ export default function AdminOrders() {
                 : null}
             </p>
           ) : null}
+
+          <ShippingLabelPanel
+            orderId={details.order.id}
+            orderNumber={details.order.order_number}
+            tracking={
+              details.order.tracking_number
+                ? {
+                    number: details.order.tracking_number,
+                    carrierLabel: labelForCarrier(details.order.tracking_carrier),
+                  }
+                : null
+            }
+            onSaved={() => loadDetails(details.order.id)}
+          />
 
           <form className="form admin-tracking-form" onSubmit={sendTrackingEmail}>
             <h4 className="admin-tracking-form__title">Email customer tracking</h4>

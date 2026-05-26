@@ -3178,3 +3178,119 @@ tr:last-child td {
   gap: 0.65rem;
   margin: 0;
 }
+
+.shipping-label-address {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem 1rem;
+  margin: 0;
+}
+
+.shipping-label-address legend {
+  padding: 0 0.35rem;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.admin-shipping-label__edit {
+  margin-top: 0.75rem;
+}
+
+.shipping-label-sheet {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+
+.shipping-label-sheet__inner {
+  max-width: 4in;
+  margin: 0 auto;
+  padding: 0.35rem 0.25rem;
+  font-size: 11pt;
+  line-height: 1.35;
+  color: #111;
+}
+
+.shipping-label-sheet__brand {
+  margin: 0 0 0.15rem;
+  font-size: 8pt;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.shipping-label-sheet__order {
+  margin: 0 0 0.5rem;
+  font-size: 9pt;
+  font-weight: 600;
+}
+
+.shipping-label-sheet__tracking {
+  margin: 0 0 0.65rem;
+  font-size: 8.5pt;
+  color: #374151;
+}
+
+.shipping-label-sheet__label {
+  margin: 0 0 0.15rem;
+  font-size: 7.5pt;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.shipping-label-sheet__from {
+  margin-bottom: 0.85rem;
+  font-size: 9pt;
+}
+
+.shipping-label-sheet__from p {
+  margin: 0;
+}
+
+.shipping-label-sheet__to p {
+  margin: 0;
+  font-size: 13pt;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.shipping-label-sheet__to p:first-of-type {
+  font-size: 15pt;
+}
+
+@media print {
+  body.printing-shipping-label .site-shell,
+  body.printing-shipping-label .admin-shell {
+    visibility: hidden;
+  }
+
+  body.printing-shipping-label .shipping-label-sheet {
+    visibility: visible;
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    padding: 0.25in;
+    border: none;
+    background: #fff;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  body.printing-shipping-label .shipping-label-sheet__inner {
+    max-width: 4in;
+    width: 4in;
+    min-height: 6in;
+  }
+
+  @page {
+    size: 4in 6in;
+    margin: 0.15in;
+  }
+}

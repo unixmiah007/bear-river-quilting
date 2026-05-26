@@ -30,6 +30,13 @@ import {
   listCustomQuiltRequestsForAdmin,
 } from './lib/customQuiltRequest.js';
 import { ensureOrderTrackingColumns } from './lib/ensureOrderTrackingColumns.js';
+import { ensureOrderShippingLabel } from './lib/ensureOrderShippingLabel.js';
+import {
+  normalizeLabelAddress,
+  resolveLabelFrom,
+  resolveLabelTo,
+} from './lib/shippingLabel.js';
+import { getDefaultShipFrom } from './lib/defaultShipFrom.js';
 import { sendOrderTrackingNotification } from './lib/orderTracking.js';
 import { SHIPPING_CARRIERS } from './lib/shippingCarriers.js';
 import {
@@ -1253,7 +1260,9 @@ app.get('/api/admin/orders/:id', authMiddleware, async (req, res) => {
               shipping_method, shipping_cost,
               billing_name, billing_address1, billing_address2, billing_city, billing_state, billing_postal_code, billing_country,
               card_last4, subtotal, tax_amount, total, created_at,
-              tracking_carrier, tracking_number, tracking_notified_at
+              tracking_carrier, tracking_number, tracking_notified_at,
+              label_from_name, label_from_address1, label_from_address2,
+              label_from_city, label_from_state, label_from_postal_code, label_from_country, label_from_phone
        FROM orders WHERE id = ?`,
       [id]
     );
@@ -1272,6 +1281,75 @@ app.get('/api/admin/orders/:id', authMiddleware, async (req, res) => {
 
 app.get('/api/admin/shipping-carriers', authMiddleware, (_req, res) => {
   res.json(SHIPPING_CARRIERS.map(({ id, label }) => ({ id, label })));
+});
+
+app.get('/api/admin/orders/:id/shipping-label', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [[order]] = await pool.query('SELECT * FROM orders WHERE id = ?', [id]);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    res.json({
+      orderNumber: order.order_number,
+      from: resolveLabelFrom(order),
+      to: resolveLabelTo(order),
+      defaultFrom: getDefaultShipFrom(),
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to load shipping label addresses' });
+  }
+});
+
+app.put('/api/admin/orders/:id/shipping-label', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const fromParsed = normalizeLabelAddress(req.body?.from, { requireName: true, requireLine1: true });
+    if (!fromParsed.ok) {
+      return res.status(400).json({ error: `From address: ${fromParsed.error}` });
+    }
+    const toParsed = normalizeLabelAddress(req.body?.to, { requireName: true, requireLine1: true });
+    if (!toParsed.ok) {
+      return res.status(400).json({ error: `Ship-to address: ${toParsed.error}` });
+    }
+    const from = fromParsed.value;
+    const to = toParsed.value;
+
+    const [result] = await pool.query(
+      `UPDATE orders SET
+        label_from_name = ?, label_from_address1 = ?, label_from_address2 = ?,
+        label_from_city = ?, label_from_state = ?, label_from_postal_code = ?, label_from_country = ?, label_from_phone = ?,
+        customer_name = ?, customer_phone = ?,
+        shipping_address1 = ?, shipping_address2 = ?,
+        shipping_city = ?, shipping_state = ?, shipping_postal_code = ?, shipping_country = ?
+       WHERE id = ?`,
+      [
+        from.name,
+        from.address1,
+        from.address2 || null,
+        from.city,
+        from.state,
+        from.postalCode,
+        from.country,
+        from.phone || null,
+        to.name,
+        to.phone || null,
+        to.address1,
+        to.address2 || null,
+        to.city,
+        to.state,
+        to.postalCode,
+        to.country,
+        id,
+      ]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to save shipping label addresses' });
+  }
 });
 
 app.post('/api/admin/orders/:id/tracking', authMiddleware, async (req, res) => {
@@ -1435,6 +1513,11 @@ async function startServer() {
     await ensureOrderTrackingColumns(pool);
   } catch (e) {
     console.error('[ensureOrderTrackingColumns]', e?.message || e);
+  }
+  try {
+    await ensureOrderShippingLabel(pool);
+  } catch (e) {
+    console.error('[ensureOrderShippingLabel]', e?.message || e);
   }
   app.listen(PORT, async () => {
     const stripeOk = !!process.env.STRIPE_SECRET_KEY;
