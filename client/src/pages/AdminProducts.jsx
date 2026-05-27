@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { adminApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
 import ProductMediaLibrary from '../components/ProductMediaLibrary.jsx';
@@ -19,7 +19,7 @@ const emptyForm = {
 
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
 
-const SORTABLE_COLUMNS = ['sku', 'name', 'size', 'price', 'stock', 'published'];
+const SORTABLE_COLUMNS = ['sku', 'name', 'size', 'price', 'stock', 'published', 'created_at'];
 
 function getSortValue(product, key) {
   switch (key) {
@@ -35,6 +35,8 @@ function getSortValue(product, key) {
       return Number(product.stock_quantity) || 0;
     case 'published':
       return product.is_published ? 1 : 0;
+    case 'created_at':
+      return product.created_at ? new Date(product.created_at).getTime() : 0;
     default:
       return '';
   }
@@ -78,6 +80,13 @@ function formatPrice(n) {
   );
 }
 
+function formatCreatedAt(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(d);
+}
+
 function productSearchText(product) {
   const sizeLabel = product.product_size
     ? PRODUCT_SIZE_OPTIONS.find((o) => o.value === product.product_size)?.label ??
@@ -108,7 +117,13 @@ function productMatchesSearch(product, term) {
   return productSearchText(product).includes(term);
 }
 
+function isInteractiveRowTarget(target) {
+  if (!(target instanceof Element)) return false;
+  return !!target.closest('a, button, input, select, textarea, label');
+}
+
 export default function AdminProducts() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -427,6 +442,11 @@ export default function AdminProducts() {
 
   function openDeleteConfirm(product) {
     setDeleteTarget({ id: product.id, name: product.name });
+  }
+
+  function goToProductDetail(productId, e) {
+    if (e && isInteractiveRowTarget(e.target)) return;
+    navigate(`/products/${productId}`);
   }
 
   function closeDeleteConfirm() {
@@ -907,7 +927,7 @@ export default function AdminProducts() {
         </div>
       ) : null}
 
-      <div className="table-wrap" style={{ marginBottom: '2rem' }}>
+      <div className="table-wrap admin-products-table" style={{ marginBottom: '2rem' }}>
         <table>
           <thead>
             <tr>
@@ -954,13 +974,20 @@ export default function AdminProducts() {
                 sortDir={sortDir}
                 onSort={handleSort}
               />
+              <SortableTh
+                label="Created At"
+                column="created_at"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
               <th scope="col" />
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={8}>
+                <td colSpan={9}>
                   <p className="muted" style={{ marginBottom: '0.75rem' }}>
                     No products in the database yet. Use the button below to add the demo quilt
                     catalog (50 handmade placeholders, published), or run{' '}
@@ -979,13 +1006,24 @@ export default function AdminProducts() {
               </tr>
             ) : paginatedRows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="muted">
+                <td colSpan={9} className="muted">
                   No products match your search.
                 </td>
               </tr>
             ) : (
               paginatedRows.map((p) => (
-                <tr key={p.id}>
+                <tr
+                  key={p.id}
+                  className="admin-product-row--clickable"
+                  tabIndex={0}
+                  aria-label={`View product: ${p.name}`}
+                  onClick={(e) => goToProductDetail(p.id, e)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    goToProductDetail(p.id, e);
+                  }}
+                >
                   <td>
                     <div className="admin-product-list-thumb">
                       <ProductImage src={p.image_url} alt={p.name} />
@@ -1012,6 +1050,9 @@ export default function AdminProducts() {
                         </span>
                       ) : null}
                     </div>
+                  </td>
+                  <td className="muted" style={{ whiteSpace: 'nowrap' }}>
+                    {formatCreatedAt(p.created_at)}
                   </td>
                   <td>
                     <div className="row" style={{ justifyContent: 'flex-end' }}>

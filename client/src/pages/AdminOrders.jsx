@@ -85,6 +85,11 @@ function orderMatchesSearch(order, term) {
   return orderSearchText(order).includes(term);
 }
 
+function isInteractiveRowTarget(target) {
+  if (!(target instanceof Element)) return false;
+  return !!target.closest('a, button, input, select, textarea, label');
+}
+
 export default function AdminOrders() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
@@ -347,7 +352,7 @@ export default function AdminOrders() {
         </div>
       ) : null}
 
-      <div className="table-wrap" style={{ marginBottom: '1.25rem' }}>
+      <div className="table-wrap admin-orders-table" style={{ marginBottom: '1.25rem' }}>
         <table>
           <thead>
             <tr>
@@ -402,18 +407,33 @@ export default function AdminOrders() {
               </tr>
             ) : (
               paginatedOrders.map((o) => (
-              <tr key={o.id}>
-                <td>{o.order_number}</td>
-                <td>{o.customer_name}</td>
-                <td>{o.status}</td>
-                <td>{formatPrice(o.total)}</td>
-                <td>{new Date(o.created_at).toLocaleString()}</td>
-                <td>
-                  <button className="btn" onClick={() => loadDetails(o.id)} type="button">
-                    View
-                  </button>
-                </td>
-              </tr>
+                <tr
+                  key={o.id}
+                  className="admin-order-row--clickable"
+                  tabIndex={0}
+                  aria-label={`View order ${o.order_number}`}
+                  onClick={(e) => {
+                    if (isInteractiveRowTarget(e.target)) return;
+                    loadDetails(o.id);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    if (isInteractiveRowTarget(e.target)) return;
+                    e.preventDefault();
+                    loadDetails(o.id);
+                  }}
+                >
+                  <td>{o.order_number}</td>
+                  <td>{o.customer_name}</td>
+                  <td>{o.status}</td>
+                  <td>{formatPrice(o.total)}</td>
+                  <td>{new Date(o.created_at).toLocaleString()}</td>
+                  <td>
+                    <button className="btn" onClick={() => loadDetails(o.id)} type="button">
+                      View
+                    </button>
+                  </td>
+                </tr>
               ))
             )}
           </tbody>

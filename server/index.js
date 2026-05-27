@@ -874,7 +874,7 @@ app.post('/api/admin/products/import', authMiddleware, async (req, res) => {
 app.get('/api/admin/products', authMiddleware, async (_req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, sku, name, description, price, stock_quantity, product_size, image_url, is_published, is_featured, updated_at FROM products ORDER BY name ASC'
+      'SELECT id, sku, name, description, price, stock_quantity, product_size, image_url, is_published, is_featured, created_at, updated_at FROM products ORDER BY name ASC'
     );
     res.json(rows);
   } catch (e) {
