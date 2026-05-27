@@ -19,6 +19,13 @@ import { ensureProductSizeColumn } from './lib/ensureProductSizeColumn.js';
 import { ensureProductFeaturedColumn } from './lib/ensureProductFeaturedColumn.js';
 import { ensurePagesTable } from './lib/ensurePagesTable.js';
 import { ensureProductCategories } from './lib/ensureProductCategories.js';
+import { ensureMediaAssetsTable } from './lib/ensureMediaAssetsTable.js';
+import {
+  listMediaAssets,
+  scanUploadsIntoMedia,
+  deleteMediaAsset,
+  copyMediaIdsToProduct,
+} from './lib/mediaLibrary.js';
 import { seedDemoProducts } from './lib/seedDemoProducts.js';
 import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './lib/mail.js';
 import { verifySendGridIfConfigured } from './lib/sendgridMail.js';
@@ -138,6 +145,29 @@ const productImageUpload = multer({
     destination(req, _file, cb) {
       const id = String(req.params.id);
       const dir = path.join(UPLOAD_ROOT, 'products', id);
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename(_req, file, cb) {
+      let ext = path.extname(file.originalname || '').toLowerCase();
+      if (!['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext)) ext = '.jpg';
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter(_req, file, cb) {
+    if (!file.mimetype.startsWith('image/')) {
+      cb(new Error('Only image files are allowed'));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+const mediaLibraryUpload = multer({
+  storage: multer.diskStorage({
+    destination(_req, _file, cb) {
+      const dir = path.join(UPLOAD_ROOT, 'media');
       fs.mkdirSync(dir, { recursive: true });
       cb(null, dir);
     },
@@ -992,6 +1022,131 @@ app.delete(
   }
 );
 
+app.get('/api/admin/media', authMiddleware, async (_req, res) => {
+  try {
+    const items = await listMediaAssets(pool);
+    res.json(items);
+  } catch (e) {
+    console.error(e);
+    if (e.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        error: 'media_assets table is missing.',
+        hint: 'Restart the API to create it automatically.',
+      });
+    }
+    res.status(500).json({ error: 'Failed to load media library' });
+  }
+});
+
+app.post(
+  '/api/admin/media',
+  authMiddleware,
+  (req, res, next) => {
+    mediaLibraryUpload.array('images', 32)(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message || 'Upload failed' });
+      next();
+    });
+  },
+  async (req, res) => {
+    const files = req.files;
+    if (!Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({ error: 'No image files received (use field name "images")' });
+    }
+    try {
+      const created = [];
+      for (const f of files) {
+        const publicPath = `/uploads/media/${f.filename}`;
+        const [result] = await pool.query(
+          'INSERT INTO media_assets (path, filename, source) VALUES (?, ?, ?)',
+          [publicPath, f.filename, 'upload']
+        );
+        created.push({
+          id: result.insertId,
+          path: publicPath,
+          filename: f.filename,
+          source: 'upload',
+        });
+      }
+      res.status(201).json({ ok: true, items: created });
+    } catch (e) {
+      console.error(e);
+      for (const f of files) {
+        try {
+          fs.unlinkSync(f.path);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      if (e.code === 'ER_NO_SUCH_TABLE') {
+        return res.status(500).json({
+          error: 'media_assets table is missing.',
+          hint: 'Restart the API to create it automatically.',
+        });
+      }
+      res.status(500).json({ error: 'Failed to save media uploads' });
+    }
+  }
+);
+
+app.post('/api/admin/media/scan', authMiddleware, async (_req, res) => {
+  try {
+    const result = await scanUploadsIntoMedia(pool, UPLOAD_ROOT);
+    const items = await listMediaAssets(pool);
+    res.json({ ok: true, ...result, items });
+  } catch (e) {
+    console.error(e);
+    if (e.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        error: 'media_assets table is missing.',
+        hint: 'Restart the API to create it automatically.',
+      });
+    }
+    res.status(500).json({ error: 'Failed to scan uploads folder' });
+  }
+});
+
+app.delete('/api/admin/media/:id', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid media id' });
+    const result = await deleteMediaAsset(pool, UPLOAD_ROOT, id);
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to delete media' });
+  }
+});
+
+app.post('/api/admin/products/:id/images/from-library', authMiddleware, async (req, res) => {
+  const productId = Number(req.params.id);
+  if (!productId) return res.status(400).json({ error: 'Invalid product id' });
+  const mediaIds = Array.isArray(req.body?.mediaIds) ? req.body.mediaIds : [];
+  try {
+    const result = await copyMediaIdsToProduct(pool, UPLOAD_ROOT, productId, mediaIds);
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    if (!result.added?.length) {
+      return res.status(400).json({ error: 'No images were added (files may be missing on disk)' });
+    }
+    try {
+      await syncProductThumbnail(productId);
+    } catch (syncErr) {
+      console.error('[syncProductThumbnail]', syncErr);
+    }
+    const images = await loadProductImages(productId);
+    res.status(201).json({ ok: true, images });
+  } catch (e) {
+    console.error(e);
+    if (e.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        error: 'product_images or media_assets table is missing.',
+        hint: 'Restart the API.',
+      });
+    }
+    res.status(500).json({ error: 'Failed to add images from library' });
+  }
+});
+
 app.post('/api/admin/products', authMiddleware, async (req, res) => {
   try {
     const { name, description, price, image_url, is_published, is_featured, sku, stock_quantity, product_size } =
@@ -1529,6 +1684,11 @@ async function startServer() {
     await ensureProductCategories(pool);
   } catch (e) {
     console.error('[ensureProductCategories]', e?.message || e);
+  }
+  try {
+    await ensureMediaAssetsTable(pool);
+  } catch (e) {
+    console.error('[ensureMediaAssetsTable]', e?.message || e);
   }
   try {
     await ensureStripeOrderColumns(pool);

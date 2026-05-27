@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { adminApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
+import ProductMediaLibrary from '../components/ProductMediaLibrary.jsx';
 import { PRODUCT_SIZE_OPTIONS } from '../lib/productSizes.js';
 
 const emptyForm = {
@@ -707,7 +708,8 @@ export default function AdminProducts() {
           <>
             <p className="muted" style={{ marginTop: 0 }}>
               Uploaded images appear on the public product page as a gallery. The first image in the
-              list is used as the thumbnail in product listings.
+              list is used as the thumbnail in product listings. You can upload directly, or pick
+              from the media gallery below (files are copied into this product&apos;s folder).
             </p>
             <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
               <label className="btn" style={{ cursor: uploadBusy ? 'wait' : 'pointer' }}>
@@ -745,10 +747,22 @@ export default function AdminProducts() {
           </>
         ) : (
           <p className="muted" style={{ marginTop: 0 }}>
-            Save a new product once (or click Edit on an existing row), then use Browse images to
-            add photos stored on the server and linked in the database.
+            Save a new product once (or click Edit on an existing row), then upload images or add them
+            from the media gallery below.
           </p>
         )}
+        <ProductMediaLibrary
+          productId={editingId}
+          disabled={uploadBusy}
+          onImagesAdded={(images) => {
+            gallerySyncGeneration.current += 1;
+            setGalleryImages(Array.isArray(images) ? images : []);
+            refresh();
+          }}
+          onError={(msg) => {
+            if (msg) setError(msg);
+          }}
+        />
       </section>
       </section>
 

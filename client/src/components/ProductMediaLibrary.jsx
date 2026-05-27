@@ -1,0 +1,283 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { adminApi } from '../api.js';
+
+const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
+
+export default function ProductMediaLibrary({ productId, disabled, onImagesAdded, onError }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState(() => new Set());
+  const [scanInfo, setScanInfo] = useState(null);
+  const [pageSize, setPageSize] = useState(15);
+  const [page, setPage] = useState(1);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await adminApi.mediaLibrary();
+      setItems(Array.isArray(data) ? data : []);
+    } catch (e) {
+      onError?.([e.body?.error, e.body?.hint].filter(Boolean).join(' ') || e.message);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [onError]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const totalPages = useMemo(() => {
+    if (pageSize === 'all' || items.length === 0) return 1;
+    return Math.max(1, Math.ceil(items.length / pageSize));
+  }, [items.length, pageSize]);
+
+  const paginatedItems = useMemo(() => {
+    if (items.length === 0) return [];
+    if (pageSize === 'all') return items;
+    const start = (page - 1) * pageSize;
+    return items.slice(start, start + pageSize);
+  }, [items, page, pageSize]);
+
+  const listRange = useMemo(() => {
+    if (items.length === 0) return { start: 0, end: 0 };
+    if (pageSize === 'all') return { start: 1, end: items.length };
+    const start = (page - 1) * pageSize + 1;
+    const end = Math.min(page * pageSize, items.length);
+    return { start, end };
+  }, [items.length, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  function toggleSelect(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function onUpload(e) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    setBusy(true);
+    setScanInfo(null);
+    onError?.(null);
+    try {
+      await adminApi.uploadMediaLibrary(files);
+      await load();
+    } catch (err) {
+      onError?.(
+        [err.body?.error, err.body?.hint].filter(Boolean).join(' — ') || err.message
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onScan() {
+    setBusy(true);
+    setScanInfo(null);
+    onError?.(null);
+    try {
+      const data = await adminApi.scanMediaLibrary();
+      setScanInfo(
+        data.added > 0
+          ? `Added ${data.added} image(s) from the uploads folder.`
+          : 'No new images found in uploads.'
+      );
+      setItems(Array.isArray(data.items) ? data.items : []);
+    } catch (err) {
+      onError?.(err.body?.error || err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDelete(id) {
+    setBusy(true);
+    onError?.(null);
+    try {
+      await adminApi.deleteMediaLibraryItem(id);
+      setSelected((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      await load();
+    } catch (err) {
+      onError?.(err.body?.error || err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onAddToProduct() {
+    if (!productId || selected.size === 0) return;
+    setBusy(true);
+    onError?.(null);
+    try {
+      const data = await adminApi.addProductImagesFromLibrary(
+        productId,
+        Array.from(selected)
+      );
+      setSelected(new Set());
+      onImagesAdded?.(data.images);
+    } catch (err) {
+      onError?.(
+        [err.body?.error, err.body?.hint].filter(Boolean).join(' — ') || err.message
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const isDisabled = disabled || busy;
+
+  return (
+    <div className="admin-media-library">
+      <h4 className="admin-media-library__title">Media gallery</h4>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Upload images to the site library or scan the server <code>/uploads</code> folder for
+        existing files. Select images below to attach copies to this product.
+      </p>
+      <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+        <label className="btn" style={{ cursor: isDisabled ? 'wait' : 'pointer' }}>
+          {busy ? 'Working…' : 'Upload to library'}
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            disabled={isDisabled}
+            onChange={onUpload}
+            style={{ display: 'none' }}
+          />
+        </label>
+        <button type="button" className="btn" onClick={onScan} disabled={isDisabled}>
+          Scan uploads folder
+        </button>
+        {productId ? (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onAddToProduct}
+            disabled={isDisabled || selected.size === 0}
+          >
+            Add selected to product ({selected.size})
+          </button>
+        ) : null}
+      </div>
+      {scanInfo ? (
+        <p className="muted" style={{ marginTop: 0 }}>
+          {scanInfo}
+        </p>
+      ) : null}
+      {loading ? (
+        <p className="muted">Loading media…</p>
+      ) : items.length === 0 ? (
+        <p className="muted">
+          No library images yet. Upload files or scan the uploads folder to import images already on
+          disk.
+        </p>
+      ) : (
+        <>
+          <div className="admin-pagination">
+            <div className="admin-pagination__size">
+              <label htmlFor="admin-media-page-size">Show</label>
+              <select
+                id="admin-media-page-size"
+                value={String(pageSize)}
+                disabled={isDisabled}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPageSize(v === 'all' ? 'all' : Number(v));
+                }}
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <option key={n} value={String(n)}>
+                    {n === 'all' ? 'All images' : n}
+                  </option>
+                ))}
+              </select>
+              <span className="muted">
+                {pageSize === 'all'
+                  ? `All ${items.length} image${items.length === 1 ? '' : 's'}`
+                  : `Showing ${listRange.start}–${listRange.end} of ${items.length}`}
+              </span>
+            </div>
+            {pageSize !== 'all' && totalPages > 1 ? (
+              <div className="admin-pagination__nav row">
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={isDisabled || page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </button>
+                <span className="muted admin-pagination__status">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={isDisabled || page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <div className="admin-media-grid" role="list">
+          {paginatedItems.map((item) => {
+            const isSelected = selected.has(item.id);
+            return (
+              <div key={item.id} className="admin-media-item" role="listitem">
+                <button
+                  type="button"
+                  className={`admin-media-item__select${isSelected ? ' admin-media-item__select--on' : ''}`}
+                  onClick={() => toggleSelect(item.id)}
+                  disabled={isDisabled}
+                  aria-pressed={isSelected}
+                  title={isSelected ? 'Deselect' : 'Select for product'}
+                >
+                  <img src={item.path} alt={item.filename} />
+                  {isSelected ? <span className="admin-media-item__check" aria-hidden="true">✓</span> : null}
+                </button>
+                <div className="admin-media-item__meta">
+                  <span className="admin-media-item__name" title={item.filename}>
+                    {item.filename}
+                  </span>
+                  {item.source === 'scan' ? (
+                    <span className="admin-media-item__badge">on disk</span>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-danger admin-media-item__delete"
+                  onClick={() => onDelete(item.id)}
+                  disabled={isDisabled}
+                  aria-label={`Remove ${item.filename} from library`}
+                >
+                  Delete
+                </button>
+              </div>
+            );
+          })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

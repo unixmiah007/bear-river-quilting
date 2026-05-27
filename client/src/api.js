@@ -104,6 +104,43 @@ export const adminApi = {
       `/api/admin/products/${encodeURIComponent(productId)}/images/${encodeURIComponent(imageId)}`,
       { method: 'DELETE', body: JSON.stringify({}) }
     ),
+  addProductImagesFromLibrary: (productId, mediaIds) =>
+    api(`/api/admin/products/${encodeURIComponent(productId)}/images/from-library`, {
+      method: 'POST',
+      body: JSON.stringify({ mediaIds }),
+    }),
+  mediaLibrary: () => apiJsonArray('/api/admin/media'),
+  uploadMediaLibrary: async (files) => {
+    const fd = new FormData();
+    for (const f of files) {
+      fd.append('images', f);
+    }
+    const res = await fetch('/api/admin/media', {
+      method: 'POST',
+      credentials: 'include',
+      body: fd,
+    });
+    const text = await res.text();
+    let data = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+    }
+    if (!res.ok) {
+      const err = new Error(data?.error || res.statusText || 'Upload failed');
+      err.status = res.status;
+      err.body = data;
+      throw err;
+    }
+    return data;
+  },
+  scanMediaLibrary: () =>
+    api('/api/admin/media/scan', { method: 'POST', body: JSON.stringify({}) }),
+  deleteMediaLibraryItem: (id) =>
+    api(`/api/admin/media/${encodeURIComponent(id)}`, { method: 'DELETE', body: JSON.stringify({}) }),
   seedExampleProducts: () =>
     api('/api/admin/products/seed-examples', { method: 'POST', body: JSON.stringify({}) }),
   importProductsCsv: (csv) =>
