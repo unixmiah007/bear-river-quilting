@@ -94,6 +94,7 @@ export default function AdminOrders() {
   const [error, setError] = useState(null);
   const [trackingMsg, setTrackingMsg] = useState(null);
   const [trackingBusy, setTrackingBusy] = useState(false);
+  const [invoiceBusy, setInvoiceBusy] = useState(false);
   const [trackingForm, setTrackingForm] = useState({ carrier: 'usps', trackingNumber: '' });
   const orderDetailRef = useRef(null);
   const [pageSize, setPageSize] = useState(15);
@@ -256,6 +257,19 @@ export default function AdminOrders() {
     }
   }
 
+  async function downloadInvoice() {
+    if (!details?.order?.id) return;
+    setInvoiceBusy(true);
+    setError(null);
+    try {
+      await adminApi.downloadOrderInvoicePdf(details.order.id, details.order.order_number);
+    } catch (e) {
+      setError(e.body?.error || e.message);
+    } finally {
+      setInvoiceBusy(false);
+    }
+  }
+
   return (
     <>
       <h1 style={{ marginTop: 0 }}>Orders</h1>
@@ -412,9 +426,19 @@ export default function AdminOrders() {
           className="card admin-order-detail-section"
           aria-labelledby="admin-order-detail-heading"
         >
-          <h3 id="admin-order-detail-heading" style={{ margin: 0 }}>
-            Order {details.order.order_number}
-          </h3>
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <h3 id="admin-order-detail-heading" style={{ margin: 0 }}>
+              Order {details.order.order_number}
+            </h3>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={downloadInvoice}
+              disabled={invoiceBusy}
+            >
+              {invoiceBusy ? 'Preparing…' : 'Download Invoice'}
+            </button>
+          </div>
           <p className="muted" style={{ margin: 0 }}>
             {details.order.customer_name} • {details.order.customer_email}
           </p>

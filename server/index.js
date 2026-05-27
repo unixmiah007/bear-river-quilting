@@ -37,6 +37,7 @@ import {
   resolveLabelTo,
 } from './lib/shippingLabel.js';
 import { getDefaultShipFrom } from './lib/defaultShipFrom.js';
+import { buildOrderInvoicePdf, invoicePdfFilename } from './lib/orderInvoicePdf.js';
 import { sendOrderTrackingNotification } from './lib/orderTracking.js';
 import { SHIPPING_CARRIERS } from './lib/shippingCarriers.js';
 import {
@@ -1248,6 +1249,36 @@ app.get('/api/admin/orders', authMiddleware, async (_req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to list orders' });
+  }
+});
+
+app.get('/api/admin/orders/:id/invoice.pdf', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [[order]] = await pool.query(
+      `SELECT id, order_number, status, customer_name, customer_email, customer_phone,
+              shipping_address1, shipping_address2, shipping_city, shipping_state, shipping_postal_code, shipping_country,
+              shipping_method, shipping_cost,
+              billing_name, billing_address1, billing_address2, billing_city, billing_state, billing_postal_code, billing_country,
+              card_last4, subtotal, tax_amount, total, created_at,
+              tracking_carrier, tracking_number
+       FROM orders WHERE id = ?`,
+      [id]
+    );
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    const [items] = await pool.query(
+      `SELECT product_name, unit_price, quantity, line_total
+       FROM order_items WHERE order_id = ? ORDER BY id ASC`,
+      [id]
+    );
+    const pdf = await buildOrderInvoicePdf(order, items);
+    const filename = invoicePdfFilename(order.order_number);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(pdf);
+  } catch (e) {
+    console.error('[invoice] PDF failed:', e);
+    res.status(500).json({ error: 'Failed to generate invoice PDF' });
   }
 });
 

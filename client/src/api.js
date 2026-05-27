@@ -143,6 +143,33 @@ export const adminApi = {
     }),
   orders: () => apiJsonArray('/api/admin/orders'),
   orderById: (id) => api(`/api/admin/orders/${id}`),
+  downloadOrderInvoicePdf: async (orderId, orderNumber) => {
+    const res = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/invoice.pdf`, {
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+      const err = new Error(data?.error || res.statusText || 'Failed to download invoice');
+      err.status = res.status;
+      err.body = data;
+      throw err;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `invoice-${String(orderNumber ?? orderId).replace(/[^a-zA-Z0-9-_]+/g, '-')}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
   updateOrderStatus: (id, status) =>
     api(`/api/admin/orders/${id}/status`, {
       method: 'PUT',
