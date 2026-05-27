@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { adminApi } from '../api.js';
 import ShippingLabelPanel from '../components/admin/ShippingLabelPanel.jsx';
+import OrderMessagingPanel from '../components/admin/OrderMessagingPanel.jsx';
 import { labelForCarrier, SHIPPING_CARRIER_OPTIONS } from '../lib/shippingCarriers.js';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
@@ -98,6 +99,7 @@ export default function AdminOrders() {
   const [details, setDetails] = useState(null);
   const [error, setError] = useState(null);
   const [trackingMsg, setTrackingMsg] = useState(null);
+  const [messagingFeedback, setMessagingFeedback] = useState(null);
   const [trackingBusy, setTrackingBusy] = useState(false);
   const [invoiceBusy, setInvoiceBusy] = useState(false);
   const [trackingForm, setTrackingForm] = useState({ carrier: 'usps', trackingNumber: '' });
@@ -210,6 +212,7 @@ export default function AdminOrders() {
   async function loadDetails(id) {
     setSelected(id);
     setTrackingMsg(null);
+    setMessagingFeedback(null);
     try {
       const data = await adminApi.orderById(id);
       setDetails(data);
@@ -595,6 +598,30 @@ export default function AdminOrders() {
           <div className="price" style={{ textAlign: 'right' }}>
             {formatPrice(details.order.total)}
           </div>
+
+          {messagingFeedback?.error ? (
+            <p className="page-body" style={{ color: '#b91c1c', marginTop: '1.25rem' }}>
+              {messagingFeedback.error}
+            </p>
+          ) : null}
+          {messagingFeedback?.warning ? (
+            <p className="page-body" style={{ color: '#92400e', marginTop: '1.25rem' }}>
+              {messagingFeedback.warning}
+            </p>
+          ) : null}
+          {messagingFeedback?.success ? (
+            <p className="page-body" style={{ color: '#065f46', marginTop: '1.25rem' }}>
+              {messagingFeedback.success}
+            </p>
+          ) : null}
+
+          <OrderMessagingPanel
+            orderId={details.order.id}
+            orderNumber={details.order.order_number}
+            customerEmail={details.order.customer_email}
+            customerName={details.order.customer_name}
+            onFeedback={setMessagingFeedback}
+          />
         </div>
       ) : null}
     </>

@@ -46,6 +46,14 @@ import {
 import { getDefaultShipFrom } from './lib/defaultShipFrom.js';
 import { buildOrderInvoicePdf, invoicePdfFilename } from './lib/orderInvoicePdf.js';
 import { sendOrderTrackingNotification } from './lib/orderTracking.js';
+import { ensureOrderMessagesTable } from './lib/ensureOrderMessagesTable.js';
+import {
+  listOrderMessages,
+  getOrderMessage,
+  sendOrderCustomerMessage,
+  sendCustomerOrderReply,
+  verifyCustomerOrderAccess,
+} from './lib/orderMessages.js';
 import { SHIPPING_CARRIERS } from './lib/shippingCarriers.js';
 import {
   createStripeCheckoutSession,
@@ -564,6 +572,98 @@ app.post('/api/customer/orders', async (req, res) => {
       });
     }
     res.status(500).json({ error: 'Could not load orders.' });
+  }
+});
+
+app.post('/api/customer/orders/messages', async (req, res) => {
+  try {
+    const email = normalizeCustomerEmail(req.body?.email);
+    const orderNumber = String(req.body?.orderNumber ?? '').trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Enter the same email you used at checkout.' });
+    }
+    if (!orderNumber || orderNumber.length > 64) {
+      return res.status(400).json({ error: 'Order number is required.' });
+    }
+    const order = await verifyCustomerOrderAccess(email, orderNumber);
+    if (!order) {
+      return res.status(404).json({
+        error: 'We could not find that order for this email.',
+        hint: 'Use the exact order number from your confirmation and the checkout email address.',
+      });
+    }
+    const messages = await listOrderMessages(order.id, { ascending: true });
+    res.json({ messages });
+  } catch (e) {
+    console.error(e);
+    if (e.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        error: 'Messaging is not available yet.',
+        hint: 'Restart the API to create the order_messages table.',
+      });
+    }
+    res.status(500).json({ error: 'Could not load messages.' });
+  }
+});
+
+app.post('/api/customer/orders/messages/view', async (req, res) => {
+  try {
+    const email = normalizeCustomerEmail(req.body?.email);
+    const orderNumber = String(req.body?.orderNumber ?? '').trim();
+    const messageId = Number(req.body?.messageId);
+    if (!email || !orderNumber || !messageId) {
+      return res.status(400).json({ error: 'Invalid request.' });
+    }
+    const order = await verifyCustomerOrderAccess(email, orderNumber);
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found for this email.' });
+    }
+    const message = await getOrderMessage(order.id, messageId);
+    if (!message) return res.status(404).json({ error: 'Message not found' });
+    res.json(message);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Could not load message.' });
+  }
+});
+
+app.post('/api/customer/orders/messages/reply', async (req, res) => {
+  try {
+    const email = normalizeCustomerEmail(req.body?.email);
+    const orderNumber = String(req.body?.orderNumber ?? '').trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Enter the same email you used at checkout.' });
+    }
+    if (!orderNumber) {
+      return res.status(400).json({ error: 'Order number is required.' });
+    }
+    const result = await sendCustomerOrderReply({
+      email,
+      orderNumber,
+      body: req.body?.body ?? req.body?.message,
+      subject: req.body?.subject,
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 500).json({
+        error: result.error,
+        hint: result.hint ?? null,
+      });
+    }
+    res.status(201).json({
+      ok: true,
+      message: result.message,
+      emailSent: result.emailSent,
+      warning: result.warning ?? null,
+    });
+  } catch (e) {
+    console.error(e);
+    if (e.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        error: 'Messaging is not available yet.',
+        hint: 'Restart the API to create the order_messages table.',
+      });
+    }
+    res.status(500).json({ error: 'Could not send your reply.' });
   }
 });
 
@@ -1581,6 +1681,73 @@ app.put('/api/admin/orders/:id/status', authMiddleware, async (req, res) => {
   }
 });
 
+app.get('/api/admin/orders/:id/messages', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid order id' });
+    const [[order]] = await pool.query('SELECT id FROM orders WHERE id = ?', [id]);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    const messages = await listOrderMessages(id);
+    res.json(messages);
+  } catch (e) {
+    console.error(e);
+    if (e.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        error: 'order_messages table is missing.',
+        hint: 'Restart the API to create it automatically.',
+      });
+    }
+    res.status(500).json({ error: 'Failed to load message history' });
+  }
+});
+
+app.get('/api/admin/orders/:id/messages/:messageId', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const messageId = Number(req.params.messageId);
+    if (!id || !messageId) return res.status(400).json({ error: 'Invalid id' });
+    const message = await getOrderMessage(id, messageId);
+    if (!message) return res.status(404).json({ error: 'Message not found' });
+    res.json(message);
+  } catch (e) {
+    console.error(e);
+    if (e.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        error: 'order_messages table is missing.',
+        hint: 'Restart the API to create it automatically.',
+      });
+    }
+    res.status(500).json({ error: 'Failed to load message' });
+  }
+});
+
+app.post('/api/admin/orders/:id/messages', authMiddleware, async (req, res) => {
+  try {
+    const result = await sendOrderCustomerMessage(req.params.id, {
+      subject: req.body?.subject,
+      body: req.body?.body ?? req.body?.message,
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 500).json({ error: result.error });
+    }
+    res.status(201).json({
+      ok: true,
+      message: result.message,
+      emailSent: result.emailSent,
+      warning: result.warning ?? null,
+    });
+  } catch (e) {
+    console.error(e);
+    if (e.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        error: 'order_messages table is missing.',
+        hint: 'Restart the API to create it automatically.',
+      });
+    }
+    res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
 // --- Admin: test email ---
 
 app.post('/api/admin/test-email', authMiddleware, async (req, res) => {
@@ -1709,6 +1876,11 @@ async function startServer() {
     await ensureOrderShippingLabel(pool);
   } catch (e) {
     console.error('[ensureOrderShippingLabel]', e?.message || e);
+  }
+  try {
+    await ensureOrderMessagesTable(pool);
+  } catch (e) {
+    console.error('[ensureOrderMessagesTable]', e?.message || e);
   }
   app.listen(PORT, async () => {
     const stripeOk = !!process.env.STRIPE_SECRET_KEY;

@@ -3282,9 +3282,112 @@ tr:last-child td {
 }
 
 .confirm-dialog__actions {
+  display: flex;
   justify-content: flex-end;
   gap: 0.65rem;
   margin: 0;
+}
+
+.admin-order-messaging {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.admin-order-messaging__title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.admin-order-messaging__hint {
+  margin: 0 0 1rem;
+}
+
+.admin-order-messaging__form {
+  margin-bottom: 1.25rem;
+}
+
+.admin-order-messaging__history-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.admin-order-message-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.admin-order-message-list__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.admin-order-message-list__item:last-child {
+  border-bottom: none;
+}
+
+.admin-order-message-list__item:hover {
+  background: #f9fafb;
+}
+
+.admin-order-message-list__item:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.admin-order-message-list__subject {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.admin-order-message-list__meta {
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.admin-order-message-dialog {
+  max-width: 32rem;
+  max-height: min(85vh, 560px);
+  overflow: auto;
+}
+
+.admin-order-message-dialog__body {
+  margin: 0 0 1.25rem;
+  padding: 0.85rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.admin-order-message-dialog__body p {
+  margin: 0 0 0.5rem;
+}
+
+.admin-order-message-dialog__body p:last-child {
+  margin-bottom: 0;
+}
+
+.order-correspondence__form {
+  margin-top: 1.25rem;
 }
 
 .shipping-label-address {

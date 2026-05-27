@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import CartIcon from '../components/CartIcon.jsx';
 import OrderTrackingDisplay from '../components/OrderTrackingDisplay.jsx';
+import OrderCorrespondencePanel from '../components/OrderCorrespondencePanel.jsx';
 import ProductCard from '../components/ProductCard.jsx';
 import { publicApi } from '../api.js';
 import { useCart } from '../context/CartContext.jsx';
@@ -435,6 +436,8 @@ export default function Account() {
             Subtotal {formatPrice(order.subtotal)} · Tax {formatPrice(order.tax_amount)} · Shipping{' '}
             {formatPrice(order.shipping_cost)} · <strong>Total {formatPrice(order.total)}</strong>
           </p>
+
+          <OrderCorrespondencePanel email={email} orderNumber={order.order_number} />
         </section>
       ) : null}
 

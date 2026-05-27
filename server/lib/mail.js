@@ -307,3 +307,127 @@ ${trackHtml}
 
   console.log('[mail] Sent tracking email', { orderNumber, to: toAddr, carrier: carrierLabel });
 }
+
+/**
+ * Custom message from staff to the customer about their order.
+ */
+export async function sendOrderCustomerMessageEmail({
+  to,
+  customerName,
+  orderNumber,
+  subject,
+  bodyText,
+  bodyHtml,
+}) {
+  const toAddr = String(to ?? '')
+    .trim()
+    .toLowerCase();
+  if (!toAddr || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toAddr)) {
+    throw new Error('Invalid customer email on order');
+  }
+
+  if (!isSendGridConfigured()) {
+    throw new Error('SendGrid is not configured — set SENDGRID_API_KEY in server/.env');
+  }
+
+  const from = resolveSendGridFromCustomer();
+  if (!from) {
+    throw new Error('Set MAIL_FROM_ADDRESS or MAIL_FROM to a verified SendGrid sender');
+  }
+
+  const orderStatusUrl = buildCustomerOrderAccountUrl(toAddr, orderNumber);
+  const htmlBody = bodyHtml || escapeHtml(bodyText).replace(/\n/g, '<br>\n');
+
+  const text = [
+    `Hi ${customerName},`,
+    '',
+    bodyText,
+    '',
+    `Order ${orderNumber}`,
+    `View order status: ${orderStatusUrl}`,
+    '',
+    '— Bear River Quilting',
+  ].join('\n');
+
+  const html = `
+<p>Hi ${escapeHtml(customerName)},</p>
+<div style="margin:1rem 0;line-height:1.5">${htmlBody}</div>
+<p class="muted" style="color:#6b7280;font-size:0.9em">Regarding order <strong>${escapeHtml(orderNumber)}</strong> · <a href="${escapeHtml(orderStatusUrl)}">View order status</a></p>
+<p>— Bear River Quilting</p>
+`.trim();
+
+  await sendSendGridMail({
+    to: toAddr,
+    from,
+    subject,
+    text,
+    html,
+  });
+
+  console.log('[mail] Sent order message to customer', { orderNumber, to: toAddr, subject });
+}
+
+/**
+ * Notifies shop staff when a customer replies on /account.
+ */
+export async function sendOrderCustomerReplyStaffEmail({
+  orderId,
+  orderNumber,
+  customerName,
+  customerEmail,
+  subject,
+  bodyText,
+}) {
+  if (!isSendGridConfigured()) {
+    throw new Error('SendGrid is not configured — set SENDGRID_API_KEY in server/.env');
+  }
+
+  const from = resolveSendGridFromStaff();
+  if (!from) {
+    throw new Error('Set MAIL_STAFF_FROM_ADDRESS or MAIL_FROM_ADDRESS for staff notifications');
+  }
+
+  const notifyTo = parseOrderNotifyRecipients();
+  if (notifyTo.length === 0) {
+    throw new Error('No staff notification emails configured (ORDER_NOTIFY_EMAILS)');
+  }
+
+  const adminOrderUrl = buildAdminOrderUrl(orderId);
+  const text = [
+    `Customer reply on order ${orderNumber}`,
+    `From: ${customerName} <${customerEmail}>`,
+    `Subject: ${subject}`,
+    '',
+    bodyText,
+    '',
+    `View in admin: ${adminOrderUrl}`,
+  ].join('\n');
+
+  const html = `
+<p><strong>Customer reply on order <a href="${escapeHtml(adminOrderUrl)}">${escapeHtml(orderNumber)}</a></strong></p>
+<p>${escapeHtml(customerName)} · <a href="mailto:${escapeHtml(customerEmail)}">${escapeHtml(customerEmail)}</a></p>
+<p><strong>${escapeHtml(subject)}</strong></p>
+<div style="margin:1rem 0;line-height:1.5;white-space:pre-wrap">${escapeHtml(bodyText)}</div>
+<p><a href="${escapeHtml(adminOrderUrl)}">Open order in admin</a></p>
+`.trim();
+
+  let sent = 0;
+  for (const addr of notifyTo) {
+    try {
+      await sendSendGridMail({
+        to: addr,
+        from,
+        subject: `Customer reply: order ${orderNumber}`,
+        text,
+        html,
+      });
+      sent += 1;
+    } catch (e) {
+      console.error('[mail] Customer reply notify failed for', addr, e?.message || e);
+    }
+  }
+  if (sent === 0) {
+    throw new Error('Failed to notify staff by email');
+  }
+  console.log('[mail] Sent customer reply notify', { orderNumber, recipients: sent });
+}

@@ -51,6 +51,12 @@ export const publicApi = {
     api(`/api/checkout/confirm?session_id=${encodeURIComponent(sessionId)}`),
   customerOrdersLookup: (body) =>
     api('/api/customer/orders', { method: 'POST', body: JSON.stringify(body) }),
+  customerOrderMessages: (body) =>
+    api('/api/customer/orders/messages', { method: 'POST', body: JSON.stringify(body) }),
+  customerOrderMessage: (body) =>
+    api('/api/customer/orders/messages/view', { method: 'POST', body: JSON.stringify(body) }),
+  customerOrderMessageReply: (body) =>
+    api('/api/customer/orders/messages/reply', { method: 'POST', body: JSON.stringify(body) }),
   submitCustomQuiltRequest: (body) =>
     api('/api/custom-quilt-requests', { method: 'POST', body: JSON.stringify(body) }),
 };
@@ -214,6 +220,17 @@ export const adminApi = {
     }),
   sendOrderTracking: (id, body) =>
     api(`/api/admin/orders/${id}/tracking`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  orderMessages: (orderId) =>
+    apiJsonArray(`/api/admin/orders/${encodeURIComponent(orderId)}/messages`),
+  orderMessage: (orderId, messageId) =>
+    api(
+      `/api/admin/orders/${encodeURIComponent(orderId)}/messages/${encodeURIComponent(messageId)}`
+    ),
+  sendOrderMessage: (orderId, body) =>
+    api(`/api/admin/orders/${encodeURIComponent(orderId)}/messages`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
