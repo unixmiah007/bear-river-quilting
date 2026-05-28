@@ -235,11 +235,28 @@ export async function createCustomQuiltRequest(body) {
 
 export async function listCustomQuiltRequestsForAdmin() {
   const [rows] = await pool.query(
-    `SELECT id, request_number, status, design_name, product_size, color_palette,
+    `SELECT id, request_number, status, acknowledged, design_name, product_size, color_palette,
             customer_name, customer_email, estimated_price, created_at
      FROM custom_quilt_requests
      ORDER BY created_at DESC
      LIMIT 200`
   );
   return rows;
+}
+
+export async function setCustomQuiltRequestAcknowledged(id, acknowledged) {
+  const value = String(acknowledged ?? '')
+    .trim()
+    .toUpperCase();
+  if (!['Y', 'N'].includes(value)) {
+    return { ok: false, status: 400, error: 'acknowledged must be Y or N' };
+  }
+  const [result] = await pool.query(
+    'UPDATE custom_quilt_requests SET acknowledged = ? WHERE id = ?',
+    [value, Number(id)]
+  );
+  if (result.affectedRows === 0) {
+    return { ok: false, status: 404, error: 'Request not found' };
+  }
+  return { ok: true, acknowledged: value };
 }

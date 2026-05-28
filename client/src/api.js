@@ -241,4 +241,9 @@ export const adminApi = {
       body: JSON.stringify(body),
     }),
   customQuiltRequests: () => apiJsonArray('/api/admin/custom-quilt-requests'),
+  setCustomQuiltRequestAcknowledged: (id, acknowledged) =>
+    api(`/api/admin/custom-quilt-requests/${encodeURIComponent(id)}/acknowledged`, {
+      method: 'PUT',
+      body: JSON.stringify({ acknowledged }),
+    }),
 };

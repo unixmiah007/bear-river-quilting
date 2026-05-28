@@ -35,6 +35,7 @@ import { ensureCustomQuiltRequestsTable } from './lib/ensureCustomQuiltRequestsT
 import {
   createCustomQuiltRequest,
   listCustomQuiltRequestsForAdmin,
+  setCustomQuiltRequestAcknowledged,
 } from './lib/customQuiltRequest.js';
 import { ensureOrderTrackingColumns } from './lib/ensureOrderTrackingColumns.js';
 import { ensureOrderShippingLabel } from './lib/ensureOrderShippingLabel.js';
@@ -1488,6 +1489,19 @@ app.get('/api/admin/custom-quilt-requests', authMiddleware, async (_req, res) =>
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to list custom quilt requests' });
+  }
+});
+
+app.put('/api/admin/custom-quilt-requests/:id/acknowledged', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid request id' });
+    const result = await setCustomQuiltRequestAcknowledged(id, req.body?.acknowledged);
+    if (!result.ok) return res.status(result.status ?? 500).json({ error: result.error });
+    res.json({ ok: true, acknowledged: result.acknowledged });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to update acknowledged flag' });
   }
 });
 

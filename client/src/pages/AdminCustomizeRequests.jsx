@@ -16,6 +16,7 @@ export default function AdminCustomizeRequests() {
   const [rows, setRows] = useState([]);
   const [err, setErr] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState(null);
 
   useEffect(() => {
     adminApi
@@ -24,6 +25,23 @@ export default function AdminCustomizeRequests() {
       .catch((e) => setErr(e.body?.error || e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  async function toggleAcknowledged(row) {
+    if (!row?.id) return;
+    const next = String(row.acknowledged || 'N').toUpperCase() === 'Y' ? 'N' : 'Y';
+    setErr(null);
+    setSavingId(row.id);
+    try {
+      await adminApi.setCustomQuiltRequestAcknowledged(row.id, next);
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, acknowledged: next } : r))
+      );
+    } catch (e) {
+      setErr(e.body?.error || e.message);
+    } finally {
+      setSavingId(null);
+    }
+  }
 
   return (
     <>
@@ -45,6 +63,7 @@ export default function AdminCustomizeRequests() {
                 <th>Size</th>
                 <th>Customer</th>
                 <th>Est. price</th>
+                <th>Acknowledged</th>
                 <th>Submitted</th>
               </tr>
             </thead>
@@ -61,6 +80,18 @@ export default function AdminCustomizeRequests() {
                     <span className="muted">{r.customer_email}</span>
                   </td>
                   <td>{formatPrice(r.estimated_price)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className={`btn ${String(r.acknowledged || 'N').toUpperCase() === 'Y' ? 'btn-primary' : ''}`}
+                      onClick={() => toggleAcknowledged(r)}
+                      disabled={savingId === r.id}
+                    >
+                      {savingId === r.id
+                        ? 'Saving…'
+                        : `Acknowledged: ${String(r.acknowledged || 'N').toUpperCase() === 'Y' ? 'Y' : 'N'}`}
+                    </button>
+                  </td>
                   <td>{formatWhen(r.created_at)}</td>
                 </tr>
               ))}
