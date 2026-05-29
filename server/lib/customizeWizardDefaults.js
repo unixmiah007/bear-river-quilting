@@ -1,0 +1,188 @@
+/** Default /customize wizard content (seeded into DB when empty). */
+export function getDefaultCustomizeWizardConfig() {
+  return {
+    enabled: true,
+    page: {
+      eyebrow: 'Custom studio',
+      title: 'Customize your quilt',
+      intro:
+        'Build your quilt step by step—pick a quilt from our catalog, set size and colors, then pay securely with Stripe to confirm your custom quilt request. Our designer will follow up within 2–3 business days with next steps.',
+    },
+    steps: [
+      {
+        n: 1,
+        key: 'design',
+        label: 'Design',
+        enabled: true,
+        title: 'Choose a quilt to customize',
+        description:
+          "Select a published product from our catalog as your starting point. You'll choose size, colors, and batting in the next step.",
+        emptyProductsMessage: 'No published products are available yet.',
+      },
+      {
+        n: 2,
+        key: 'options',
+        label: 'Size & colors',
+        enabled: true,
+        title: 'Size, colors & batting',
+        showSelectedProduct: true,
+        basedOnPrefix: 'Based on',
+        estimatedPrefix: '— estimated starting at',
+      },
+      {
+        n: 3,
+        key: 'vision',
+        label: 'Your vision',
+        enabled: true,
+        title: 'Tell our designer your vision',
+        quiltTitleLabel: 'Working title (optional)',
+        quiltTitlePlaceholder: 'e.g. Guest room sunset quilt',
+        notesLabel: 'Notes for the designer',
+        notesPlaceholder: 'Room colors, deadline, gift recipient, pattern tweaks, etc.',
+      },
+      {
+        n: 4,
+        key: 'contact',
+        label: 'Contact',
+        enabled: true,
+        title: 'How can we reach you?',
+        nameLabel: 'Full name',
+        emailLabel: 'Email',
+        phoneLabel: 'Phone (optional)',
+      },
+      {
+        n: 5,
+        key: 'pay',
+        label: 'Pay',
+        enabled: true,
+        title: 'Review & pay',
+        stripeIntro:
+          "You will be redirected to Stripe's secure checkout to pay {amount}. Test cards work in sandbox mode (for example 4242 4242 4242 4242).",
+        finePrint:
+          'Payment confirms your custom quilt request. Our designer may adjust the final scope or quote before production begins.',
+        countdownMessage: 'Please review your order. Payment unlocks in {seconds}…',
+        payButtonLabel: 'Pay with Stripe',
+        payButtonWaitingLabel: 'Pay in {seconds}s…',
+        payButtonBusyLabel: 'Redirecting to Stripe…',
+      },
+    ],
+    sections: {
+      sizes: { enabled: true, heading: 'Quilt size', display: 'letter' },
+      colors: { enabled: true, heading: 'Color palette', display: 'swatch' },
+      batting: { enabled: true, heading: 'Batting preference', display: 'batting' },
+    },
+    defaults: {
+      productSize: 'large',
+      colorPalette: 'warm-neutrals',
+      batting: 'cotton',
+    },
+    pay: {
+      pauseSeconds: 4,
+    },
+    sizeOptions: [
+      { value: 'small', label: 'Small', code: 'S', hint: 'Throw / lap · ~50" × 65"', enabled: true },
+      { value: 'large', label: 'Large', code: 'L', hint: 'Full / queen · ~90" × 90"', enabled: true },
+      {
+        value: 'x-large',
+        label: 'X-Large',
+        code: 'XLarge',
+        hint: 'Oversized queen · ~96" × 96"',
+        enabled: true,
+      },
+      { value: 'xx-large', label: 'XX-Large', code: 'XXLarge', hint: 'King · ~108" × 96"', enabled: true },
+      {
+        value: 'xxx-large',
+        label: 'XXX-Large',
+        code: 'XXXLarge',
+        hint: 'Oversized king · ~110" × 98"',
+        enabled: true,
+      },
+    ],
+    colorOptions: [
+      {
+        value: 'warm-neutrals',
+        label: 'Warm neutrals',
+        hint: 'Cream, tan, rust',
+        colors: ['#f7f2ea', '#e8d4b8', '#c9956a', '#a65d3f'],
+        enabled: true,
+      },
+      {
+        value: 'cool-blues',
+        label: 'Cool blues',
+        hint: 'Soft blues & gray',
+        colors: ['#e8f1f8', '#9bb8d4', '#5a7fa3', '#6b7280'],
+        enabled: true,
+      },
+      {
+        value: 'sage-greens',
+        label: 'Sage greens',
+        hint: 'Sage & forest tones',
+        colors: ['#e4ebe4', '#9cb39a', '#5f7d5c', '#3d5340'],
+        enabled: true,
+      },
+      {
+        value: 'jewel-tones',
+        label: 'Jewel tones',
+        hint: 'Ruby, emerald, plum',
+        colors: ['#9b2335', '#1f6f54', '#5c2d6e', '#c9a227'],
+        enabled: true,
+      },
+      {
+        value: 'monochrome',
+        label: 'Monochrome',
+        hint: 'Black, white, gray',
+        colors: ['#ffffff', '#d1d5db', '#6b7280', '#111111'],
+        enabled: true,
+      },
+      {
+        value: 'scrappy-rainbow',
+        label: 'Scrappy rainbow',
+        hint: 'Mixed vibrant prints',
+        colors: ['#e63946', '#f4a261', '#e9c46a', '#2a9d8f', '#457b9d', '#9b5de5'],
+        swatchLayout: 'stripes',
+        enabled: true,
+      },
+    ],
+    battingOptions: [
+      {
+        value: 'cotton',
+        label: 'Cotton',
+        hint: 'All-season, breathable',
+        image: '/assets/batting-cotton.svg',
+        enabled: true,
+      },
+      {
+        value: 'wool',
+        label: 'Wool',
+        hint: 'Warm, lightweight loft',
+        image: '/assets/batting-wool.svg',
+        enabled: true,
+      },
+      {
+        value: 'bamboo',
+        label: 'Bamboo',
+        hint: 'Silky, drapey hand',
+        image: '/assets/batting-bamboo.svg',
+        enabled: true,
+      },
+      {
+        value: 'unsure',
+        label: 'Not sure',
+        hint: 'Designer recommendation',
+        code: '?',
+        enabled: true,
+      },
+    ],
+    messages: {
+      chooseProduct: 'Choose a product from the catalog to continue.',
+      selectSizeColor: 'Select a size and color palette.',
+      contactRequired: 'Enter your name and email so our designer can reach you.',
+      selectDesignPay: 'Select a design before paying.',
+      priceError: 'Could not calculate price for this design and size.',
+      checkoutCancelled:
+        'Payment was cancelled. Your design is saved — review and try again when ready.',
+      loadingProducts: 'Loading products…',
+      wizardDisabled: 'Custom quilt orders are temporarily unavailable. Please check back soon.',
+    },
+  };
+}

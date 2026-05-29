@@ -64,6 +64,7 @@ export const publicApi = {
     api('/api/customer/orders/messages/reply', { method: 'POST', body: JSON.stringify(body) }),
   submitCustomQuiltRequest: (body) =>
     api('/api/custom-quilt-requests', { method: 'POST', body: JSON.stringify(body) }),
+  customizeConfig: () => api('/api/customize/config'),
 };
 
 export const authApi = {
@@ -251,4 +252,7 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify({ acknowledged }),
     }),
+  customizeConfig: () => api('/api/admin/customize-config'),
+  saveCustomizeConfig: (body) =>
+    api('/api/admin/customize-config', { method: 'PUT', body: JSON.stringify(body) }),
 };

@@ -7,7 +7,9 @@ import {
   QUILT_CRAFT_DETAIL_IMAGE,
   QUILT_MISTY_IMAGE,
   QUILT_STUDIO_IMAGE,
-  SEWING_MACHINE_IMAGE,
+  BATTING_BAMBOO_IMAGE,
+  BATTING_COTTON_IMAGE,
+  BATTING_WOOL_IMAGE,
 } from './quiltAssets.js';
 
 /** Design templates for the Customize wizard (ids must match server allowlist). */
@@ -75,30 +77,35 @@ export const CUSTOMIZE_SIZE_OPTIONS = [
   {
     value: 'small',
     label: 'Small',
+    code: 'S',
     hint: 'Throw / lap · ~50" × 65"',
     image: QUILT_CRAFT_DETAIL_IMAGE,
   },
   {
     value: 'large',
     label: 'Large',
+    code: 'L',
     hint: 'Full / queen · ~90" × 90"',
     image: IMPROV_QUILTING_IMAGE,
   },
   {
     value: 'x-large',
     label: 'X-Large',
+    code: 'XLarge',
     hint: 'Oversized queen · ~96" × 96"',
     image: PRODUCTS_HERO_IMAGES[0].src,
   },
   {
     value: 'xx-large',
     label: 'XX-Large',
+    code: 'XXLarge',
     hint: 'King · ~108" × 96"',
     image: PRODUCTS_HERO_IMAGES[1].src,
   },
   {
     value: 'xxx-large',
     label: 'XXX-Large',
+    code: 'XXXLarge',
     hint: 'Oversized king · ~110" × 98"',
     image: QUILT_STUDIO_IMAGE,
   },
@@ -109,37 +116,38 @@ export const COLOR_PALETTE_OPTIONS = [
     value: 'warm-neutrals',
     label: 'Warm neutrals',
     hint: 'Cream, tan, rust',
-    image: IMPROV_QUILTING_IMAGE,
+    colors: ['#f7f2ea', '#e8d4b8', '#c9956a', '#a65d3f'],
   },
   {
     value: 'cool-blues',
     label: 'Cool blues',
     hint: 'Soft blues & gray',
-    image: QUILT_MISTY_IMAGE,
+    colors: ['#e8f1f8', '#9bb8d4', '#5a7fa3', '#6b7280'],
   },
   {
     value: 'sage-greens',
     label: 'Sage greens',
     hint: 'Sage & forest tones',
-    image: IMPROV_QUILT_BASTING_IMAGE,
+    colors: ['#e4ebe4', '#9cb39a', '#5f7d5c', '#3d5340'],
   },
   {
     value: 'jewel-tones',
     label: 'Jewel tones',
     hint: 'Ruby, emerald, plum',
-    image: PRODUCTS_HERO_IMAGES[2].src,
+    colors: ['#9b2335', '#1f6f54', '#5c2d6e', '#c9a227'],
   },
   {
     value: 'monochrome',
     label: 'Monochrome',
     hint: 'Black, white, gray',
-    image: IMPROV_QUILTING_020_IMAGE,
+    colors: ['#ffffff', '#d1d5db', '#6b7280', '#111111'],
   },
   {
     value: 'scrappy-rainbow',
     label: 'Scrappy rainbow',
     hint: 'Mixed vibrant prints',
-    image: PRODUCTS_HERO_IMAGES[3].src,
+    colors: ['#e63946', '#f4a261', '#e9c46a', '#2a9d8f', '#457b9d', '#9b5de5'],
+    swatchLayout: 'stripes',
   },
 ];
 
@@ -148,25 +156,25 @@ export const BATTING_OPTIONS = [
     value: 'cotton',
     label: 'Cotton',
     hint: 'All-season, breathable',
-    image: QUILT_CRAFT_DETAIL_IMAGE,
+    image: BATTING_COTTON_IMAGE,
   },
   {
     value: 'wool',
     label: 'Wool',
     hint: 'Warm, lightweight loft',
-    image: IMPROV_QUILTING_010_IMAGE,
+    image: BATTING_WOOL_IMAGE,
   },
   {
     value: 'bamboo',
     label: 'Bamboo',
     hint: 'Silky, drapey hand',
-    image: QUILT_MISTY_IMAGE,
+    image: BATTING_BAMBOO_IMAGE,
   },
   {
     value: 'unsure',
     label: 'Not sure',
     hint: 'Designer recommendation',
-    image: SEWING_MACHINE_IMAGE,
+    code: '?',
   },
 ];
 
@@ -204,5 +212,6 @@ export function labelForBatting(value) {
 export function labelForCustomizeSize(value) {
   const o = CUSTOMIZE_SIZE_OPTIONS.find((opt) => opt.value === value);
   if (!o) return value;
-  return o.hint ? `${o.label} — ${o.hint}` : o.label;
+  const name = o.code ? `${o.label} ${o.code}` : o.label;
+  return o.hint ? `${name} — ${o.hint}` : name;
 }

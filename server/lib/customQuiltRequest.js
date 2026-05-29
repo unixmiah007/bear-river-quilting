@@ -2,32 +2,17 @@ import pool from '../db.js';
 import { sendSendGridMail, resolveSendGridFromStaff, resolveSendGridFromCustomer } from './sendgridMail.js';
 import { parseOrderNotifyRecipients } from './mail.js';
 import { normalizeProductSize } from './productSize.js';
+import { estimateCustomizePrice, resolveCustomizeDesign } from './customizeDesign.js';
+import {
+  getActiveSizeOptions,
+  getAllowedBattingValues,
+  getAllowedColorPaletteValues,
+  loadCustomizeWizardConfig,
+} from './customizeWizardConfig.js';
 
 export function customQuiltRequestNumber() {
   return `CQ${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 900 + 100)}`;
 }
-
-const DESIGN_IDS = new Set([
-  'heritage-log-cabin',
-  'modern-loft-stripe',
-  'prairie-nine-patch',
-  'sunset-flying-geese',
-  'sage-basting',
-  'misty-floral',
-  'studio-medallion',
-  'patchwork-heritage',
-]);
-
-const COLOR_PALETTES = new Set([
-  'warm-neutrals',
-  'cool-blues',
-  'sage-greens',
-  'jewel-tones',
-  'monochrome',
-  'scrappy-rainbow',
-]);
-
-const BATTING_OPTIONS = new Set(['cotton', 'wool', 'bamboo', 'unsure']);
 
 function escapeHtml(s) {
   return String(s ?? '')
@@ -37,7 +22,7 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-export function validateCustomQuiltBody(body) {
+export async function validateCustomQuiltBody(body) {
   const designId = String(body?.designId ?? '').trim();
   const designName = String(body?.designName ?? '').trim();
   const customerName = String(body?.customer?.name ?? body?.customerName ?? '').trim();
@@ -48,35 +33,51 @@ export function validateCustomQuiltBody(body) {
   const batting = String(body?.batting ?? '').trim() || null;
   const quiltTitle = String(body?.quiltTitle ?? '').trim() || null;
   const notes = String(body?.notes ?? '').trim() || null;
-  const estimatedPrice = Number(body?.estimatedPrice);
 
-  if (!designId || !DESIGN_IDS.has(designId)) {
-    return { ok: false, status: 400, error: 'Select a design from the palette' };
+  if (!designId) {
+    return { ok: false, status: 400, error: 'Select a product to customize' };
   }
-  if (!designName) {
-    return { ok: false, status: 400, error: 'Design name is required' };
+
+  const resolved = await resolveCustomizeDesign(designId, designName);
+  if (!resolved.ok) {
+    return { ok: false, status: 400, error: resolved.error };
   }
+
+  const estimatedPrice = estimateCustomizePrice(
+    resolved.designId,
+    productSize,
+    resolved.basePrice
+  );
+  if (estimatedPrice == null || estimatedPrice <= 0) {
+    return { ok: false, status: 400, error: 'Could not calculate price for this design and size' };
+  }
+
   if (!customerName || !customerEmail) {
     return { ok: false, status: 400, error: 'Your name and email are required' };
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
     return { ok: false, status: 400, error: 'Enter a valid email address' };
   }
-  if (!productSize) {
+  const wizardConfig = await loadCustomizeWizardConfig();
+  const allowedSizes = new Set(getActiveSizeOptions(wizardConfig).map((o) => o.value));
+  const allowedColors = getAllowedColorPaletteValues(wizardConfig);
+  const allowedBatting = getAllowedBattingValues(wizardConfig);
+
+  if (!productSize || !allowedSizes.has(productSize)) {
     return { ok: false, status: 400, error: 'Select a quilt size' };
   }
-  if (!colorPalette || !COLOR_PALETTES.has(colorPalette)) {
+  if (!colorPalette || !allowedColors.has(colorPalette)) {
     return { ok: false, status: 400, error: 'Select a color palette' };
   }
-  if (batting && !BATTING_OPTIONS.has(batting)) {
+  if (batting && !allowedBatting.has(batting)) {
     return { ok: false, status: 400, error: 'Invalid batting option' };
   }
 
   return {
     ok: true,
     data: {
-      designId,
-      designName,
+      designId: resolved.designId,
+      designName: resolved.designName,
       customerName,
       customerEmail,
       customerPhone,
@@ -85,7 +86,7 @@ export function validateCustomQuiltBody(body) {
       batting,
       quiltTitle,
       notes,
-      estimatedPrice: Number.isFinite(estimatedPrice) && estimatedPrice > 0 ? estimatedPrice : null,
+      estimatedPrice,
     },
   };
 }
@@ -192,7 +193,7 @@ function rowFromData(d, id, requestNumber) {
 
 /** Insert request before Stripe payment (no emails). */
 export async function insertPendingCustomQuiltRequest(body) {
-  const validated = validateCustomQuiltBody(body);
+  const validated = await validateCustomQuiltBody(body);
   if (!validated.ok) {
     return validated;
   }
@@ -285,7 +286,7 @@ export async function fulfillCustomQuiltRequestPayment(requestId, { sessionId, p
 
 /** Free submit path (no Stripe) — kept for API compatibility. */
 export async function createCustomQuiltRequest(body) {
-  const validated = validateCustomQuiltBody(body);
+  const validated = await validateCustomQuiltBody(body);
   if (!validated.ok) {
     return validated;
   }

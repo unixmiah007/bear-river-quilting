@@ -1,48 +1,89 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
+import ProductImage from '../components/ProductImage.jsx';
 import {
-  BATTING_OPTIONS,
-  COLOR_PALETTE_OPTIONS,
-  CUSTOMIZE_SIZE_OPTIONS,
-  estimateCustomQuiltPrice,
-  getDesignById,
-  labelForBatting,
-  labelForColorPalette,
-  labelForCustomizeSize,
-  QUILT_DESIGN_PALETTE,
-} from '../lib/quiltDesignPalette.js';
-
-const STEPS = [
-  { n: 1, label: 'Design' },
-  { n: 2, label: 'Size & colors' },
-  { n: 3, label: 'Your vision' },
-  { n: 4, label: 'Contact' },
-  { n: 5, label: 'Pay' },
-];
+  estimateCustomizePrice,
+  findCustomizeDesign,
+  productDesignId,
+  productToCustomizeDesign,
+  truncateCustomizeDescription,
+} from '../lib/customizeProductDesign.js';
+import { getClientFallbackCustomizeConfig } from '../lib/customizeWizardFallback.js';
+import {
+  activeBattingOptions,
+  activeColorOptions,
+  activeSizeOptions,
+  getEnabledWizardSteps,
+  getWizardStep,
+  interpolate,
+  isWizardStepEnabled,
+  labelForBattingOption,
+  labelForColorOption,
+  labelForSizeOption,
+  nextWizardStep,
+  prevWizardStep,
+} from '../lib/customizeWizardHelpers.js';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(Number(n));
 }
 
-function CustomizeChoiceGrid({ heading, options, value, onChange, name }) {
+function CustomizeChoiceGrid({ heading, options, value, onChange, name, variant = 'image' }) {
+  const useLetters = variant === 'letter';
+  const useSwatches = variant === 'swatch';
+
   return (
     <div className="customize-choices">
       <h3 className="customize-choices__heading">{heading}</h3>
       <div className="customize-choices__grid" role="listbox" aria-label={heading}>
         {options.map((option) => {
           const selected = value === option.value;
+          const letter = option.code ?? '';
+          const longLetter = letter.length > 2;
+          const swatches = Array.isArray(option.colors) ? option.colors : [];
+          const showLetterTile = Boolean(letter && (useLetters || !option.image));
+          const ariaLabel =
+            showLetterTile && letter
+              ? `${option.label}, ${letter}`
+              : useSwatches && option.hint
+                ? `${option.label}, ${option.hint}`
+                : option.label;
+
           return (
             <button
               key={option.value}
               type="button"
               role="option"
               aria-selected={selected}
+              aria-label={ariaLabel}
               name={name}
-              className={`customize-choices__card${selected ? ' customize-choices__card--selected' : ''}`}
+              className={`customize-choices__card${selected ? ' customize-choices__card--selected' : ''}${showLetterTile ? ' customize-choices__card--letter' : ''}${useSwatches ? ' customize-choices__card--swatch' : ''}`}
               onClick={() => onChange(option.value)}
             >
-              <img src={option.image} alt="" loading="lazy" decoding="async" />
+              {showLetterTile ? (
+                <span
+                  className={`customize-choices__letter-tile${longLetter ? ' customize-choices__letter-tile--long' : ''}${letter === '?' ? ' customize-choices__letter-tile--symbol' : ''}`}
+                  aria-hidden="true"
+                >
+                  {letter}
+                </span>
+              ) : useSwatches && swatches.length > 0 ? (
+                <span
+                  className={`customize-choices__color-tile${option.swatchLayout === 'stripes' ? ' customize-choices__color-tile--stripes' : ''}`}
+                  aria-hidden="true"
+                >
+                  {swatches.map((color, index) => (
+                    <span
+                      key={`${option.value}-${index}`}
+                      className="customize-choices__color-swatch"
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </span>
+              ) : (
+                <img src={option.image} alt="" loading="lazy" decoding="async" />
+              )}
               <span className="customize-choices__label">{option.label}</span>
               {option.hint ? <span className="customize-choices__hint muted">{option.hint}</span> : null}
             </button>
@@ -71,51 +112,137 @@ export default function Customize() {
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [payCountdown, setPayCountdown] = useState(0);
+  const [wizardConfig, setWizardConfig] = useState(null);
+  const [loadingConfig, setLoadingConfig] = useState(true);
+
+  const config = wizardConfig ?? getClientFallbackCustomizeConfig();
+  const payPauseSeconds = Math.min(30, Math.max(0, Number(config.pay?.pauseSeconds ?? 4) || 0));
+  const enabledSteps = getEnabledWizardSteps(config);
+  const maxStep = enabledSteps.length ? enabledSteps[enabledSteps.length - 1].n : 5;
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadConfig() {
+      try {
+        const data = await publicApi.customizeConfig();
+        if (!cancelled) setWizardConfig(data);
+      } catch {
+        if (!cancelled) setWizardConfig(null);
+      } finally {
+        if (!cancelled) setLoadingConfig(false);
+      }
+    }
+    loadConfig();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!config.defaults) return;
+    setForm((f) => ({
+      ...f,
+      productSize: f.productSize || config.defaults.productSize || 'large',
+      colorPalette: f.colorPalette || config.defaults.colorPalette || 'warm-neutrals',
+      batting: f.batting || config.defaults.batting || 'cotton',
+    }));
+  }, [config.defaults?.productSize, config.defaults?.colorPalette, config.defaults?.batting]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadProducts() {
+      try {
+        const rows = await publicApi.listProducts();
+        if (!cancelled) setProducts(Array.isArray(rows) ? rows : []);
+      } catch {
+        if (!cancelled) setProducts([]);
+      } finally {
+        if (!cancelled) setLoadingProducts(false);
+      }
+    }
+    loadProducts();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const pre = searchParams.get('product');
+    if (!pre || products.length === 0) return;
+    const id = Number(pre);
+    if (!Number.isFinite(id)) return;
+    const match = products.find((p) => Number(p.id) === id);
+    if (match) {
+      setForm((f) => ({ ...f, designId: productDesignId(match.id) }));
+    }
+  }, [products, searchParams]);
+
+  useEffect(() => {
+    if (step !== 5) {
+      setPayCountdown(0);
+      return undefined;
+    }
+    setPayCountdown(payPauseSeconds);
+    if (payPauseSeconds <= 0) return undefined;
+    const timer = window.setInterval(() => {
+      setPayCountdown((current) => (current <= 1 ? 0 : current - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [step, payPauseSeconds]);
 
   useEffect(() => {
     if (searchParams.get('checkout') === 'cancelled') {
-      setError('Payment was cancelled. Your design is saved — review and try again when ready.');
-      setStep(5);
+      setError(config.messages?.checkoutCancelled ?? 'Payment was cancelled.');
+      setStep(isWizardStepEnabled(config, 5) ? 5 : maxStep);
       const next = new URLSearchParams(searchParams);
       next.delete('checkout');
       setSearchParams(next, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, config, maxStep]);
 
-  const selectedDesign = useMemo(() => getDesignById(form.designId), [form.designId]);
+  const selectedDesign = useMemo(
+    () => findCustomizeDesign(form.designId, products),
+    [form.designId, products]
+  );
   const estimatedPrice = useMemo(
-    () => (form.designId && form.productSize ? estimateCustomQuiltPrice(form.designId, form.productSize) : null),
-    [form.designId, form.productSize]
+    () =>
+      form.designId && form.productSize
+        ? estimateCustomizePrice(form.designId, form.productSize, products)
+        : null,
+    [form.designId, form.productSize, products]
   );
 
   function nextStep() {
     setError(null);
     if (step === 1 && !form.designId) {
-      setError('Choose a design from the palette to continue.');
+      setError(config.messages?.chooseProduct ?? 'Choose a product from the catalog to continue.');
       return;
     }
     if (step === 2 && (!form.productSize || !form.colorPalette)) {
-      setError('Select a size and color palette.');
+      setError(config.messages?.selectSizeColor ?? 'Select a size and color palette.');
       return;
     }
     if (step === 4) {
       if (!form.contactName.trim() || !form.contactEmail.trim()) {
-        setError('Enter your name and email so our designer can reach you.');
+        setError(config.messages?.contactRequired ?? 'Enter your name and email.');
         return;
       }
     }
-    setStep((s) => Math.min(5, s + 1));
+    setStep((s) => nextWizardStep(config, s));
   }
 
   async function payWithStripe(e) {
     e.preventDefault();
     if (!selectedDesign) {
-      setError('Select a design before paying.');
+      setError(config.messages?.selectDesignPay ?? 'Select a design before paying.');
       setStep(1);
       return;
     }
     if (estimatedPrice == null || estimatedPrice <= 0) {
-      setError('Could not calculate price for this design and size.');
+      setError(config.messages?.priceError ?? 'Could not calculate price for this design and size.');
       return;
     }
     setBusy(true);
@@ -146,22 +273,44 @@ export default function Customize() {
     }
   }
 
+  if (loadingConfig) {
+    return <p className="muted">Loading customize studio…</p>;
+  }
+
+  if (config.enabled === false) {
+    return (
+      <article className="customize-page">
+        <h1>{config.page?.title ?? 'Customize your quilt'}</h1>
+        <p className="page-body">
+          {config.messages?.wizardDisabled ??
+            'Custom quilt orders are temporarily unavailable. Please check back soon.'}
+        </p>
+        <Link className="btn" to="/products">
+          Browse products
+        </Link>
+      </article>
+    );
+  }
+
+  const step1 = getWizardStep(config, 1);
+  const step2 = getWizardStep(config, 2);
+  const step3 = getWizardStep(config, 3);
+  const step4 = getWizardStep(config, 4);
+  const step5 = getWizardStep(config, 5);
+  const payStepActive = step === 5 && isWizardStepEnabled(config, 5);
+
   return (
     <article className="customize-page">
       <header className="customize-page__header">
-        <p className="eyebrow">Custom studio</p>
-        <h1>Customize your quilt</h1>
-        <p className="page-body">
-          Build your quilt step by step—choose a design from our palette, set size and colors, then
-          pay securely with Stripe to confirm your custom quilt request. Our designer will follow up
-          within 2–3 business days with next steps.
-        </p>
+        <p className="eyebrow">{config.page?.eyebrow ?? 'Custom studio'}</p>
+        <h1>{config.page?.title ?? 'Customize your quilt'}</h1>
+        <p className="page-body">{config.page?.intro ?? ''}</p>
       </header>
 
       {error ? <p className="error">{error}</p> : null}
 
       <div className="wizard-progress customize-wizard__progress">
-        {STEPS.map(({ n, label }) => (
+        {enabledSteps.map(({ n, label }) => (
           <span
             key={n}
             className={`wizard-step${step === n ? ' current' : ''}${step > n ? ' done' : ''}`}
@@ -171,102 +320,142 @@ export default function Customize() {
         ))}
       </div>
 
-      <form className="form customize-form" onSubmit={step === 5 ? payWithStripe : (e) => e.preventDefault()}>
-        {step === 1 ? (
+      <form
+        className="form customize-form"
+        onSubmit={payStepActive ? payWithStripe : (e) => e.preventDefault()}
+      >
+        {step === 1 && isWizardStepEnabled(config, 1) ? (
           <section className="customize-step">
-            <h2>Choose a design palette</h2>
-            <p className="muted">Select the pattern family that best matches your room and style.</p>
-            <div className="design-palette" role="listbox" aria-label="Quilt design palette">
-              {QUILT_DESIGN_PALETTE.map((design) => {
-                const selected = form.designId === design.id;
-                return (
-                  <button
-                    key={design.id}
-                    type="button"
-                    role="option"
-                    aria-selected={selected}
-                    className={`design-palette__card${selected ? ' design-palette__card--selected' : ''}`}
-                    onClick={() => setForm((f) => ({ ...f, designId: design.id }))}
-                  >
-                    <img src={design.image} alt="" loading="lazy" />
-                    <span className="design-palette__name">{design.name}</span>
-                    <span className="design-palette__desc muted">{design.description}</span>
-                    <span className="design-palette__price">From {formatPrice(design.basePrice)}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        ) : null}
-
-        {step === 2 ? (
-          <section className="customize-step">
-            <h2>Size, colors &amp; batting</h2>
-            {selectedDesign ? (
+            <h2>{step1?.title ?? 'Choose a quilt to customize'}</h2>
+            <p className="muted">{step1?.description ?? ''}</p>
+            {loadingProducts ? (
+              <p className="muted">{config.messages?.loadingProducts ?? 'Loading products…'}</p>
+            ) : products.length === 0 ? (
               <p className="muted">
-                Based on <strong>{selectedDesign.name}</strong>
-                {estimatedPrice != null ? (
-                  <>
-                    {' '}
-                    — estimated starting at <strong>{formatPrice(estimatedPrice)}</strong>
-                  </>
-                ) : null}
+                {step1?.emptyProductsMessage ?? 'No published products are available yet.'}{' '}
+                <Link to="/products">Browse the shop</Link>
               </p>
-            ) : null}
-            <CustomizeChoiceGrid
-              heading="Quilt size"
-              name="productSize"
-              options={CUSTOMIZE_SIZE_OPTIONS}
-              value={form.productSize}
-              onChange={(productSize) => setForm((f) => ({ ...f, productSize }))}
-            />
-            <CustomizeChoiceGrid
-              heading="Color palette"
-              name="colorPalette"
-              options={COLOR_PALETTE_OPTIONS}
-              value={form.colorPalette}
-              onChange={(colorPalette) => setForm((f) => ({ ...f, colorPalette }))}
-            />
-            <CustomizeChoiceGrid
-              heading="Batting preference"
-              name="batting"
-              options={BATTING_OPTIONS}
-              value={form.batting}
-              onChange={(batting) => setForm((f) => ({ ...f, batting }))}
-            />
+            ) : (
+              <div className="design-palette" role="listbox" aria-label="Products to customize">
+                {products.map((product) => {
+                  const design = productToCustomizeDesign(product);
+                  const selected = form.designId === design.id;
+                  return (
+                    <button
+                      key={product.id}
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      className={`design-palette__card${selected ? ' design-palette__card--selected' : ''}`}
+                      onClick={() => setForm((f) => ({ ...f, designId: design.id }))}
+                    >
+                      <span className="design-palette__media">
+                        <ProductImage src={design.image} alt={design.name} />
+                      </span>
+                      <span className="design-palette__name">{design.name}</span>
+                      {design.description ? (
+                        <span className="design-palette__desc muted">
+                          {truncateCustomizeDescription(design.description)}
+                        </span>
+                      ) : null}
+                      <span className="design-palette__price">
+                        From {formatPrice(design.basePrice)} <span className="muted">(Small)</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </section>
         ) : null}
 
-        {step === 3 ? (
+        {step === 2 && isWizardStepEnabled(config, 2) ? (
           <section className="customize-step">
-            <h2>Tell our designer your vision</h2>
+            <h2>{step2?.title ?? 'Size, colors & batting'}</h2>
+            {step2?.description ? <p className="muted">{step2.description}</p> : null}
+            {selectedDesign && step2?.showSelectedProduct !== false ? (
+              <div className="customize-selected-product card">
+                <div className="customize-selected-product__thumb">
+                  <ProductImage src={selectedDesign.image} alt={selectedDesign.name} />
+                </div>
+                <p className="customize-selected-product__summary muted">
+                  {step2?.basedOnPrefix ?? 'Based on'} <strong>{selectedDesign.name}</strong>
+                  {estimatedPrice != null ? (
+                    <>
+                      {' '}
+                      {step2?.estimatedPrefix ?? '— estimated starting at'}{' '}
+                      <strong>{formatPrice(estimatedPrice)}</strong>
+                    </>
+                  ) : null}
+                </p>
+              </div>
+            ) : null}
+            {config.sections?.sizes?.enabled !== false ? (
+              <CustomizeChoiceGrid
+                heading={config.sections?.sizes?.heading ?? 'Quilt size'}
+                name="productSize"
+                variant="letter"
+                options={activeSizeOptions(config)}
+                value={form.productSize}
+                onChange={(productSize) => setForm((f) => ({ ...f, productSize }))}
+              />
+            ) : null}
+            {config.sections?.colors?.enabled !== false ? (
+              <CustomizeChoiceGrid
+                heading={config.sections?.colors?.heading ?? 'Color palette'}
+                name="colorPalette"
+                variant="swatch"
+                options={activeColorOptions(config)}
+                value={form.colorPalette}
+                onChange={(colorPalette) => setForm((f) => ({ ...f, colorPalette }))}
+              />
+            ) : null}
+            {config.sections?.batting?.enabled !== false ? (
+              <CustomizeChoiceGrid
+                heading={config.sections?.batting?.heading ?? 'Batting preference'}
+                name="batting"
+                options={activeBattingOptions(config)}
+                value={form.batting}
+                onChange={(batting) => setForm((f) => ({ ...f, batting }))}
+              />
+            ) : null}
+          </section>
+        ) : null}
+
+        {step === 3 && isWizardStepEnabled(config, 3) ? (
+          <section className="customize-step">
+            <h2>{step3?.title ?? 'Tell our designer your vision'}</h2>
             <div className="field">
-              <label htmlFor="quilt-title">Working title (optional)</label>
+              <label htmlFor="quilt-title">
+                {step3?.quiltTitleLabel ?? 'Working title (optional)'}
+              </label>
               <input
                 id="quilt-title"
                 value={form.quiltTitle}
                 onChange={(e) => setForm((f) => ({ ...f, quiltTitle: e.target.value }))}
-                placeholder="e.g. Guest room sunset quilt"
+                placeholder={step3?.quiltTitlePlaceholder ?? ''}
               />
             </div>
             <div className="field">
-              <label htmlFor="designer-notes">Notes for the designer</label>
+              <label htmlFor="designer-notes">
+                {step3?.notesLabel ?? 'Notes for the designer'}
+              </label>
               <textarea
                 id="designer-notes"
                 rows={5}
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                placeholder="Room colors, deadline, gift recipient, pattern tweaks, etc."
+                placeholder={step3?.notesPlaceholder ?? ''}
               />
             </div>
           </section>
         ) : null}
 
-        {step === 4 ? (
+        {step === 4 && isWizardStepEnabled(config, 4) ? (
           <section className="customize-step">
-            <h2>How can we reach you?</h2>
+            <h2>{step4?.title ?? 'How can we reach you?'}</h2>
             <div className="field">
-              <label htmlFor="custom-name">Full name</label>
+              <label htmlFor="custom-name">{step4?.nameLabel ?? 'Full name'}</label>
               <input
                 id="custom-name"
                 value={form.contactName}
@@ -275,7 +464,7 @@ export default function Customize() {
               />
             </div>
             <div className="field">
-              <label htmlFor="custom-email">Email</label>
+              <label htmlFor="custom-email">{step4?.emailLabel ?? 'Email'}</label>
               <input
                 id="custom-email"
                 type="email"
@@ -285,7 +474,7 @@ export default function Customize() {
               />
             </div>
             <div className="field">
-              <label htmlFor="custom-phone">Phone (optional)</label>
+              <label htmlFor="custom-phone">{step4?.phoneLabel ?? 'Phone (optional)'}</label>
               <input
                 id="custom-phone"
                 value={form.contactPhone}
@@ -295,31 +484,37 @@ export default function Customize() {
           </section>
         ) : null}
 
-        {step === 5 ? (
+        {payStepActive ? (
           <section className="customize-step">
-            <h2>Review &amp; pay</h2>
+            <h2>{step5?.title ?? 'Review & pay'}</h2>
             <div className="customize-review card">
               {selectedDesign ? (
                 <div className="customize-review__design">
-                  <img src={selectedDesign.image} alt="" />
+                  {selectedDesign.image ? (
+                    <img src={selectedDesign.image} alt="" />
+                  ) : (
+                    <div className="featured-no-image customize-review__no-image">No image</div>
+                  )}
                   <div>
                     <h3>{selectedDesign.name}</h3>
-                    <p className="muted">{selectedDesign.description}</p>
+                    {selectedDesign.description ? (
+                      <p className="muted">{selectedDesign.description}</p>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
               <dl className="customize-review__dl">
                 <div>
                   <dt>Size</dt>
-                  <dd>{labelForCustomizeSize(form.productSize)}</dd>
+                  <dd>{labelForSizeOption(config, form.productSize)}</dd>
                 </div>
                 <div>
                   <dt>Color palette</dt>
-                  <dd>{labelForColorPalette(form.colorPalette)}</dd>
+                  <dd>{labelForColorOption(config, form.colorPalette)}</dd>
                 </div>
                 <div>
                   <dt>Batting</dt>
-                  <dd>{labelForBatting(form.batting)}</dd>
+                  <dd>{labelForBattingOption(config, form.batting)}</dd>
                 </div>
                 {form.quiltTitle ? (
                   <div>
@@ -357,17 +552,21 @@ export default function Customize() {
                 ) : null}
               </dl>
             </div>
-            {estimatedPrice != null ? (
+            {estimatedPrice != null && step5?.stripeIntro ? (
               <p className="page-body">
-                You will be redirected to Stripe&apos;s secure checkout to pay{' '}
-                <strong>{formatPrice(estimatedPrice)}</strong>. Test cards work in sandbox mode (for
-                example <code>4242 4242 4242 4242</code>).
+                {interpolate(step5.stripeIntro, { amount: formatPrice(estimatedPrice) })}
               </p>
             ) : null}
-            <p className="muted customize-review__fine">
-              Payment confirms your custom quilt request. Our designer may adjust the final scope or
-              quote before production begins.
-            </p>
+            {step5?.finePrint ? (
+              <p className="muted customize-review__fine">{step5.finePrint}</p>
+            ) : null}
+            {payCountdown > 0 && step5?.countdownMessage ? (
+              <p className="customize-pay-countdown" role="status" aria-live="polite">
+                {interpolate(step5.countdownMessage, {
+                  seconds: `${payCountdown} second${payCountdown === 1 ? '' : 's'}`,
+                })}
+              </p>
+            ) : null}
           </section>
         ) : null}
 
@@ -375,20 +574,35 @@ export default function Customize() {
           <button
             type="button"
             className="btn"
-            onClick={() => setStep((s) => Math.max(1, s - 1))}
-            disabled={step === 1 || busy}
+            onClick={() => setStep((s) => prevWizardStep(config, s))}
+            disabled={step <= (enabledSteps[0]?.n ?? 1) || busy}
           >
             Back
           </button>
-          {step < 5 ? (
-            <button type="button" className="btn btn-primary" onClick={nextStep}>
+          {nextWizardStep(config, step) > step ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={nextStep}
+              disabled={step === 1 && (loadingProducts || products.length === 0)}
+            >
               Continue
             </button>
-          ) : (
-            <button type="submit" className="btn btn-primary" disabled={busy || estimatedPrice == null}>
-              {busy ? 'Redirecting to Stripe…' : 'Pay with Stripe'}
+          ) : payStepActive ? (
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={busy || estimatedPrice == null || payCountdown > 0}
+            >
+              {busy
+                ? (step5?.payButtonBusyLabel ?? 'Redirecting to Stripe…')
+                : payCountdown > 0
+                  ? interpolate(step5?.payButtonWaitingLabel ?? 'Pay in {seconds}s…', {
+                      seconds: payCountdown,
+                    })
+                  : (step5?.payButtonLabel ?? 'Pay with Stripe')}
             </button>
-          )}
+          ) : null}
         </div>
       </form>
     </article>

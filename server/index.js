@@ -63,6 +63,11 @@ import {
   handleStripeWebhook,
 } from './lib/stripeCheckout.js';
 import { createCustomQuiltStripeCheckoutSession } from './lib/customQuiltStripeCheckout.js';
+import { ensureCustomizeWizardConfigTable } from './lib/ensureCustomizeWizardConfigTable.js';
+import {
+  loadCustomizeWizardConfig,
+  saveCustomizeWizardConfig,
+} from './lib/customizeWizardConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameRoot = path.dirname(__filename);
@@ -502,6 +507,16 @@ app.get('/api/checkout/confirm', async (req, res) => {
     mail: result.mail,
     alreadyFulfilled: !!result.alreadyFulfilled,
   });
+});
+
+app.get('/api/customize/config', async (_req, res) => {
+  try {
+    const config = await loadCustomizeWizardConfig();
+    res.json(config);
+  } catch (e) {
+    console.error('[customize/config]', e);
+    res.status(500).json({ error: 'Failed to load customize wizard config' });
+  }
 });
 
 app.post('/api/custom-quilt-requests', async (req, res) => {
@@ -1495,6 +1510,28 @@ app.put('/api/admin/pages/:id/products', authMiddleware, async (req, res) => {
   }
 });
 
+// --- Admin: customize wizard (/customize) ---
+
+app.get('/api/admin/customize-config', authMiddleware, async (_req, res) => {
+  try {
+    const config = await loadCustomizeWizardConfig();
+    res.json(config);
+  } catch (e) {
+    console.error('[admin/customize-config]', e);
+    res.status(500).json({ error: 'Failed to load customize wizard config' });
+  }
+});
+
+app.put('/api/admin/customize-config', authMiddleware, async (req, res) => {
+  try {
+    const config = await saveCustomizeWizardConfig(req.body);
+    res.json({ ok: true, config });
+  } catch (e) {
+    console.error('[admin/customize-config]', e);
+    res.status(500).json({ error: 'Failed to save customize wizard config' });
+  }
+});
+
 // --- Admin: custom quilt requests ---
 
 app.get('/api/admin/custom-quilt-requests', authMiddleware, async (_req, res) => {
@@ -1895,6 +1932,12 @@ async function startServer() {
     await ensureCustomQuiltRequestsTable(pool);
   } catch (e) {
     console.error('[ensureCustomQuiltRequestsTable]', e?.message || e);
+  }
+  try {
+    await ensureCustomizeWizardConfigTable(pool);
+    await loadCustomizeWizardConfig();
+  } catch (e) {
+    console.error('[ensureCustomizeWizardConfigTable]', e?.message || e);
   }
   try {
     await ensureOrderTrackingColumns(pool);

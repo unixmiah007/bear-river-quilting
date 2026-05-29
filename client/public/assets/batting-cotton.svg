@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" role="img" aria-label="Cotton batting">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#faf8f5"/>
+      <stop offset="100%" stop-color="#efe9df"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="240" fill="url(#bg)"/>
+  <g fill="#f8f6f2" stroke="#d9d2c6" stroke-width="2">
+    <ellipse cx="160" cy="118" rx="72" ry="52"/>
+    <ellipse cx="118" cy="98" rx="28" ry="22"/>
+    <ellipse cx="202" cy="96" rx="30" ry="24"/>
+    <ellipse cx="132" cy="142" rx="26" ry="20"/>
+    <ellipse cx="188" cy="140" rx="28" ry="21"/>
+  </g>
+  <g stroke="#8b9a6b" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M160 168v28"/>
+    <path d="M148 182h24"/>
+    <path d="M160 168l-14 10M160 168l14 10"/>
+  </g>
+  <circle cx="160" cy="78" r="10" fill="#e8dfd0" stroke="#c4b8a8"/>
+</svg>

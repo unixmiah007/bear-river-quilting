@@ -8,6 +8,10 @@ export const QUILT_CRAFT_DETAIL_IMAGE = '/assets/quilt-craft-detail.webp';
 export const QUILT_STUDIO_IMAGE = '/assets/quilt-studio.jpg';
 export const QUILT_MISTY_IMAGE = '/assets/quilt-misty.jpg';
 
+export const BATTING_COTTON_IMAGE = '/assets/batting-cotton.svg';
+export const BATTING_WOOL_IMAGE = '/assets/batting-wool.svg';
+export const BATTING_BAMBOO_IMAGE = '/assets/batting-bamboo.svg';
+
 /** Products page hero mosaic (client/public/assets). */
 export const PRODUCTS_HERO_IMAGES = [
   {

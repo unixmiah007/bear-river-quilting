@@ -4,6 +4,7 @@ import { adminApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
 import ProductMediaLibrary from '../components/ProductMediaLibrary.jsx';
 import RichTextEditor from '../components/RichTextEditor.jsx';
+import AdminCustomizeWizardPanel from '../components/AdminCustomizeWizardPanel.jsx';
 import { normalizeRichHtml } from '../lib/richText.js';
 import { PRODUCT_SIZE_OPTIONS } from '../lib/productSizes.js';
 
@@ -563,6 +564,8 @@ export default function AdminProducts() {
       <h1 style={{ marginTop: 0 }}>Products</h1>
       {error ? <p className="error">{error}</p> : null}
       {info ? <p className="muted">{info}</p> : null}
+
+      <AdminCustomizeWizardPanel />
 
       <section
         ref={editSectionRef}
