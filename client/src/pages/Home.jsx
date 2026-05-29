@@ -12,6 +12,7 @@ import ProductCard from '../components/ProductCard.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { HOME_TESTIMONIALS } from '../lib/homeTestimonials.js';
 import HomeHeroBackdrop from '../components/HomeHeroBackdrop.jsx';
+import CustomizePromoBanner from '../components/CustomizePromoBanner.jsx';
 
 export default function Home() {
   const [carouselProducts, setCarouselProducts] = useState([]);
@@ -182,6 +183,8 @@ export default function Home() {
           </div>
         </article>
       </section>
+
+      <CustomizePromoBanner />
 
       <section className="featured best-sellers">
         <div className="featured-head">
