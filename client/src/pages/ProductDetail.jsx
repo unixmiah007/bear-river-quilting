@@ -193,7 +193,7 @@ export default function ProductDetail() {
           ) : (
             <p className="muted">Handmade quilt from Bear River Quilting.</p>
           )}
-          <div className="row" style={{ marginTop: '1rem' }}>
+          <div className="row product-detail-actions" style={{ marginTop: '1rem' }}>
             <button
               type="button"
               className="btn btn-primary"
@@ -213,6 +213,12 @@ export default function ProductDetail() {
             >
               Add to cart
             </button>
+            <Link
+              className="btn"
+              to={`/customize?product=${encodeURIComponent(product.id)}`}
+            >
+              Customize
+            </Link>
             <Link className="btn cart-inline-link" to="/cart">
               <CartIcon /> View cart
             </Link>
