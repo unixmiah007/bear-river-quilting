@@ -7,6 +7,7 @@ export const SEWING_MACHINE_IMAGE = '/assets/sewing-machine.jpg';
 export const QUILT_CRAFT_DETAIL_IMAGE = '/assets/quilt-craft-detail.webp';
 export const QUILT_STUDIO_IMAGE = '/assets/quilt-studio.jpg';
 export const QUILT_MISTY_IMAGE = '/assets/quilt-misty.jpg';
+export const ABOUT_OWNER_IMAGE = '/assets/about-owner.png';
 
 export const BATTING_COTTON_IMAGE = '/assets/batting-cotton.svg';
 export const BATTING_WOOL_IMAGE = '/assets/batting-wool.svg';

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import ProductCard from '../components/ProductCard.jsx';
 import { useCart } from '../context/CartContext.jsx';
-import { QUILT_MISTY_IMAGE, QUILT_STUDIO_IMAGE } from '../lib/quiltAssets.js';
+import { QUILT_STUDIO_IMAGE, ABOUT_OWNER_IMAGE } from '../lib/quiltAssets.js';
 
 const TESTIMONIALS = [
   {
@@ -111,15 +111,15 @@ export default function About() {
 
       <section className="owner-bio">
         <img
-          src={QUILT_MISTY_IMAGE}
-          alt="Misty quilt pattern in soft blue and cream tones"
+          src={ABOUT_OWNER_IMAGE}
+          alt="Tracy Alto, founder and lead quilter at Bear River Quilting"
           loading="lazy"
         />
         <div>
           <h2>Meet the owner</h2>
-          <h3 style={{ margin: '0 0 0.6rem' }}>Mara Jensen, Founder & Lead Quilter</h3>
+          <h3 style={{ margin: '0 0 0.6rem' }}>Tracy Alto, Founder & Lead Quilter</h3>
           <p className="muted">
-            Mara started Bear River Quilting after years of restoring vintage quilts passed down in
+            Tracy started Bear River Quilting after years of restoring vintage quilts passed down in
             her family. What began as weekend craft fairs became a dedicated studio where each
             quilt is cut, layered, stitched, and finished with a high standard of durability and
             softness.
@@ -128,6 +128,18 @@ export default function About() {
             Her design approach is simple: make pieces that look timeless, feel luxurious, and hold
             up beautifully through everyday life.
           </p>
+          <section
+            className="testimonial owner-bio__testimonial"
+            aria-live="polite"
+            aria-atomic="true"
+            aria-label="Customer testimonials"
+          >
+            <p className="eyebrow">What buyers say</p>
+            <blockquote key={startIndex} className="testimonial__quote">
+              &ldquo;{TESTIMONIALS[startIndex].quote}&rdquo;
+            </blockquote>
+            <p className="muted testimonial__author">&mdash; {TESTIMONIALS[startIndex].author}</p>
+          </section>
         </div>
       </section>
 
