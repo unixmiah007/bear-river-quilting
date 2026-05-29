@@ -131,9 +131,8 @@ export default function SiteHeader({ categories = [] }) {
     <header className="site-header">
       <div className="site-header__bar">
         <div className="brand">
-          <NavLink to="/" className="brand-link" onClick={closeMenu}>
+          <NavLink to="/" className="brand-link" onClick={closeMenu} aria-label="Bear River Quilting home">
             <BrandLogo className="brand-logo" />
-            <span className="brand-text">Bear River Quilting</span>
           </NavLink>
         </div>
         <button

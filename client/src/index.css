@@ -510,8 +510,9 @@ button {
   }
 
   .brand-logo {
-    width: 3.25rem;
-    height: 3.25rem;
+    width: auto;
+    height: 4.35rem;
+    max-width: 14.5rem;
   }
 
   .nav--mobile {
@@ -595,9 +596,17 @@ button {
 
 .brand-logo {
   flex-shrink: 0;
-  width: 4.7rem;
-  height: 4.7rem;
+  width: auto;
+  height: 6.25rem;
+  max-width: 20rem;
   display: block;
+  object-fit: contain;
+  object-position: left center;
+  border: 1px solid var(--border);
+  /* Oval corner curves (wider horizontal radius than vertical) */
+  border-radius: 2.25rem / 1.35rem;
+  box-sizing: border-box;
+  background: #ffffff;
 }
 
 .nav {
@@ -781,9 +790,13 @@ button {
 
 .site-sticky-bar__logo {
   display: block;
-  width: 2.75rem;
-  height: 2.75rem;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.35));
+  width: auto;
+  height: 3.85rem;
+  max-width: 12rem;
+  object-fit: contain;
+  object-position: left center;
+  /* Invert only: white PNG background → dark; black artwork → light on #111 bar */
+  filter: invert(1);
   opacity: 0.97;
 }
 
@@ -862,8 +875,9 @@ button {
   }
 
   .site-sticky-bar__logo {
-    width: 2.35rem;
-    height: 2.35rem;
+    width: auto;
+    height: 3.25rem;
+    max-width: 10.5rem;
   }
 }
 
