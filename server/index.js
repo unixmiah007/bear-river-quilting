@@ -58,10 +58,11 @@ import {
 import { SHIPPING_CARRIERS } from './lib/shippingCarriers.js';
 import {
   createStripeCheckoutSession,
-  fulfillOrderFromStripeSession,
+  fulfillStripeCheckoutSession,
   getStripePublishableKey,
   handleStripeWebhook,
 } from './lib/stripeCheckout.js';
+import { createCustomQuiltStripeCheckoutSession } from './lib/customQuiltStripeCheckout.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameRoot = path.dirname(__filename);
@@ -471,18 +472,32 @@ app.post('/api/checkout/stripe-session', async (req, res) => {
   });
 });
 
+app.post('/api/checkout/custom-quilt-stripe-session', async (req, res) => {
+  const result = await createCustomQuiltStripeCheckoutSession(req.body);
+  if (!result.ok) {
+    return res.status(result.status ?? 500).json({ error: result.error });
+  }
+  res.json({
+    url: result.url,
+    sessionId: result.sessionId,
+    requestNumber: result.requestNumber,
+  });
+});
+
 app.get('/api/checkout/confirm', async (req, res) => {
   const sessionId = String(req.query.session_id ?? '').trim();
   if (!sessionId) {
     return res.status(400).json({ error: 'session_id is required' });
   }
-  const result = await fulfillOrderFromStripeSession(sessionId);
+  const result = await fulfillStripeCheckoutSession(sessionId);
   if (!result.ok) {
     return res.status(result.status ?? 500).json({ error: result.error });
   }
   res.json({
     ok: true,
-    orderNumber: result.orderNumber,
+    checkoutType: result.checkoutType ?? 'order',
+    orderNumber: result.orderNumber ?? null,
+    requestNumber: result.requestNumber ?? null,
     customerEmail: result.customerEmail,
     mail: result.mail,
     alreadyFulfilled: !!result.alreadyFulfilled,

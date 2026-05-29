@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import pool from '../db.js';
 import { buildCheckoutFromBody, insertPendingOrder } from './orderCheckout.js';
 import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './mail.js';
+import { fulfillCustomQuiltFromStripeSession } from './customQuiltStripeCheckout.js';
 
 const CLIENT_ORIGIN = (process.env.CLIENT_ORIGIN ?? 'http://localhost:5173').replace(/\/$/, '');
 
@@ -175,8 +176,7 @@ async function sendOrderEmails(order, items) {
   };
 }
 
-/** Marks order paid and sends emails once (idempotent). */
-export async function fulfillOrderFromStripeSession(sessionId) {
+async function retrievePaidCheckoutSession(sessionId) {
   const stripe = getStripe();
   if (!stripe) {
     return { ok: false, status: 503, error: 'Stripe is not configured' };
@@ -190,6 +190,36 @@ export async function fulfillOrderFromStripeSession(sessionId) {
     return { ok: false, status: 400, error: 'Payment is not complete yet' };
   }
 
+  return { ok: true, session };
+}
+
+/** Routes Stripe session to cart order or custom quilt fulfillment. */
+export async function fulfillStripeCheckoutSession(sessionId) {
+  const loaded = await retrievePaidCheckoutSession(sessionId);
+  if (!loaded.ok) return loaded;
+
+  const { session } = loaded;
+  const customQuiltId = Number(session.metadata?.custom_quilt_request_id);
+  if (customQuiltId) {
+    return fulfillCustomQuiltFromStripeSession(session);
+  }
+
+  const orderId = Number(session.metadata?.order_id);
+  if (orderId) {
+    return fulfillOrderFromStripeSessionWithSession(session);
+  }
+
+  return { ok: false, status: 400, error: 'Unknown checkout session type' };
+}
+
+/** Marks order paid and sends emails once (idempotent). */
+export async function fulfillOrderFromStripeSession(sessionId) {
+  const loaded = await retrievePaidCheckoutSession(sessionId);
+  if (!loaded.ok) return loaded;
+  return fulfillOrderFromStripeSessionWithSession(loaded.session);
+}
+
+async function fulfillOrderFromStripeSessionWithSession(session) {
   const orderId = Number(session.metadata?.order_id);
   if (!orderId) {
     return { ok: false, status: 400, error: 'Missing order reference on checkout session' };
@@ -203,6 +233,7 @@ export async function fulfillOrderFromStripeSession(sessionId) {
   if (order.status === 'paid') {
     return {
       ok: true,
+      checkoutType: 'order',
       alreadyFulfilled: true,
       orderId,
       orderNumber: order.order_number,
@@ -234,6 +265,7 @@ export async function fulfillOrderFromStripeSession(sessionId) {
 
   return {
     ok: true,
+    checkoutType: 'order',
     orderId,
     orderNumber: order.order_number,
     customerEmail: order.customer_email,
@@ -258,7 +290,7 @@ export async function handleStripeWebhook(rawBody, signature) {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
-    const result = await fulfillOrderFromStripeSession(session.id);
+    const result = await fulfillStripeCheckoutSession(session.id);
     if (!result.ok && result.status !== 400) {
       return { ok: false, status: result.status ?? 500, error: result.error };
     }

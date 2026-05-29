@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import {
   BATTING_OPTIONS,
@@ -18,7 +18,7 @@ const STEPS = [
   { n: 2, label: 'Size & colors' },
   { n: 3, label: 'Your vision' },
   { n: 4, label: 'Contact' },
-  { n: 5, label: 'Review' },
+  { n: 5, label: 'Pay' },
 ];
 
 function formatPrice(n) {
@@ -66,11 +66,21 @@ const initialForm = {
 };
 
 export default function Customize() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [submitted, setSubmitted] = useState(null);
+
+  useEffect(() => {
+    if (searchParams.get('checkout') === 'cancelled') {
+      setError('Payment was cancelled. Your design is saved — review and try again when ready.');
+      setStep(5);
+      const next = new URLSearchParams(searchParams);
+      next.delete('checkout');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const selectedDesign = useMemo(() => getDesignById(form.designId), [form.designId]);
   const estimatedPrice = useMemo(
@@ -97,17 +107,21 @@ export default function Customize() {
     setStep((s) => Math.min(5, s + 1));
   }
 
-  async function submitRequest(e) {
+  async function payWithStripe(e) {
     e.preventDefault();
     if (!selectedDesign) {
-      setError('Select a design before submitting.');
+      setError('Select a design before paying.');
       setStep(1);
+      return;
+    }
+    if (estimatedPrice == null || estimatedPrice <= 0) {
+      setError('Could not calculate price for this design and size.');
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      const result = await publicApi.submitCustomQuiltRequest({
+      const result = await publicApi.createCustomQuiltStripeCheckoutSession({
         designId: form.designId,
         designName: selectedDesign.name,
         productSize: form.productSize,
@@ -122,38 +136,14 @@ export default function Customize() {
           phone: form.contactPhone.trim() || null,
         },
       });
-      setSubmitted({
-        requestNumber: result.requestNumber,
-        email: form.contactEmail.trim(),
-      });
-      setForm(initialForm);
-      setStep(1);
+      if (!result?.url) {
+        throw new Error('Stripe checkout URL was not returned');
+      }
+      window.location.assign(result.url);
     } catch (err) {
       setError(err.body?.error || err.message);
-    } finally {
       setBusy(false);
     }
-  }
-
-  if (submitted) {
-    return (
-      <article className="customize-page">
-        <h1>Request sent to our designer</h1>
-        <p className="page-body">
-          Thank you! Your custom quilt request <strong>{submitted.requestNumber}</strong> is in our
-          studio queue. We will email <strong>{submitted.email}</strong> within 2–3 business days with
-          next steps and a formal quote.
-        </p>
-        <div className="row">
-          <button type="button" className="btn btn-primary" onClick={() => setSubmitted(null)}>
-            Start another design
-          </button>
-          <Link className="btn" to="/products">
-            Browse ready-made quilts
-          </Link>
-        </div>
-      </article>
-    );
   }
 
   return (
@@ -163,8 +153,8 @@ export default function Customize() {
         <h1>Customize your quilt</h1>
         <p className="page-body">
           Build your quilt step by step—choose a design from our palette, set size and colors, then
-          send your request to our designer. No payment is collected here; we will follow up with a
-          personalized quote.
+          pay securely with Stripe to confirm your custom quilt request. Our designer will follow up
+          within 2–3 business days with next steps.
         </p>
       </header>
 
@@ -181,7 +171,7 @@ export default function Customize() {
         ))}
       </div>
 
-      <form className="form customize-form" onSubmit={step === 5 ? submitRequest : (e) => e.preventDefault()}>
+      <form className="form customize-form" onSubmit={step === 5 ? payWithStripe : (e) => e.preventDefault()}>
         {step === 1 ? (
           <section className="customize-step">
             <h2>Choose a design palette</h2>
@@ -307,7 +297,7 @@ export default function Customize() {
 
         {step === 5 ? (
           <section className="customize-step">
-            <h2>Review &amp; submit to designer</h2>
+            <h2>Review &amp; pay</h2>
             <div className="customize-review card">
               {selectedDesign ? (
                 <div className="customize-review__design">
@@ -359,18 +349,24 @@ export default function Customize() {
                 </div>
                 {estimatedPrice != null ? (
                   <div>
-                    <dt>Estimated starting price</dt>
+                    <dt>Amount due today</dt>
                     <dd>
                       <strong>{formatPrice(estimatedPrice)}</strong>
-                      <span className="muted"> — final quote from designer</span>
                     </dd>
                   </div>
                 ) : null}
               </dl>
             </div>
+            {estimatedPrice != null ? (
+              <p className="page-body">
+                You will be redirected to Stripe&apos;s secure checkout to pay{' '}
+                <strong>{formatPrice(estimatedPrice)}</strong>. Test cards work in sandbox mode (for
+                example <code>4242 4242 4242 4242</code>).
+              </p>
+            ) : null}
             <p className="muted customize-review__fine">
-              By submitting, you agree that this is a design request only—not a confirmed order. Our
-              designer will contact you before any work begins.
+              Payment confirms your custom quilt request. Our designer may adjust the final scope or
+              quote before production begins.
             </p>
           </section>
         ) : null}
@@ -389,8 +385,8 @@ export default function Customize() {
               Continue
             </button>
           ) : (
-            <button type="submit" className="btn btn-primary" disabled={busy}>
-              {busy ? 'Sending to designer…' : 'Submit request to designer'}
+            <button type="submit" className="btn btn-primary" disabled={busy || estimatedPrice == null}>
+              {busy ? 'Redirecting to Stripe…' : 'Pay with Stripe'}
             </button>
           )}
         </div>

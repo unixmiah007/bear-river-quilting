@@ -40,4 +40,14 @@ export async function ensureCustomQuiltRequestsTable(pool) {
       "ALTER TABLE custom_quilt_requests ADD COLUMN acknowledged CHAR(1) NOT NULL DEFAULT 'N' AFTER status"
     );
   }
+  if (!(await columnExists(pool, 'custom_quilt_requests', 'stripe_checkout_session_id'))) {
+    await pool.query(
+      'ALTER TABLE custom_quilt_requests ADD COLUMN stripe_checkout_session_id VARCHAR(255) NULL AFTER estimated_price'
+    );
+  }
+  if (!(await columnExists(pool, 'custom_quilt_requests', 'stripe_payment_intent_id'))) {
+    await pool.query(
+      'ALTER TABLE custom_quilt_requests ADD COLUMN stripe_payment_intent_id VARCHAR(255) NULL AFTER stripe_checkout_session_id'
+    );
+  }
 }

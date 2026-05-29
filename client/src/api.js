@@ -47,6 +47,11 @@ export const publicApi = {
   stripeConfig: () => api('/api/config/stripe'),
   createStripeCheckoutSession: (body) =>
     api('/api/checkout/stripe-session', { method: 'POST', body: JSON.stringify(body) }),
+  createCustomQuiltStripeCheckoutSession: (body) =>
+    api('/api/checkout/custom-quilt-stripe-session', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   confirmStripeCheckout: (sessionId) =>
     api(`/api/checkout/confirm?session_id=${encodeURIComponent(sessionId)}`),
   customerOrdersLookup: (body) =>

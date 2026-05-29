@@ -172,6 +172,118 @@ ${row.customer_phone ? `<br>${escapeHtml(row.customer_phone)}` : ''}</p>
   };
 }
 
+function rowFromData(d, id, requestNumber) {
+  return {
+    id,
+    request_number: requestNumber,
+    design_id: d.designId,
+    design_name: d.designName,
+    product_size: d.productSize,
+    color_palette: d.colorPalette,
+    batting: d.batting,
+    quilt_title: d.quiltTitle,
+    notes: d.notes,
+    customer_name: d.customerName,
+    customer_email: d.customerEmail,
+    customer_phone: d.customerPhone,
+    estimated_price: d.estimatedPrice,
+  };
+}
+
+/** Insert request before Stripe payment (no emails). */
+export async function insertPendingCustomQuiltRequest(body) {
+  const validated = validateCustomQuiltBody(body);
+  if (!validated.ok) {
+    return validated;
+  }
+
+  const d = validated.data;
+  const price = Number(d.estimatedPrice);
+  if (!Number.isFinite(price) || price <= 0) {
+    return { ok: false, status: 400, error: 'A valid estimated price is required for checkout' };
+  }
+
+  const requestNumber = customQuiltRequestNumber();
+  const [result] = await pool.query(
+    `INSERT INTO custom_quilt_requests (
+       request_number, status, design_id, design_name, product_size, color_palette,
+       batting, quilt_title, notes, customer_name, customer_email, customer_phone, estimated_price
+     ) VALUES (?, 'pending_payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      requestNumber,
+      d.designId,
+      d.designName,
+      d.productSize,
+      d.colorPalette,
+      d.batting,
+      d.quiltTitle,
+      d.notes,
+      d.customerName,
+      d.customerEmail,
+      d.customerPhone,
+      d.estimatedPrice,
+    ]
+  );
+
+  return {
+    ok: true,
+    requestNumber,
+    requestId: result.insertId,
+    row: rowFromData(d, result.insertId, requestNumber),
+  };
+}
+
+export async function fulfillCustomQuiltRequestPayment(requestId, { sessionId, paymentIntentId, cardLast4 }) {
+  const id = Number(requestId);
+  const [[existing]] = await pool.query(
+    `SELECT id, request_number, status, design_id, design_name, product_size, color_palette,
+            batting, quilt_title, notes, customer_name, customer_email, customer_phone, estimated_price
+     FROM custom_quilt_requests WHERE id = ?`,
+    [id]
+  );
+  if (!existing) {
+    return { ok: false, status: 404, error: 'Custom quilt request not found' };
+  }
+
+  if (existing.status === 'paid') {
+    return {
+      ok: true,
+      alreadyFulfilled: true,
+      checkoutType: 'custom_quilt',
+      requestId: id,
+      requestNumber: existing.request_number,
+      customerEmail: existing.customer_email,
+    };
+  }
+
+  await pool.query(
+    `UPDATE custom_quilt_requests SET
+       status = 'paid',
+       stripe_checkout_session_id = ?,
+       stripe_payment_intent_id = ?
+     WHERE id = ?`,
+    [sessionId ?? null, paymentIntentId ?? null, id]
+  );
+
+  const row = { ...existing, status: 'paid' };
+  let mail = { customerOk: false, staffOk: false };
+  try {
+    mail = await sendCustomQuiltEmails(row);
+  } catch (e) {
+    console.error('[custom-quilt] mail failed:', e?.message || e);
+  }
+
+  return {
+    ok: true,
+    checkoutType: 'custom_quilt',
+    requestId: id,
+    requestNumber: existing.request_number,
+    customerEmail: existing.customer_email,
+    mail,
+  };
+}
+
+/** Free submit path (no Stripe) — kept for API compatibility. */
 export async function createCustomQuiltRequest(body) {
   const validated = validateCustomQuiltBody(body);
   if (!validated.ok) {
@@ -202,21 +314,7 @@ export async function createCustomQuiltRequest(body) {
     ]
   );
 
-  const row = {
-    id: result.insertId,
-    request_number: requestNumber,
-    design_id: d.designId,
-    design_name: d.designName,
-    product_size: d.productSize,
-    color_palette: d.colorPalette,
-    batting: d.batting,
-    quilt_title: d.quiltTitle,
-    notes: d.notes,
-    customer_name: d.customerName,
-    customer_email: d.customerEmail,
-    customer_phone: d.customerPhone,
-    estimated_price: d.estimatedPrice,
-  };
+  const row = rowFromData(d, result.insertId, requestNumber);
 
   let mail = { customerOk: false, staffOk: false };
   try {
