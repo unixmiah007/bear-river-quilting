@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { authApi } from '../api.js';
+import PageLoading from '../components/PageLoading.jsx';
 
 async function signOut() {
   await authApi.logout();
@@ -21,7 +22,7 @@ export default function AdminLayout() {
   if (state.loading) {
     return (
       <div className="admin-shell">
-        <p className="muted">Checking session…</p>
+        <PageLoading active label="Checking session…" />
       </div>
     );
   }

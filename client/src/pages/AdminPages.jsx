@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi } from '../api.js';
+import PageLoading from '../components/PageLoading.jsx';
 import RichTextEditor from '../components/RichTextEditor.jsx';
 import { normalizeRichHtml } from '../lib/richText.js';
 
@@ -207,7 +208,7 @@ export default function AdminPages() {
   }
 
   if (loading) {
-    return <p className="muted">Loading pages…</p>;
+    return <PageLoading active label="Loading pages…" />;
   }
 
   return (

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import ProductCard from '../components/ProductCard.jsx';
+import PageLoading from '../components/PageLoading.jsx';
 import { stripRichHtml } from '../lib/richText.js';
 import ProductsHero from '../components/ProductsHero.jsx';
 import { useCart } from '../context/CartContext.jsx';
@@ -107,7 +108,7 @@ export default function Products() {
       {activeCategory?.description ? (
         <p className="muted products-catalog__intro">{activeCategory.description}</p>
       ) : null}
-      {loading ? <p className="muted">Loading products…</p> : null}
+      <PageLoading active={loading} label="Loading products…" />
       {error ? <p className="error">{error}</p> : null}
       {!loading && !error ? (
       <>

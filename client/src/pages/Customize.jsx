@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
+import PageLoading from '../components/PageLoading.jsx';
 import {
   estimateCustomizePrice,
   findCustomizeDesign,
@@ -274,7 +275,7 @@ export default function Customize() {
   }
 
   if (loadingConfig) {
-    return <p className="muted">Loading customize studio…</p>;
+    return <PageLoading active label="Loading customize studio…" />;
   }
 
   if (config.enabled === false) {
@@ -329,7 +330,7 @@ export default function Customize() {
             <h2>{step1?.title ?? 'Choose a quilt to customize'}</h2>
             <p className="muted">{step1?.description ?? ''}</p>
             {loadingProducts ? (
-              <p className="muted">{config.messages?.loadingProducts ?? 'Loading products…'}</p>
+              <PageLoading active label={config.messages?.loadingProducts ?? 'Loading products…'} inline />
             ) : products.length === 0 ? (
               <p className="muted">
                 {step1?.emptyProductsMessage ?? 'No published products are available yet.'}{' '}

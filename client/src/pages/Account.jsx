@@ -8,6 +8,7 @@ import { publicApi } from '../api.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useFavorites } from '../context/FavoritesContext.jsx';
 import { buildTrackingUrl, labelForCarrier } from '../lib/shippingCarriers.js';
+import PageLoading from '../components/PageLoading.jsx';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -232,7 +233,7 @@ export default function Account() {
             any item.
           </p>
         ) : favoritesLoading ? (
-          <p className="muted">Loading favorites…</p>
+          <PageLoading active label="Loading favorites…" inline />
         ) : favoriteProducts.length === 0 ? (
           <p className="muted" style={{ marginBottom: 0 }}>
             Your saved items are no longer available.{' '}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi } from '../api.js';
+import PageLoading from '../components/PageLoading.jsx';
 
 const emptyForm = { name: '', slug: '', description: '', sort_order: '0' };
 
@@ -164,7 +165,7 @@ export default function AdminCategories() {
   }
 
   if (loading) {
-    return <p className="muted">Loading categories…</p>;
+    return <PageLoading active label="Loading categories…" />;
   }
 
   return (

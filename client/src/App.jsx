@@ -1,54 +1,201 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import SiteLayout from './layouts/SiteLayout.jsx';
-import Home from './pages/Home.jsx';
-import DynamicPage from './pages/DynamicPage.jsx';
-import Products from './pages/Products.jsx';
-import ProductDetail from './pages/ProductDetail.jsx';
-import Cart from './pages/Cart.jsx';
-import CheckoutSuccess from './pages/CheckoutSuccess.jsx';
-import Account from './pages/Account.jsx';
-import About from './pages/About.jsx';
-import PrivacyPolicy from './pages/PrivacyPolicy.jsx';
-import ReturnPolicy from './pages/ReturnPolicy.jsx';
-import TypesOfQuilting from './pages/TypesOfQuilting.jsx';
-import Customize from './pages/Customize.jsx';
-import CustomizeSuccess from './pages/CustomizeSuccess.jsx';
 import AdminLayout from './layouts/AdminLayout.jsx';
-import AdminLogin from './pages/AdminLogin.jsx';
-import AdminPages from './pages/AdminPages.jsx';
-import AdminProducts from './pages/AdminProducts.jsx';
-import AdminCategories from './pages/AdminCategories.jsx';
-import AdminPageProducts from './pages/AdminPageProducts.jsx';
-import AdminOrders from './pages/AdminOrders.jsx';
-import AdminCustomizeRequests from './pages/AdminCustomizeRequests.jsx';
+import RouteSuspenseFallback from './components/RouteSuspenseFallback.jsx';
+
+const Home = lazy(() => import('./pages/Home.jsx'));
+const DynamicPage = lazy(() => import('./pages/DynamicPage.jsx'));
+const Products = lazy(() => import('./pages/Products.jsx'));
+const ProductDetail = lazy(() => import('./pages/ProductDetail.jsx'));
+const Cart = lazy(() => import('./pages/Cart.jsx'));
+const CheckoutSuccess = lazy(() => import('./pages/CheckoutSuccess.jsx'));
+const Account = lazy(() => import('./pages/Account.jsx'));
+const About = lazy(() => import('./pages/About.jsx'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy.jsx'));
+const ReturnPolicy = lazy(() => import('./pages/ReturnPolicy.jsx'));
+const TypesOfQuilting = lazy(() => import('./pages/TypesOfQuilting.jsx'));
+const Customize = lazy(() => import('./pages/Customize.jsx'));
+const CustomizeSuccess = lazy(() => import('./pages/CustomizeSuccess.jsx'));
+const AdminLogin = lazy(() => import('./pages/AdminLogin.jsx'));
+const AdminPages = lazy(() => import('./pages/AdminPages.jsx'));
+const AdminProducts = lazy(() => import('./pages/AdminProducts.jsx'));
+const AdminCategories = lazy(() => import('./pages/AdminCategories.jsx'));
+const AdminPageProducts = lazy(() => import('./pages/AdminPageProducts.jsx'));
+const AdminOrders = lazy(() => import('./pages/AdminOrders.jsx'));
+const AdminCustomizeRequests = lazy(() => import('./pages/AdminCustomizeRequests.jsx'));
+
+function SuspenseRoute({ children }) {
+  return <Suspense fallback={<RouteSuspenseFallback />}>{children}</Suspense>;
+}
 
 export default function App() {
   return (
     <Routes>
       <Route element={<SiteLayout />}>
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/return-policy" element={<ReturnPolicy />} />
-        <Route path="/types-of-quilting" element={<TypesOfQuilting />} />
-        <Route path="/customize" element={<Customize />} />
-        <Route path="/customize/success" element={<CustomizeSuccess />} />
-        <Route path="/products" element={<Products />} />
-        <Route path="/products/:id" element={<ProductDetail />} />
-        <Route path="/cart" element={<Cart />} />
-        <Route path="/checkout/success" element={<CheckoutSuccess />} />
-        <Route path="/account" element={<Account />} />
-        <Route path="/p/:slug" element={<DynamicPage />} />
+        <Route
+          path="/"
+          element={
+            <SuspenseRoute>
+              <Home />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/about"
+          element={
+            <SuspenseRoute>
+              <About />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/privacy-policy"
+          element={
+            <SuspenseRoute>
+              <PrivacyPolicy />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/return-policy"
+          element={
+            <SuspenseRoute>
+              <ReturnPolicy />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/types-of-quilting"
+          element={
+            <SuspenseRoute>
+              <TypesOfQuilting />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/customize"
+          element={
+            <SuspenseRoute>
+              <Customize />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/customize/success"
+          element={
+            <SuspenseRoute>
+              <CustomizeSuccess />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/products"
+          element={
+            <SuspenseRoute>
+              <Products />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/products/:id"
+          element={
+            <SuspenseRoute>
+              <ProductDetail />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/cart"
+          element={
+            <SuspenseRoute>
+              <Cart />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/checkout/success"
+          element={
+            <SuspenseRoute>
+              <CheckoutSuccess />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <SuspenseRoute>
+              <Account />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/p/:slug"
+          element={
+            <SuspenseRoute>
+              <DynamicPage />
+            </SuspenseRoute>
+          }
+        />
       </Route>
-      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route
+        path="/admin/login"
+        element={
+          <SuspenseRoute>
+            <AdminLogin />
+          </SuspenseRoute>
+        }
+      />
       <Route element={<AdminLayout />}>
         <Route path="/admin" element={<Navigate to="/admin/pages" replace />} />
-        <Route path="/admin/pages" element={<AdminPages />} />
-        <Route path="/admin/products" element={<AdminProducts />} />
-        <Route path="/admin/categories" element={<AdminCategories />} />
-        <Route path="/admin/orders" element={<AdminOrders />} />
-        <Route path="/admin/customize-requests" element={<AdminCustomizeRequests />} />
-        <Route path="/admin/pages/:id/products" element={<AdminPageProducts />} />
+        <Route
+          path="/admin/pages"
+          element={
+            <SuspenseRoute>
+              <AdminPages />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/admin/products"
+          element={
+            <SuspenseRoute>
+              <AdminProducts />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/admin/categories"
+          element={
+            <SuspenseRoute>
+              <AdminCategories />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/admin/orders"
+          element={
+            <SuspenseRoute>
+              <AdminOrders />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/admin/customize-requests"
+          element={
+            <SuspenseRoute>
+              <AdminCustomizeRequests />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/admin/pages/:id/products"
+          element={
+            <SuspenseRoute>
+              <AdminPageProducts />
+            </SuspenseRoute>
+          }
+        />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

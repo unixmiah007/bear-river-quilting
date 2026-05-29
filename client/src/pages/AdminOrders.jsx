@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { adminApi } from '../api.js';
 import ShippingLabelPanel from '../components/admin/ShippingLabelPanel.jsx';
 import OrderMessagingPanel from '../components/admin/OrderMessagingPanel.jsx';
+import PageLoading from '../components/PageLoading.jsx';
 import { labelForCarrier, SHIPPING_CARRIER_OPTIONS } from '../lib/shippingCarriers.js';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
@@ -282,8 +283,9 @@ export default function AdminOrders() {
     <>
       <h1 style={{ marginTop: 0 }}>Orders</h1>
       {error ? <p className="error">{error}</p> : null}
+      {!ordersLoaded ? <PageLoading active label="Loading orders…" /> : null}
 
-      {orders.length > 0 ? (
+      {ordersLoaded && orders.length > 0 ? (
         <div className="field admin-orders-search" style={{ marginBottom: '1rem', maxWidth: '32rem' }}>
           <label htmlFor="admin-orders-search">Search</label>
           <input
@@ -355,6 +357,7 @@ export default function AdminOrders() {
         </div>
       ) : null}
 
+      {ordersLoaded ? (
       <div className="table-wrap admin-orders-table" style={{ marginBottom: '1.25rem' }}>
         <table>
           <thead>
@@ -442,6 +445,7 @@ export default function AdminOrders() {
           </tbody>
         </table>
       </div>
+      ) : null}
       {details ? (
         <div
           ref={orderDetailRef}

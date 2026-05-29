@@ -13,6 +13,7 @@ import { useCart } from '../context/CartContext.jsx';
 import { HOME_TESTIMONIALS } from '../lib/homeTestimonials.js';
 import HomeHeroBackdrop from '../components/HomeHeroBackdrop.jsx';
 import CustomizePromoBanner from '../components/CustomizePromoBanner.jsx';
+import PageLoading from '../components/PageLoading.jsx';
 
 export default function Home() {
   const [carouselProducts, setCarouselProducts] = useState([]);
@@ -192,7 +193,7 @@ export default function Home() {
           <Link to="/p/heritage-quilts">See collections</Link>
         </div>
         {loadingBest ? (
-          <p className="muted">Loading best sellers…</p>
+          <PageLoading active label="Loading best sellers…" inline />
         ) : hasBestSellers ? (
           <>
             <div className="card-grid featured-carousel-grid">
@@ -231,7 +232,7 @@ export default function Home() {
           <Link to="/p/heritage-quilts">See all collections</Link>
         </div>
         {loadingFeatured ? (
-          <p className="muted">Loading featured pieces...</p>
+          <PageLoading active label="Loading featured pieces…" inline />
         ) : hasFeatured ? (
           <>
             <div className="card-grid featured-carousel-grid">

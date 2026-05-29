@@ -5,6 +5,7 @@ import ProductImage from '../components/ProductImage.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
 import { stripRichHtml } from '../lib/richText.js';
+import PageLoading from '../components/PageLoading.jsx';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -40,7 +41,7 @@ export default function DynamicPage() {
     return <p className="error">{error}</p>;
   }
   if (!data) {
-    return <p className="muted">Loading…</p>;
+    return <PageLoading active label="Loading page…" />;
   }
 
   const { page, products } = data;

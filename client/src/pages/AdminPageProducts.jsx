@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { adminApi } from '../api.js';
+import PageLoading from '../components/PageLoading.jsx';
 
 export default function AdminPageProducts() {
   const { id } = useParams();
@@ -84,7 +85,7 @@ export default function AdminPageProducts() {
   }
 
   if (loading) {
-    return <p className="muted">Loading…</p>;
+    return <PageLoading active label="Loading page products…" />;
   }
 
   if (error && !pageTitle) {

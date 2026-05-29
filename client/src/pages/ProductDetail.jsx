@@ -7,6 +7,7 @@ import CartIcon from '../components/CartIcon.jsx';
 import FavoriteProductButton from '../components/FavoriteProductButton.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { CUSTOMER_SIZE_OPTIONS, priceForProductSize } from '../lib/productSizes.js';
+import PageLoading from '../components/PageLoading.jsx';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -89,7 +90,7 @@ export default function ProductDetail() {
     );
   }
   if (!product) {
-    return <p className="muted">Loading…</p>;
+    return <PageLoading active label="Loading product…" />;
   }
 
   const mainSrc = galleryUrls[activeIdx] ?? galleryUrls[0];

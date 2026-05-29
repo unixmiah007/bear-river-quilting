@@ -4,6 +4,7 @@ import { publicApi } from '../api.js';
 import ProductCard from '../components/ProductCard.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { QUILT_STUDIO_IMAGE, ABOUT_OWNER_IMAGE } from '../lib/quiltAssets.js';
+import PageLoading from '../components/PageLoading.jsx';
 
 const TESTIMONIALS = [
   {
@@ -149,7 +150,7 @@ export default function About() {
           <Link to="/products">Shop all products</Link>
         </div>
         {featuredLoading ? (
-          <p className="muted">Loading featured quilts…</p>
+          <PageLoading active label="Loading featured quilts…" inline />
         ) : featuredError ? (
           <p className="error">{featuredError}</p>
         ) : featuredProducts.length === 0 ? (

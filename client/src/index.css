@@ -27,6 +27,50 @@ body {
   line-height: 1.5;
 }
 
+.page-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  padding: 3rem 1.5rem;
+  min-height: 12rem;
+}
+
+.page-loader--inline {
+  min-height: 4rem;
+  padding: 1.25rem 1rem;
+}
+
+.page-loader__spinner {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 2px solid var(--border);
+  border-top-color: var(--text);
+  border-radius: 50%;
+  animation: page-loader-spin 0.7s linear infinite;
+}
+
+.page-loader__label {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+@keyframes page-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-loader__spinner {
+    animation: none;
+    border-top-color: var(--border);
+    opacity: 0.65;
+  }
+}
+
 #root {
   min-height: 100vh;
 }

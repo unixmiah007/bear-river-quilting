@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { adminApi } from '../api.js';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
+import PageLoading from '../components/PageLoading.jsx';
 
 const SORTABLE_COLUMNS = [
   'request',
@@ -138,7 +139,7 @@ export default function AdminCustomizeRequests() {
       </p>
       {err ? <p className="error">{err}</p> : null}
       {loading ? (
-        <p className="muted">Loading…</p>
+        <PageLoading active label="Loading requests…" />
       ) : rows.length === 0 ? (
         <p className="muted">No requests yet.</p>
       ) : (

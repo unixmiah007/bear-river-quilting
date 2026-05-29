@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
+import PageLoading from '../components/PageLoading.jsx';
 
 export default function CustomizeSuccess() {
   const [searchParams] = useSearchParams();
@@ -58,7 +59,7 @@ export default function CustomizeSuccess() {
   }, [searchParams]);
 
   if (state.loading) {
-    return <p className="muted">Confirming your payment…</p>;
+    return <PageLoading active label="Confirming your payment…" />;
   }
 
   if (state.error) {

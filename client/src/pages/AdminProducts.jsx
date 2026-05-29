@@ -5,6 +5,7 @@ import ProductImage from '../components/ProductImage.jsx';
 import ProductMediaLibrary from '../components/ProductMediaLibrary.jsx';
 import RichTextEditor from '../components/RichTextEditor.jsx';
 import AdminCustomizeWizardPanel from '../components/AdminCustomizeWizardPanel.jsx';
+import PageLoading from '../components/PageLoading.jsx';
 import { normalizeRichHtml } from '../lib/richText.js';
 import { PRODUCT_SIZE_OPTIONS } from '../lib/productSizes.js';
 
@@ -556,7 +557,7 @@ export default function AdminProducts() {
   }
 
   if (loading) {
-    return <p className="muted">Loading products…</p>;
+    return <PageLoading active label="Loading products…" />;
   }
 
   return (
