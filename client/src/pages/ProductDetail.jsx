@@ -186,9 +186,10 @@ export default function ProductDetail() {
             {formatPrice(displayPrice)}
           </div>
           {product.description ? (
-            <p className="page-body" style={{ whiteSpace: 'normal' }}>
-              {product.description}
-            </p>
+            <div
+              className="page-body cms-rich-content"
+              dangerouslySetInnerHTML={{ __html: product.description }}
+            />
           ) : (
             <p className="muted">Handmade quilt from Bear River Quilting.</p>
           )}

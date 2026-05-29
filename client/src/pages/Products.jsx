@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import ProductCard from '../components/ProductCard.jsx';
+import { stripRichHtml } from '../lib/richText.js';
 import ProductsHero from '../components/ProductsHero.jsx';
 import { useCart } from '../context/CartContext.jsx';
 
@@ -83,9 +84,7 @@ export default function Products() {
       const inText =
         !term ||
         p.name.toLowerCase().includes(term) ||
-        String(p.description ?? '')
-          .toLowerCase()
-          .includes(term);
+        stripRichHtml(p.description).toLowerCase().includes(term);
       const inPrice = Number(p.price) <= priceCap;
       return inText && inPrice;
     });

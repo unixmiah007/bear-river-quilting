@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi } from '../api.js';
+import RichTextEditor from '../components/RichTextEditor.jsx';
+import { normalizeRichHtml } from '../lib/richText.js';
 
 const emptyForm = { title: '', slug: '', body: '' };
 const PRODUCT_DRAG_TYPE = 'application/x-brq-product-id';
@@ -142,7 +144,7 @@ export default function AdminPages() {
       const created = await adminApi.createPage({
         title: builderTitle.trim(),
         slug: builderSlug.trim() || undefined,
-        body: builderBody.trim() || undefined,
+        body: normalizeRichHtml(builderBody) || undefined,
       });
       await adminApi.setPageProducts(created.id, draftProductIds);
       setBuilderTitle('');
@@ -161,7 +163,10 @@ export default function AdminPages() {
     e.preventDefault();
     setError(null);
     try {
-      await adminApi.createPage(form);
+      await adminApi.createPage({
+        ...form,
+        body: normalizeRichHtml(form.body) || undefined,
+      });
       setForm(emptyForm);
       await refresh();
     } catch (err) {
@@ -178,7 +183,10 @@ export default function AdminPages() {
     e.preventDefault();
     setError(null);
     try {
-      await adminApi.updatePage(editingId, form);
+      await adminApi.updatePage(editingId, {
+        ...form,
+        body: normalizeRichHtml(form.body) || undefined,
+      });
       setEditingId(null);
       setForm(emptyForm);
       await refresh();
@@ -316,7 +324,7 @@ export default function AdminPages() {
               )}
             </div>
 
-            <form className="form" onSubmit={onCreateFromBuilder} style={{ marginTop: '1rem' }}>
+            <form className="form admin-page-builder__form" onSubmit={onCreateFromBuilder} style={{ marginTop: '1rem' }}>
               <div className="field">
                 <label htmlFor="builder-title">Title (footer link label)</label>
                 <input
@@ -338,11 +346,13 @@ export default function AdminPages() {
               </div>
               <div className="field">
                 <label htmlFor="builder-body">Intro text (optional)</label>
-                <textarea
+                <RichTextEditor
                   id="builder-body"
                   value={builderBody}
-                  onChange={(e) => setBuilderBody(e.target.value)}
-                  rows={3}
+                  onChange={setBuilderBody}
+                  placeholder="Intro copy shown above products on the public page"
+                  disabled={builderBusy}
+                  minHeight={120}
                 />
               </div>
               <button type="submit" className="btn btn-primary" disabled={builderBusy}>
@@ -422,11 +432,12 @@ export default function AdminPages() {
           />
         </div>
         <div className="field">
-          <label htmlFor="body">Body</label>
-          <textarea
+          <label htmlFor="body">Intro / body text</label>
+          <RichTextEditor
             id="body"
             value={form.body}
-            onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+            onChange={(html) => setForm((f) => ({ ...f, body: html }))}
+            placeholder="Formatted intro shown on the public page"
           />
         </div>
         <div className="row">

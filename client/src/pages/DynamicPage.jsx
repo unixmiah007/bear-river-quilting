@@ -4,6 +4,7 @@ import { publicApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
+import { stripRichHtml } from '../lib/richText.js';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -47,7 +48,12 @@ export default function DynamicPage() {
   return (
     <>
       <h1>{page.title}</h1>
-      {page.body ? <div className="page-body">{page.body}</div> : null}
+      {page.body ? (
+        <div
+          className="page-body cms-rich-content"
+          dangerouslySetInnerHTML={{ __html: page.body }}
+        />
+      ) : null}
       <h2>Products on this page</h2>
       {products.length === 0 ? (
         <div className="empty">No published products linked to this page yet.</div>
@@ -62,7 +68,7 @@ export default function DynamicPage() {
                   Size: {formatProductSizeLabel(p.product_size)}
                 </p>
               ) : null}
-              {p.description ? <p className="muted">{p.description}</p> : null}
+              {p.description ? <p className="muted">{stripRichHtml(p.description)}</p> : null}
               <div className="price">{formatPrice(p.price)}</div>
               <div className="row card-actions">
                 <Link className="btn" to={`/products/${p.id}`}>

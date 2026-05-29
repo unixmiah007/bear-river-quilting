@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { adminApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
 import ProductMediaLibrary from '../components/ProductMediaLibrary.jsx';
+import RichTextEditor from '../components/RichTextEditor.jsx';
+import { normalizeRichHtml } from '../lib/richText.js';
 import { PRODUCT_SIZE_OPTIONS } from '../lib/productSizes.js';
 
 const emptyForm = {
@@ -300,6 +302,7 @@ export default function AdminProducts() {
     try {
       const { id } = await adminApi.createProduct({
         ...form,
+        description: normalizeRichHtml(form.description) || null,
         price: form.price,
         stock_quantity: form.stock_quantity,
         is_published: !!form.is_published,
@@ -390,6 +393,7 @@ export default function AdminProducts() {
     try {
       await adminApi.updateProduct(editingId, {
         ...form,
+        description: normalizeRichHtml(form.description) || null,
         price: form.price,
         stock_quantity: form.stock_quantity,
         is_published: !!form.is_published,
@@ -569,7 +573,7 @@ export default function AdminProducts() {
       <h2 id="admin-product-edit-heading" style={{ marginTop: 0 }}>
         {editingId ? 'Edit product' : 'New product'}
       </h2>
-      <form className="form" onSubmit={editingId ? onUpdate : onCreate}>
+      <form className="form admin-product-form" onSubmit={editingId ? onUpdate : onCreate}>
         <div className="field">
           <label htmlFor="sku">SKU</label>
           <input
@@ -591,10 +595,12 @@ export default function AdminProducts() {
         </div>
         <div className="field">
           <label htmlFor="description">Description</label>
-          <textarea
+          <RichTextEditor
             id="description"
             value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            onChange={(html) => setForm((f) => ({ ...f, description: html }))}
+            placeholder="Product description shown on the storefront"
+            minHeight={160}
           />
         </div>
         <div className="field">

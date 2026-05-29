@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import FavoriteProductButton from './FavoriteProductButton.jsx';
 import ProductImage from './ProductImage.jsx';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
+import { stripRichHtml } from '../lib/richText.js';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -33,7 +34,9 @@ export default function ProductCard({ product, onAddToCart, badge, showFavorite 
             Size: {formatProductSizeLabel(product.product_size)}
           </p>
         ) : null}
-        {product.description ? <p className="muted">{product.description}</p> : null}
+        {product.description ? (
+          <p className="muted">{stripRichHtml(product.description)}</p>
+        ) : null}
         <div className="price">{formatPrice(product.price)}</div>
       </Link>
       <div className="row card-actions">
