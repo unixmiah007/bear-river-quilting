@@ -3967,23 +3967,33 @@ tr:last-child td {
   background: #f9fafb;
   border: 1px dashed var(--border);
   border-radius: var(--radius);
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
 }
 
 .shipping-label-sheet__inner {
+  position: relative;
+  width: 100%;
   max-width: 4in;
-  margin: 0 auto;
-  padding: 0.35rem 0.25rem;
+  margin: 0;
+  padding: 2.65rem 0 0.35rem 0;
   font-size: 11pt;
   line-height: 1.35;
   color: #111;
 }
 
-.shipping-label-sheet__brand {
-  margin: 0 0 0.15rem;
-  font-size: 8pt;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #6b7280;
+.shipping-label-sheet__logo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  height: 2.35rem;
+  width: auto;
+  max-width: 3.25in;
+  margin: 0;
+  object-fit: contain;
+  object-position: left top;
 }
 
 .shipping-label-sheet__order {
@@ -4028,28 +4038,43 @@ tr:last-child td {
 }
 
 @media print {
-  body.printing-shipping-label .site-shell,
-  body.printing-shipping-label .admin-shell {
+  /* Hide entire page, then reveal only the label (images included). */
+  body.printing-shipping-label * {
     visibility: hidden;
   }
 
-  body.printing-shipping-label .shipping-label-sheet {
+  body.printing-shipping-label .shipping-label-sheet,
+  body.printing-shipping-label .shipping-label-sheet * {
     visibility: visible;
+  }
+
+  body.printing-shipping-label .shipping-label-sheet {
     position: fixed;
     inset: 0;
     margin: 0;
-    padding: 0.25in;
+    padding: 0;
     border: none;
     background: #fff;
     display: flex;
     align-items: flex-start;
-    justify-content: center;
+    justify-content: flex-start;
   }
 
   body.printing-shipping-label .shipping-label-sheet__inner {
     max-width: 4in;
     width: 4in;
     min-height: 6in;
+    margin: 0;
+    padding: 2.5rem 0 0 0;
+  }
+
+  body.printing-shipping-label .shipping-label-sheet__logo {
+    top: 0;
+    left: 0;
+    height: 2.25rem;
+    max-width: 3.25in;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 
   @page {

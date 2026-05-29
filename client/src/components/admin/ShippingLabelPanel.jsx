@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { adminApi } from '../../api.js';
 import { emptyLabelAddress, formatLabelBlock } from '../../lib/shippingLabel.js';
+import { SITE_LOGO_ALT, SITE_LOGO_URL } from '../../lib/siteBrand.js';
 
 function AddressFields({ title, value, onChange }) {
   const id = useId();
@@ -66,7 +67,15 @@ function LabelPreview({ orderNumber, from, to, tracking }) {
   return (
     <div className="shipping-label-sheet" aria-label="Shipping label preview">
       <div className="shipping-label-sheet__inner">
-        <p className="shipping-label-sheet__brand">Bear River Quilting</p>
+        <img
+          className="shipping-label-sheet__logo"
+          src={SITE_LOGO_URL}
+          alt={SITE_LOGO_ALT}
+          width={858}
+          height={703}
+          decoding="sync"
+          loading="eager"
+        />
         <p className="shipping-label-sheet__order">Order {orderNumber}</p>
         {tracking?.number ? (
           <p className="shipping-label-sheet__tracking">

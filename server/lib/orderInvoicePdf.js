@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import { BRAND_LOGO_PATH, brandLogoExists } from './brandLogoPath.js';
 
 function money(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
@@ -52,8 +53,18 @@ export function buildOrderInvoicePdf(order, items) {
     doc.on('error', reject);
 
     const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const marginLeft = doc.page.margins.left;
 
-    doc.font('Helvetica-Bold').fontSize(20).text('Bear River Quilting', { align: 'left' });
+    const logoHeight = 56;
+    const headerTop = doc.y;
+    if (brandLogoExists()) {
+      doc.image(BRAND_LOGO_PATH, marginLeft, headerTop, { height: logoHeight });
+      doc.y = headerTop + logoHeight + 10;
+    } else {
+      doc.font('Helvetica-Bold').fontSize(20).text('Bear River Quilting', { align: 'left' });
+      doc.moveDown(0.35);
+    }
+
     doc.font('Helvetica').fontSize(11).fillColor('#444444').text('Invoice', { align: 'left' });
     doc.fillColor('#000000');
     doc.moveDown(1);
