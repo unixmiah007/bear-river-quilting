@@ -309,6 +309,79 @@ ${trackHtml}
 }
 
 /**
+ * Emails the customer their order invoice with PDF attached.
+ */
+export async function sendOrderInvoiceEmail({
+  to,
+  customerName,
+  orderNumber,
+  total,
+  pdfBuffer,
+  filename,
+}) {
+  const toAddr = String(to ?? '')
+    .trim()
+    .toLowerCase();
+  if (!toAddr || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toAddr)) {
+    throw new Error('Invalid customer email on order');
+  }
+
+  if (!isSendGridConfigured()) {
+    throw new Error('SendGrid is not configured — set SENDGRID_API_KEY in server/.env');
+  }
+
+  const from = resolveSendGridFromCustomer();
+  if (!from) {
+    throw new Error('Set MAIL_FROM_ADDRESS or MAIL_FROM to a verified SendGrid sender');
+  }
+
+  if (!pdfBuffer || !Buffer.isBuffer(pdfBuffer)) {
+    throw new Error('Invoice PDF is missing');
+  }
+
+  const orderStatusUrl = buildCustomerOrderAccountUrl(toAddr, orderNumber);
+  const subject = `Invoice — Order ${orderNumber}`;
+
+  const text = [
+    `Hi ${customerName},`,
+    '',
+    `Please find your invoice for Bear River Quilting order ${orderNumber} attached as a PDF.`,
+    `Order total: $${Number(total).toFixed(2)}`,
+    '',
+    `View order status: ${orderStatusUrl}`,
+    '',
+    'Thank you for shopping with us.',
+    '— Bear River Quilting',
+  ].join('\n');
+
+  const html = `
+<p>Hi ${escapeHtml(customerName)},</p>
+<p>Please find your invoice for Bear River Quilting order <strong>${escapeHtml(orderNumber)}</strong> attached as a PDF.</p>
+<p>Order total: <strong>$${Number(total).toFixed(2)}</strong></p>
+<p><a href="${escapeHtml(orderStatusUrl)}">View order status and details</a></p>
+<p>Thank you for shopping with us.<br>— Bear River Quilting</p>
+`.trim();
+
+  await sendSendGridMail({
+    to: toAddr,
+    from,
+    subject,
+    text,
+    html,
+    attachments: [
+      {
+        content: pdfBuffer.toString('base64'),
+        filename: filename || `invoice-${orderNumber}.pdf`,
+        type: 'application/pdf',
+        disposition: 'attachment',
+      },
+    ],
+  });
+
+  console.log('[mail] Sent customer invoice', { orderNumber, to: toAddr });
+}
+
+/**
  * Custom message from staff to the customer about their order.
  */
 export async function sendOrderCustomerMessageEmail({

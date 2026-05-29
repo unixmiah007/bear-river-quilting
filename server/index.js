@@ -30,6 +30,12 @@ import { seedDemoProducts } from './lib/seedDemoProducts.js';
 import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './lib/mail.js';
 import { verifySendGridIfConfigured } from './lib/sendgridMail.js';
 import { normalizeProductSize } from './lib/productSize.js';
+import {
+  ensureProductSizePricesColumn,
+  hydrateProductRow,
+  hydrateProductRows,
+  parseProductPriceInput,
+} from './lib/productSizePrices.js';
 import { ensureStripeOrderColumns } from './lib/ensureStripeOrderColumns.js';
 import { ensureCustomQuiltRequestsTable } from './lib/ensureCustomQuiltRequestsTable.js';
 import {
@@ -46,6 +52,8 @@ import {
 } from './lib/shippingLabel.js';
 import { getDefaultShipFrom } from './lib/defaultShipFrom.js';
 import { buildOrderInvoicePdf, invoicePdfFilename } from './lib/orderInvoicePdf.js';
+import { emailCustomerOrderInvoice } from './lib/orderInvoiceEmail.js';
+import { ensureOrderInvoiceEmailColumn } from './lib/ensureOrderInvoiceEmailColumn.js';
 import { sendOrderTrackingNotification } from './lib/orderTracking.js';
 import { ensureOrderMessagesTable } from './lib/ensureOrderMessagesTable.js';
 import {
@@ -238,7 +246,7 @@ app.get('/api/pages', async (_req, res) => {
     const [rows] = await pool.query(
       'SELECT id, slug, title, updated_at FROM pages ORDER BY title ASC'
     );
-    res.json(rows);
+    res.json(hydrateProductRows(rows));
   } catch (e) {
     console.error(e);
     if (e.code === 'ER_NO_SUCH_TABLE') {
@@ -268,14 +276,14 @@ app.get('/api/pages/by-slug/:slug', async (req, res) => {
       return res.status(404).json({ error: 'Page not found' });
     }
     const [products] = await pool.query(
-      `SELECT p.id, p.name, p.description, p.price, p.image_url, p.stock_quantity, p.product_size
+      `SELECT p.id, p.name, p.description, p.price, p.size_prices, p.image_url, p.stock_quantity, p.product_size
        FROM products p
        INNER JOIN page_products pp ON pp.product_id = p.id
        WHERE pp.page_id = ? AND p.is_published = 1
        ORDER BY pp.sort_order ASC, p.name ASC`,
       [page.id]
     );
-    res.json({ page, products });
+    res.json({ page, products: hydrateProductRows(products) });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to load page' });
@@ -289,7 +297,7 @@ app.get('/api/product-categories', async (_req, res) => {
        FROM product_categories
        ORDER BY sort_order ASC, name ASC`
     );
-    res.json(rows);
+    res.json(hydrateProductRows(rows));
   } catch (e) {
     console.error(e);
     if (e.code === 'ER_NO_SUCH_TABLE') {
@@ -311,22 +319,22 @@ app.get('/api/products', async (req, res) => {
         return res.json([]);
       }
       const [rows] = await pool.query(
-        `SELECT p.id, p.name, p.description, p.price, p.image_url, p.stock_quantity, p.product_size
+        `SELECT p.id, p.name, p.description, p.price, p.size_prices, p.image_url, p.stock_quantity, p.product_size
          FROM products p
          INNER JOIN product_category_products pcp ON pcp.product_id = p.id
          WHERE pcp.category_id = ? AND p.is_published = 1
          ORDER BY pcp.sort_order ASC, p.name ASC`,
         [cat.id]
       );
-      return res.json(rows);
+      return res.json(hydrateProductRows(rows));
     }
     const [rows] = await pool.query(
-      `SELECT id, name, description, price, image_url, stock_quantity, product_size
+      `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size
        FROM products
        WHERE is_published = 1
        ORDER BY updated_at DESC, name ASC`
     );
-    res.json(rows);
+    res.json(hydrateProductRows(rows));
   } catch (e) {
     console.error(e);
     if (e.code === 'ER_NO_SUCH_TABLE') {
@@ -346,25 +354,25 @@ app.get('/api/products', async (req, res) => {
 app.get('/api/products/featured', async (_req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id, name, description, price, image_url, stock_quantity, product_size
+      `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size
        FROM products
        WHERE is_published = 1 AND is_featured = 1
        ORDER BY updated_at DESC, name ASC
        LIMIT 4`
     );
-    res.json(rows);
+    res.json(hydrateProductRows(rows));
   } catch (e) {
     console.error(e);
     if (isMissingProductColumnError(e)) {
       try {
         const [rows] = await pool.query(
-          `SELECT id, name, description, price, image_url, stock_quantity, product_size
+          `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size
            FROM products
            WHERE is_published = 1
            ORDER BY updated_at DESC, name ASC
            LIMIT 4`
         );
-        return res.json(rows);
+        return res.json(hydrateProductRows(rows));
       } catch (e2) {
         console.error(e2);
         return res.json([]);
@@ -378,7 +386,7 @@ app.get('/api/products/featured', async (_req, res) => {
 app.get('/api/products/best-sellers', async (_req, res) => {
   try {
     const [ranked] = await pool.query(
-      `SELECT p.id, p.name, p.description, p.price, p.image_url, p.stock_quantity, p.product_size,
+      `SELECT p.id, p.name, p.description, p.price, p.size_prices, p.image_url, p.stock_quantity, p.product_size,
               agg.units_sold AS units_sold
        FROM products p
        INNER JOIN (
@@ -392,28 +400,28 @@ app.get('/api/products/best-sellers', async (_req, res) => {
        LIMIT 10`
     );
     if (ranked.length > 0) {
-      return res.json(ranked);
+      return res.json(hydrateProductRows(ranked));
     }
     const [fallback] = await pool.query(
-      `SELECT id, name, description, price, image_url, stock_quantity, product_size, NULL AS units_sold
+      `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size, NULL AS units_sold
        FROM products
        WHERE is_published = 1
        ORDER BY updated_at DESC, name ASC
        LIMIT 10`
     );
-    res.json(fallback);
+    res.json(hydrateProductRows(fallback));
   } catch (e) {
     console.error(e);
     if (e.code === 'ER_NO_SUCH_TABLE') {
       try {
         const [rows] = await pool.query(
-          `SELECT id, name, description, price, image_url, stock_quantity, product_size, NULL AS units_sold
+          `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size, NULL AS units_sold
            FROM products
            WHERE is_published = 1
            ORDER BY updated_at DESC, name ASC
            LIMIT 10`
         );
-        return res.json(rows);
+        return res.json(hydrateProductRows(rows));
       } catch (e2) {
         console.error(e2);
         return res.json([]);
@@ -433,7 +441,7 @@ app.get('/api/products/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid product id' });
     }
     const [[row]] = await pool.query(
-      `SELECT id, name, description, price, image_url, stock_quantity, product_size, updated_at
+      `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size, updated_at
        FROM products
        WHERE id = ? AND is_published = 1`,
       [id]
@@ -447,7 +455,7 @@ app.get('/api/products/:id', async (req, res) => {
     } catch (e) {
       if (e.code !== 'ER_NO_SUCH_TABLE') throw e;
     }
-    res.json({ ...row, images });
+    res.json({ ...hydrateProductRow(row), images });
   } catch (e) {
     console.error(e);
     if (isMissingProductColumnError(e)) {
@@ -740,7 +748,7 @@ app.get('/api/admin/pages', authMiddleware, async (_req, res) => {
     const [rows] = await pool.query(
       'SELECT id, slug, title, body, updated_at FROM pages ORDER BY title ASC'
     );
-    res.json(rows);
+    res.json(hydrateProductRows(rows));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to list pages' });
@@ -816,7 +824,7 @@ app.get('/api/admin/product-categories', authMiddleware, async (_req, res) => {
        FROM product_categories
        ORDER BY sort_order ASC, name ASC`
     );
-    res.json(rows);
+    res.json(hydrateProductRows(rows));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to list categories' });
@@ -896,7 +904,7 @@ app.get('/api/admin/product-categories/:id/products', authMiddleware, async (req
        ORDER BY pcp.sort_order ASC, p.name ASC`,
       [categoryId]
     );
-    res.json(rows);
+    res.json(hydrateProductRows(rows));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to load category products' });
@@ -1005,9 +1013,9 @@ app.post('/api/admin/products/import', authMiddleware, async (req, res) => {
 app.get('/api/admin/products', authMiddleware, async (_req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, sku, name, description, price, stock_quantity, product_size, image_url, is_published, is_featured, created_at, updated_at FROM products ORDER BY name ASC'
+      'SELECT id, sku, name, description, price, size_prices, stock_quantity, product_size, image_url, is_published, is_featured, created_at, updated_at FROM products ORDER BY name ASC'
     );
-    res.json(rows);
+    res.json(hydrateProductRows(rows));
   } catch (e) {
     console.error(e);
     if (isMissingProductColumnError(e)) {
@@ -1024,7 +1032,7 @@ app.get('/api/admin/products/by-id/:id', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Invalid product id' });
     }
     const [[product]] = await pool.query(
-      `SELECT id, sku, name, description, price, stock_quantity, product_size, image_url, is_published, is_featured, updated_at
+      `SELECT id, sku, name, description, price, size_prices, stock_quantity, product_size, image_url, is_published, is_featured, updated_at
        FROM products WHERE id = ?`,
       [id]
     );
@@ -1037,7 +1045,7 @@ app.get('/api/admin/products/by-id/:id', authMiddleware, async (req, res) => {
     } catch (e) {
       if (e.code !== 'ER_NO_SUCH_TABLE') throw e;
     }
-    res.json({ ...product, images });
+    res.json({ ...hydrateProductRow(product), images });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to load product' });
@@ -1280,10 +1288,14 @@ app.post('/api/admin/products/:id/images/from-library', authMiddleware, async (r
 
 app.post('/api/admin/products', authMiddleware, async (req, res) => {
   try {
-    const { name, description, price, image_url, is_published, is_featured, sku, stock_quantity, product_size } =
+    const { name, description, image_url, is_published, is_featured, sku, stock_quantity, product_size } =
       req.body ?? {};
     if (!name) {
       return res.status(400).json({ error: 'name is required' });
+    }
+    const priceParsed = parseProductPriceInput(req.body);
+    if (!priceParsed.ok) {
+      return res.status(400).json({ error: priceParsed.error });
     }
     const sizeParsed = parseProductSizeInput({ product_size });
     if (!sizeParsed.ok) {
@@ -1292,11 +1304,12 @@ app.post('/api/admin/products', authMiddleware, async (req, res) => {
     const skuVal = sku != null && String(sku).trim() !== '' ? String(sku).trim().slice(0, 64) : null;
     const stock = Math.max(0, Math.min(9999999, Math.floor(Number(stock_quantity) || 0)));
     const [result] = await pool.query(
-      'INSERT INTO products (name, description, price, image_url, is_published, is_featured, sku, stock_quantity, product_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO products (name, description, price, size_prices, image_url, is_published, is_featured, sku, stock_quantity, product_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         name,
         description ?? null,
-        Number(price) || 0,
+        priceParsed.price,
+        priceParsed.sizePricesJson,
         image_url ?? null,
         is_published ? 1 : 0,
         is_featured ? 1 : 0,
@@ -1326,7 +1339,7 @@ app.get('/api/admin/products/:id/categories', authMiddleware, async (req, res) =
        ORDER BY c.sort_order ASC, c.name ASC`,
       [productId]
     );
-    res.json(rows);
+    res.json(hydrateProductRows(rows));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to load product categories' });
@@ -1380,10 +1393,14 @@ app.put('/api/admin/products/:id/categories', authMiddleware, async (req, res) =
 app.put('/api/admin/products/:id', authMiddleware, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { name, description, price, image_url, is_published, is_featured, sku, stock_quantity, product_size } =
+    const { name, description, image_url, is_published, is_featured, sku, stock_quantity, product_size } =
       req.body ?? {};
     if (!name) {
       return res.status(400).json({ error: 'name is required' });
+    }
+    const priceParsed = parseProductPriceInput(req.body);
+    if (!priceParsed.ok) {
+      return res.status(400).json({ error: priceParsed.error });
     }
     const sizeParsed = parseProductSizeInput({ product_size });
     if (!sizeParsed.ok) {
@@ -1392,11 +1409,12 @@ app.put('/api/admin/products/:id', authMiddleware, async (req, res) => {
     const skuVal = sku != null && String(sku).trim() !== '' ? String(sku).trim().slice(0, 64) : null;
     const stock = Math.max(0, Math.min(9999999, Math.floor(Number(stock_quantity) || 0)));
     const [result] = await pool.query(
-      'UPDATE products SET name = ?, description = ?, price = ?, image_url = ?, is_published = ?, is_featured = ?, sku = ?, stock_quantity = ?, product_size = ? WHERE id = ?',
+      'UPDATE products SET name = ?, description = ?, price = ?, size_prices = ?, image_url = ?, is_published = ?, is_featured = ?, sku = ?, stock_quantity = ?, product_size = ? WHERE id = ?',
       [
         name,
         description ?? null,
-        Number(price) || 0,
+        priceParsed.price,
+        priceParsed.sizePricesJson,
         image_url ?? null,
         is_published ? 1 : 0,
         is_featured ? 1 : 0,
@@ -1465,7 +1483,7 @@ app.get('/api/admin/pages/:id/products', authMiddleware, async (req, res) => {
        ORDER BY pp.sort_order ASC, p.name ASC`,
       [pageId]
     );
-    res.json(rows);
+    res.json(hydrateProductRows(rows));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to load page products' });
@@ -1537,7 +1555,7 @@ app.put('/api/admin/customize-config', authMiddleware, async (req, res) => {
 app.get('/api/admin/custom-quilt-requests', authMiddleware, async (_req, res) => {
   try {
     const rows = await listCustomQuiltRequestsForAdmin();
-    res.json(rows);
+    res.json(hydrateProductRows(rows));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to list custom quilt requests' });
@@ -1566,7 +1584,7 @@ app.get('/api/admin/orders', authMiddleware, async (_req, res) => {
        FROM orders
        ORDER BY created_at DESC`
     );
-    res.json(rows);
+    res.json(hydrateProductRows(rows));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to list orders' });
@@ -1603,6 +1621,23 @@ app.get('/api/admin/orders/:id/invoice.pdf', authMiddleware, async (req, res) =>
   }
 });
 
+app.post('/api/admin/orders/:id/invoice/email', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid order id' });
+    const result = await emailCustomerOrderInvoice(pool, id);
+    if (!result.ok) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+    res.json({ ok: true, invoiceEmailedAt: result.invoiceEmailedAt });
+  } catch (e) {
+    console.error('[invoice] email failed:', e);
+    res.status(500).json({
+      error: e.message || 'Failed to email invoice',
+    });
+  }
+});
+
 app.get('/api/admin/orders/:id', authMiddleware, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -1612,7 +1647,7 @@ app.get('/api/admin/orders/:id', authMiddleware, async (req, res) => {
               shipping_method, shipping_cost,
               billing_name, billing_address1, billing_address2, billing_city, billing_state, billing_postal_code, billing_country,
               card_last4, subtotal, tax_amount, total, created_at,
-              tracking_carrier, tracking_number, tracking_notified_at,
+              tracking_carrier, tracking_number, tracking_notified_at, invoice_emailed_at,
               label_from_name, label_from_address1, label_from_address2,
               label_from_city, label_from_state, label_from_postal_code, label_from_country, label_from_phone
        FROM orders WHERE id = ?`,
@@ -1909,6 +1944,11 @@ async function startServer() {
     console.error('[ensureProductSizeColumn]', e?.message || e);
   }
   try {
+    await ensureProductSizePricesColumn(pool);
+  } catch (e) {
+    console.error('[ensureProductSizePricesColumn]', e?.message || e);
+  }
+  try {
     await ensureProductFeaturedColumn(pool);
   } catch (e) {
     console.error('[ensureProductFeaturedColumn]', e?.message || e);
@@ -1943,6 +1983,11 @@ async function startServer() {
     await ensureOrderTrackingColumns(pool);
   } catch (e) {
     console.error('[ensureOrderTrackingColumns]', e?.message || e);
+  }
+  try {
+    await ensureOrderInvoiceEmailColumn(pool);
+  } catch (e) {
+    console.error('[ensureOrderInvoiceEmailColumn]', e?.message || e);
   }
   try {
     await ensureOrderShippingLabel(pool);

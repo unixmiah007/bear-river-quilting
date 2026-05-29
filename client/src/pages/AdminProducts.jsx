@@ -7,13 +7,20 @@ import RichTextEditor from '../components/RichTextEditor.jsx';
 import AdminCustomizeWizardPanel from '../components/AdminCustomizeWizardPanel.jsx';
 import PageLoading from '../components/PageLoading.jsx';
 import { normalizeRichHtml } from '../lib/richText.js';
-import { PRODUCT_SIZE_OPTIONS } from '../lib/productSizes.js';
+import {
+  CUSTOMER_SIZE_OPTIONS,
+  PRODUCT_SIZE_OPTIONS,
+  emptySizePriceForm,
+  formatProductPriceRange,
+  sizePricesFormToPayload,
+  sizePricesFromProduct,
+} from '../lib/productSizes.js';
 
 const emptyForm = {
   sku: '',
   name: '',
   description: '',
-  price: '0',
+  size_prices: emptySizePriceForm('0'),
   stock_quantity: '0',
   product_size: '',
   image_url: '',
@@ -302,10 +309,11 @@ export default function AdminProducts() {
     e.preventDefault();
     setError(null);
     try {
+      const pricePayload = sizePricesFormToPayload(form.size_prices);
       const { id } = await adminApi.createProduct({
         ...form,
+        ...pricePayload,
         description: normalizeRichHtml(form.description) || null,
-        price: form.price,
         stock_quantity: form.stock_quantity,
         is_published: !!form.is_published,
         is_featured: !!form.is_featured,
@@ -320,11 +328,14 @@ export default function AdminProducts() {
 
   const startEdit = useCallback((p) => {
     setEditingId(p.id);
+    const prices = sizePricesFromProduct(p);
     setForm({
       sku: p.sku ?? '',
       name: p.name,
       description: p.description ?? '',
-      price: String(p.price),
+      size_prices: Object.fromEntries(
+        CUSTOMER_SIZE_OPTIONS.map((o) => [o.value, String(prices[o.value] ?? p.price ?? 0)])
+      ),
       stock_quantity: String(p.stock_quantity ?? 0),
       product_size: p.product_size ?? '',
       image_url: p.image_url ?? '',
@@ -393,10 +404,11 @@ export default function AdminProducts() {
     e.preventDefault();
     setError(null);
     try {
+      const pricePayload = sizePricesFormToPayload(form.size_prices);
       await adminApi.updateProduct(editingId, {
         ...form,
+        ...pricePayload,
         description: normalizeRichHtml(form.description) || null,
-        price: form.price,
         stock_quantity: form.stock_quantity,
         is_published: !!form.is_published,
         is_featured: !!form.is_featured,
@@ -607,18 +619,33 @@ export default function AdminProducts() {
             minHeight={160}
           />
         </div>
-        <div className="field">
-          <label htmlFor="price">Price (USD)</label>
-          <input
-            id="price"
-            type="number"
-            step="0.01"
-            min="0"
-            value={form.price}
-            onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-            required
-          />
-        </div>
+        <fieldset className="admin-size-prices">
+          <legend>Prices by size (USD)</legend>
+          <p className="muted admin-size-prices__hint">
+            Stored in the database per product. Small is also saved as the base catalog price.
+          </p>
+          <div className="admin-size-prices__grid">
+            {CUSTOMER_SIZE_OPTIONS.map((o) => (
+              <div className="field" key={o.value}>
+                <label htmlFor={`size-price-${o.value}`}>{o.label}</label>
+                <input
+                  id={`size-price-${o.value}`}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.size_prices[o.value] ?? ''}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      size_prices: { ...f.size_prices, [o.value]: e.target.value },
+                    }))
+                  }
+                  required
+                />
+              </div>
+            ))}
+          </div>
+        </fieldset>
         <div className="field">
           <label htmlFor="stock_quantity">Stock (available)</label>
           <input
@@ -1047,7 +1074,7 @@ export default function AdminProducts() {
                         p.product_size
                       : '—'}
                   </td>
-                  <td>{formatPrice(p.price)}</td>
+                  <td>{formatProductPriceRange(p, formatPrice)}</td>
                   <td>{Number(p.stock_quantity ?? 0)}</td>
                   <td>
                     <div className="admin-product-badges">

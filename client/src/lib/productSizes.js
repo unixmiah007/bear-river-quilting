@@ -31,6 +31,63 @@ export function priceForProductSize(basePrice, size) {
   return Number((base + steps * SIZE_PRICE_INCREMENT).toFixed(2));
 }
 
+/** Uses DB size_prices when set; otherwise falls back to base price + $30 steps. */
+export function resolveProductPrice(product, size) {
+  const prices = product?.size_prices;
+  const key =
+    size == null || String(size).trim() === '' ? 'small' : String(size).trim().toLowerCase();
+  if (prices && prices[key] != null && Number.isFinite(Number(prices[key]))) {
+    return Number(Number(prices[key]).toFixed(2));
+  }
+  return priceForProductSize(product?.price ?? 0, key);
+}
+
+export function buildDefaultSizePricesFromBase(basePrice) {
+  const base = Number(basePrice);
+  if (!Number.isFinite(base) || base < 0) return null;
+  const out = {};
+  for (const size of SIZE_PRICE_STEP_ORDER) {
+    out[size] = priceForProductSize(base, size);
+  }
+  return out;
+}
+
+export function sizePricesFromProduct(product) {
+  if (product?.size_prices && typeof product.size_prices === 'object') {
+    return product.size_prices;
+  }
+  return buildDefaultSizePricesFromBase(product?.price ?? 0);
+}
+
+export function formatProductPriceRange(product, formatPrice) {
+  const prices = sizePricesFromProduct(product);
+  const vals = SIZE_PRICE_STEP_ORDER.map((s) => prices?.[s]).filter((n) => Number.isFinite(Number(n)));
+  if (!vals.length) return formatPrice(product?.price ?? 0);
+  const nums = vals.map(Number);
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  if (min === max) return formatPrice(min);
+  return `${formatPrice(min)} – ${formatPrice(max)}`;
+}
+
+export function emptySizePriceForm(basePrice = '0') {
+  const prices = buildDefaultSizePricesFromBase(Number(basePrice) || 0) ?? {};
+  return Object.fromEntries(
+    SIZE_PRICE_STEP_ORDER.map((size) => [size, String(prices[size] ?? basePrice ?? '0')])
+  );
+}
+
+export function sizePricesFormToPayload(sizePricesForm) {
+  const size_prices = {};
+  for (const size of SIZE_PRICE_STEP_ORDER) {
+    size_prices[size] = Number(sizePricesForm[size]) || 0;
+  }
+  return {
+    size_prices,
+    price: size_prices.small,
+  };
+}
+
 const LABELS = {
   small: 'Small',
   large: 'Large',

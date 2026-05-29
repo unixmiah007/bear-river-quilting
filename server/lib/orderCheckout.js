@@ -1,4 +1,5 @@
-import { normalizeProductSize, priceForProductSize } from './productSize.js';
+import { normalizeProductSize } from './productSize.js';
+import { hydrateProductRow, resolveProductPrice } from './productSizePrices.js';
 
 const SIZE_LABELS = {
   small: 'Small',
@@ -53,12 +54,12 @@ export async function buildCheckoutFromBody(conn, body) {
   }
 
   const [products] = await conn.query(
-    `SELECT id, name, price FROM products WHERE is_published = 1 AND id IN (${productIds
+    `SELECT id, name, price, size_prices FROM products WHERE is_published = 1 AND id IN (${productIds
       .map(() => '?')
       .join(',')})`,
     productIds
   );
-  const productMap = new Map(products.map((p) => [p.id, p]));
+  const productMap = new Map(products.map((p) => [p.id, hydrateProductRow(p)]));
 
   const normalizedItems = [];
   for (const raw of items) {
@@ -75,7 +76,7 @@ export async function buildCheckoutFromBody(conn, body) {
         error: 'Invalid product size in cart. Please update your cart and try again.',
       };
     }
-    const unitPrice = priceForProductSize(product.price, productSize);
+    const unitPrice = resolveProductPrice(product, productSize);
     normalizedItems.push({
       productId,
       productName: productNameWithSize(product.name, productSize),

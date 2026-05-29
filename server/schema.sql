@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS products (
   name VARCHAR(255) NOT NULL,
   description TEXT NULL,
   price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+  size_prices JSON NULL,
   stock_quantity INT UNSIGNED NOT NULL DEFAULT 0,
   product_size VARCHAR(32) NULL,
   image_url VARCHAR(512) NULL,

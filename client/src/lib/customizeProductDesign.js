@@ -1,4 +1,4 @@
-import { priceForProductSize } from './productSizes.js';
+import { resolveProductPrice } from './productSizes.js';
 import { stripRichHtml } from './richText.js';
 import { estimateCustomQuiltPrice, getDesignById } from './quiltDesignPalette.js';
 
@@ -41,7 +41,7 @@ export function estimateCustomizePrice(designId, productSize, products) {
   if (productId != null) {
     const product = products.find((p) => Number(p.id) === productId);
     if (!product) return null;
-    return priceForProductSize(product.price, productSize);
+    return resolveProductPrice(product, productSize);
   }
   return estimateCustomQuiltPrice(designId, productSize);
 }

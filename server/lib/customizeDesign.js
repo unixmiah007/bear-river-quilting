@@ -1,5 +1,6 @@
 import pool from '../db.js';
 import { priceForProductSize } from './productSize.js';
+import { hydrateProductRow, resolveProductPrice } from './productSizePrices.js';
 
 export const PRODUCT_DESIGN_PREFIX = 'product-';
 
@@ -49,17 +50,19 @@ export async function resolveCustomizeDesign(designId, designNameFromClient) {
   const productId = parseProductDesignId(id);
   if (productId) {
     const [[row]] = await pool.query(
-      `SELECT id, name, price FROM products WHERE id = ? AND is_published = 1`,
+      `SELECT id, name, price, size_prices FROM products WHERE id = ? AND is_published = 1`,
       [productId]
     );
     if (!row) {
       return { ok: false, error: 'Select a published product to customize' };
     }
+    const product = hydrateProductRow(row);
     return {
       ok: true,
       designId: id,
-      designName: row.name,
-      basePrice: Number(row.price),
+      designName: product.name,
+      basePrice: Number(product.price),
+      product,
     };
   }
 
@@ -79,12 +82,18 @@ export async function resolveCustomizeDesign(designId, designNameFromClient) {
   return { ok: false, error: 'Select a product to customize' };
 }
 
-export function estimateCustomizePrice(designId, productSize, basePrice) {
-  const base = Number(basePrice);
+export function estimateCustomizePrice(designId, productSize, basePriceOrProduct) {
+  const base = Number(
+    typeof basePriceOrProduct === 'object' ? basePriceOrProduct?.price : basePriceOrProduct
+  );
   if (!Number.isFinite(base) || base <= 0) return null;
 
   if (isProductDesignId(designId)) {
-    return priceForProductSize(base, productSize);
+    const product =
+      typeof basePriceOrProduct === 'object' && basePriceOrProduct != null
+        ? basePriceOrProduct
+        : { price: base };
+    return resolveProductPrice(product, productSize);
   }
 
   const mult = LEGACY_SIZE_MULTIPLIERS[productSize] ?? 1;

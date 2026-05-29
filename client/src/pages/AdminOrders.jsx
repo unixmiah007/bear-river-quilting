@@ -103,6 +103,8 @@ export default function AdminOrders() {
   const [messagingFeedback, setMessagingFeedback] = useState(null);
   const [trackingBusy, setTrackingBusy] = useState(false);
   const [invoiceBusy, setInvoiceBusy] = useState(false);
+  const [invoiceEmailBusy, setInvoiceEmailBusy] = useState(false);
+  const [invoiceEmailMsg, setInvoiceEmailMsg] = useState(null);
   const [trackingForm, setTrackingForm] = useState({ carrier: 'usps', trackingNumber: '' });
   const orderDetailRef = useRef(null);
   const [pageSize, setPageSize] = useState(15);
@@ -214,6 +216,7 @@ export default function AdminOrders() {
     setSelected(id);
     setTrackingMsg(null);
     setMessagingFeedback(null);
+    setInvoiceEmailMsg(null);
     try {
       const data = await adminApi.orderById(id);
       setDetails(data);
@@ -278,6 +281,34 @@ export default function AdminOrders() {
       setInvoiceBusy(false);
     }
   }
+
+  async function emailCustomerInvoice() {
+    if (!details?.order?.id) return;
+    setInvoiceEmailBusy(true);
+    setInvoiceEmailMsg(null);
+    setError(null);
+    try {
+      const result = await adminApi.emailOrderInvoice(details.order.id);
+      setDetails((prev) =>
+        prev
+          ? {
+              ...prev,
+              order: {
+                ...prev.order,
+                invoice_emailed_at: result.invoiceEmailedAt ?? new Date().toISOString(),
+              },
+            }
+          : prev
+      );
+      setInvoiceEmailMsg(`Invoice emailed to ${details.order.customer_email}.`);
+    } catch (e) {
+      setError(e.body?.error || e.message);
+    } finally {
+      setInvoiceEmailBusy(false);
+    }
+  }
+
+  const invoiceEmailed = Boolean(details?.order?.invoice_emailed_at);
 
   return (
     <>
@@ -453,19 +484,41 @@ export default function AdminOrders() {
           className="card admin-order-detail-section"
           aria-labelledby="admin-order-detail-heading"
         >
-          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div className="row admin-order-invoice-actions" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <h3 id="admin-order-detail-heading" style={{ margin: 0 }}>
               Order {details.order.order_number}
             </h3>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={downloadInvoice}
-              disabled={invoiceBusy}
-            >
-              {invoiceBusy ? 'Preparing…' : 'Download Invoice'}
-            </button>
+            <div className="row admin-order-invoice-actions__buttons">
+              <button
+                type="button"
+                className="btn"
+                onClick={downloadInvoice}
+                disabled={invoiceBusy || invoiceEmailBusy}
+              >
+                {invoiceBusy ? 'Preparing…' : 'Download Invoice'}
+              </button>
+              <button
+                type="button"
+                className={invoiceEmailed ? 'btn' : 'btn btn-primary'}
+                onClick={emailCustomerInvoice}
+                disabled={invoiceEmailBusy || invoiceBusy}
+              >
+                {invoiceEmailBusy ? 'Sending…' : 'E-mail Customer Invoice'}
+              </button>
+            </div>
           </div>
+          {invoiceEmailMsg ? (
+            <p className="muted" style={{ margin: '0.35rem 0 0' }}>
+              {invoiceEmailMsg}
+              {details.order.invoice_emailed_at
+                ? ` · Sent ${new Date(details.order.invoice_emailed_at).toLocaleString()}`
+                : null}
+            </p>
+          ) : details.order.invoice_emailed_at ? (
+            <p className="muted" style={{ margin: '0.35rem 0 0' }}>
+              Invoice emailed {new Date(details.order.invoice_emailed_at).toLocaleString()}
+            </p>
+          ) : null}
           <p className="muted" style={{ margin: 0 }}>
             {details.order.customer_name} • {details.order.customer_email}
           </p>

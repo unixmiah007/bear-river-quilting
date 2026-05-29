@@ -229,6 +229,11 @@ export const adminApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  emailOrderInvoice: (id) =>
+    api(`/api/admin/orders/${encodeURIComponent(id)}/invoice/email`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
   orderMessages: (orderId) =>
     apiJsonArray(`/api/admin/orders/${encodeURIComponent(orderId)}/messages`),
   orderMessage: (orderId, messageId) =>

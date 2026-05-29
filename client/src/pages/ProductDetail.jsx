@@ -6,7 +6,7 @@ import ProductImage from '../components/ProductImage.jsx';
 import CartIcon from '../components/CartIcon.jsx';
 import FavoriteProductButton from '../components/FavoriteProductButton.jsx';
 import { useCart } from '../context/CartContext.jsx';
-import { CUSTOMER_SIZE_OPTIONS, priceForProductSize } from '../lib/productSizes.js';
+import { CUSTOMER_SIZE_OPTIONS, resolveProductPrice } from '../lib/productSizes.js';
 import PageLoading from '../components/PageLoading.jsx';
 import { useProductVisitHistory } from '../context/ProductVisitHistoryContext.jsx';
 
@@ -102,7 +102,7 @@ export default function ProductDetail() {
   const mainSrc = galleryUrls[activeIdx] ?? galleryUrls[0];
   const sizeReady = CUSTOMER_SIZE_OPTIONS.some((o) => o.value === selectedSize);
   const displayPrice = product
-    ? priceForProductSize(product.price, sizeReady ? selectedSize : 'small')
+    ? resolveProductPrice(product, sizeReady ? selectedSize : 'small')
     : 0;
 
   return (
@@ -178,7 +178,7 @@ export default function ProductDetail() {
               <option value="">Select a size</option>
               {CUSTOMER_SIZE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
-                  {o.label} — {formatPrice(priceForProductSize(product.price, o.value))}
+                  {o.label} — {formatPrice(resolveProductPrice(product, o.value))}
                 </option>
               ))}
             </select>
@@ -211,7 +211,7 @@ export default function ProductDetail() {
                   {
                     ...product,
                     product_size: selectedSize,
-                    price: priceForProductSize(product.price, selectedSize),
+                    price: resolveProductPrice(product, selectedSize),
                   },
                   1
                 );

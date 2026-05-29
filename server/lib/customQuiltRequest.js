@@ -46,7 +46,7 @@ export async function validateCustomQuiltBody(body) {
   const estimatedPrice = estimateCustomizePrice(
     resolved.designId,
     productSize,
-    resolved.basePrice
+    resolved.product ?? resolved.basePrice
   );
   if (estimatedPrice == null || estimatedPrice <= 0) {
     return { ok: false, status: 400, error: 'Could not calculate price for this design and size' };
