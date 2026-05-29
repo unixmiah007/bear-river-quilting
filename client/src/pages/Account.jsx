@@ -9,6 +9,7 @@ import { useCart } from '../context/CartContext.jsx';
 import { useFavorites } from '../context/FavoritesContext.jsx';
 import { buildTrackingUrl, labelForCarrier } from '../lib/shippingCarriers.js';
 import PageLoading from '../components/PageLoading.jsx';
+import AccountVisitHistory from '../components/AccountVisitHistory.jsx';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -262,6 +263,8 @@ export default function Account() {
           </div>
         )}
       </section>
+
+      <AccountVisitHistory />
 
       <section className="card" style={{ marginBottom: '1.5rem' }}>
         <h2 style={{ marginTop: 0 }}>Look up orders</h2>

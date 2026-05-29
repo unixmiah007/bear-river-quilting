@@ -8,6 +8,7 @@ import FavoriteProductButton from '../components/FavoriteProductButton.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { CUSTOMER_SIZE_OPTIONS, priceForProductSize } from '../lib/productSizes.js';
 import PageLoading from '../components/PageLoading.jsx';
+import { useProductVisitHistory } from '../context/ProductVisitHistoryContext.jsx';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -22,6 +23,7 @@ export default function ProductDetail() {
   const { isAdmin: adminSession } = useAdminSession();
   const { addItem } = useCart();
   const navigate = useNavigate();
+  const { recordVisit } = useProductVisitHistory();
 
   useEffect(() => {
     let cancelled = false;
@@ -41,6 +43,10 @@ export default function ProductDetail() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (product?.id) recordVisit(product.id);
+  }, [product?.id, recordVisit]);
 
   const galleryUrls = useMemo(() => {
     if (!product) return [];

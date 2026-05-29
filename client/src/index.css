@@ -2515,6 +2515,25 @@ h2 {
   align-self: flex-start;
 }
 
+.account-visit-history-grid {
+  margin-top: 0.75rem;
+}
+
+.account-visit-history-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.account-visit-history-item__when {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+}
+
+.account-visit-history__pagination {
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
 .admin-gallery-strip {
   display: flex;
   flex-wrap: wrap;
