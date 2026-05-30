@@ -2815,6 +2815,61 @@ h2 {
   font-size: 1rem;
 }
 
+.admin-upload-progress {
+  margin: 0 0 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fafafa;
+}
+
+.admin-upload-progress__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.admin-upload-progress__phase {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.admin-upload-progress__counts {
+  font-size: 0.78rem;
+}
+
+.admin-upload-progress__file {
+  margin: 0 0 0.55rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-upload-progress__bar {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.admin-upload-progress__bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--text);
+  transition: width 0.15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-upload-progress__bar-fill {
+    transition: none;
+  }
+}
+
 .admin-media-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));

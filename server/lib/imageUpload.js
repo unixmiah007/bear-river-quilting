@@ -24,6 +24,9 @@ const HEIC_FTYP_BRANDS = new Set([
 ]);
 const RASTER_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
 
+/** Max files per media library upload batch. */
+export const MEDIA_LIBRARY_UPLOAD_MAX = 100;
+
 /** Max bytes for a single gallery upload (HEIC originals can be large). */
 export const IMAGE_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
 

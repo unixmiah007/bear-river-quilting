@@ -9,3 +9,4 @@ server/uploads/products/
 .env.local
 server/.env
 client/.env
+server/uploads/

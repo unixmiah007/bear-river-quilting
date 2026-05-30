@@ -28,6 +28,7 @@ import {
 } from './lib/mediaLibrary.js';
 import {
   IMAGE_UPLOAD_MAX_BYTES,
+  MEDIA_LIBRARY_UPLOAD_MAX,
   imageUploadFilename,
   imageUploadFileFilter,
   normalizeUploadedImageFiles,
@@ -1176,7 +1177,7 @@ app.post(
   '/api/admin/media',
   authMiddleware,
   (req, res, next) => {
-    mediaLibraryUpload.array('images', 32)(req, res, (err) => {
+    mediaLibraryUpload.array('images', MEDIA_LIBRARY_UPLOAD_MAX)(req, res, (err) => {
       if (err) return res.status(400).json({ error: err.message || 'Upload failed' });
       next();
     });

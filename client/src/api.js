@@ -124,34 +124,9 @@ export const adminApi = {
       body: JSON.stringify({ mediaIds }),
     }),
   mediaLibrary: () => apiJsonArray('/api/admin/media'),
-  uploadMediaLibrary: async (files) => {
-    const { prepareUploadImageFiles } = await import('./lib/prepareUploadImages.js');
-    const prepared = await prepareUploadImageFiles(files);
-    const fd = new FormData();
-    for (const f of prepared) {
-      fd.append('images', f);
-    }
-    const res = await fetch('/api/admin/media', {
-      method: 'POST',
-      credentials: 'include',
-      body: fd,
-    });
-    const text = await res.text();
-    let data = null;
-    if (text) {
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = { raw: text };
-      }
-    }
-    if (!res.ok) {
-      const err = new Error(data?.error || res.statusText || 'Upload failed');
-      err.status = res.status;
-      err.body = data;
-      throw err;
-    }
-    return data;
+  uploadMediaLibrary: async (files, onProgress) => {
+    const { uploadMediaLibraryWithProgress } = await import('./lib/mediaLibraryUpload.js');
+    return uploadMediaLibraryWithProgress(files, onProgress);
   },
   scanMediaLibrary: () =>
     api('/api/admin/media/scan', { method: 'POST', body: JSON.stringify({}) }),

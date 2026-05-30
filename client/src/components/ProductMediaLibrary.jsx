@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminApi } from '../api.js';
 import { IMAGE_UPLOAD_ACCEPT } from '../lib/prepareUploadImages.js';
+import { MEDIA_LIBRARY_UPLOAD_MAX } from '../lib/mediaLibraryUpload.js';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
+
+function uploadPhaseLabel(phase) {
+  if (phase === 'prepare') return 'Preparing';
+  if (phase === 'upload') return 'Uploading';
+  return 'Processing';
+}
 
 export default function ProductMediaLibrary({ productId, disabled, onImagesAdded, onError }) {
   const [items, setItems] = useState([]);
@@ -10,6 +17,7 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
   const [scanInfo, setScanInfo] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(null);
   const [pageSize, setPageSize] = useState(15);
   const [page, setPage] = useState(1);
 
@@ -71,12 +79,21 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
     const files = Array.from(e.target.files || []);
     e.target.value = '';
     if (!files.length) return;
+    if (files.length > MEDIA_LIBRARY_UPLOAD_MAX) {
+      onError?.(
+        `You can upload up to ${MEDIA_LIBRARY_UPLOAD_MAX} files at a time. You selected ${files.length}.`
+      );
+      return;
+    }
     setBusy(true);
     setScanInfo(null);
+    setUploadProgress(null);
     onError?.(null);
     try {
-      const data = await adminApi.uploadMediaLibrary(files);
+      const data = await adminApi.uploadMediaLibrary(files, setUploadProgress);
       const uploaded = Array.isArray(data?.items) ? data.items : [];
+      const failed = Array.isArray(data?.errors) ? data.errors : [];
+
       if (uploaded.length) {
         setItems((prev) => {
           const newIds = new Set(uploaded.map((item) => item.id));
@@ -84,20 +101,38 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
           return [...uploaded, ...rest];
         });
         setPage(1);
-        const heicNote = uploaded.some((item) => /\.png$/i.test(item.filename))
-          ? ' HEIC photos are saved as PNG.'
-          : '';
-        setScanInfo(
-          `Added ${uploaded.length} image${uploaded.length === 1 ? '' : 's'} to the library.${heicNote}`
-        );
-      } else {
+      } else if (!failed.length) {
         await load();
+      }
+
+      const parts = [];
+      if (uploaded.length) {
+        parts.push(
+          `Added ${uploaded.length} image${uploaded.length === 1 ? '' : 's'} to the library.`
+        );
+      }
+      if (failed.length) {
+        const names = failed.slice(0, 3).map((f) => f.fileName).join(', ');
+        const more = failed.length > 3 ? ` (+${failed.length - 3} more)` : '';
+        parts.push(`${failed.length} failed${names ? `: ${names}${more}` : ''}.`);
+      }
+      if (parts.length) {
+        setScanInfo(parts.join(' '));
+      }
+
+      if (failed.length && !uploaded.length) {
+        onError?.(failed[0]?.error || `${failed.length} file(s) could not be uploaded.`);
+      } else if (failed.length) {
+        onError?.(
+          `${failed.length} file${failed.length === 1 ? '' : 's'} failed. ${failed[0]?.fileName}: ${failed[0]?.error}`
+        );
       }
     } catch (err) {
       onError?.(
-        [err.body?.error, err.body?.hint, err.body?.detail].filter(Boolean).join(' — ') || err.message
+        [err.body?.error, err.body?.hint, err.body?.detail, err.message].filter(Boolean).join(' — ')
       );
     } finally {
+      setUploadProgress(null);
       setBusy(false);
     }
   }
@@ -165,13 +200,17 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
     <div className="admin-media-library">
       <h4 className="admin-media-library__title">Media gallery</h4>
       <p className="muted" style={{ marginTop: 0 }}>
-        Upload images to the site library (including iPhone HEIC — converted to high-quality PNG) or
-        scan the server <code>/uploads</code> folder for existing files. Select images below to attach
-        copies to this product.
+        Upload up to {MEDIA_LIBRARY_UPLOAD_MAX} images at a time to the site library (including iPhone
+        HEIC — converted to high-quality PNG) or scan the server <code>/uploads</code> folder for
+        existing files. Select images below to attach copies to this product.
       </p>
       <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
         <label className="btn" style={{ cursor: isDisabled ? 'wait' : 'pointer' }}>
-          {busy ? 'Working…' : 'Upload to library'}
+          {uploadProgress
+            ? `${uploadPhaseLabel(uploadProgress.phase)} ${uploadProgress.current}/${uploadProgress.total}…`
+            : busy
+              ? 'Working…'
+              : 'Upload to library'}
           <input
             type="file"
             accept={IMAGE_UPLOAD_ACCEPT}
@@ -195,6 +234,38 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
           </button>
         ) : null}
       </div>
+      {uploadProgress ? (
+        <div className="admin-upload-progress" role="status" aria-live="polite">
+          <div className="admin-upload-progress__header">
+            <span className="admin-upload-progress__phase">
+              {uploadPhaseLabel(uploadProgress.phase)}{' '}
+              <strong>{uploadProgress.current}</strong> of <strong>{uploadProgress.total}</strong>
+            </span>
+            <span className="admin-upload-progress__counts muted">
+              {uploadProgress.uploaded} added
+              {uploadProgress.failed > 0 ? ` · ${uploadProgress.failed} failed` : ''}
+            </span>
+          </div>
+          <p className="admin-upload-progress__file" title={uploadProgress.fileName}>
+            {uploadProgress.fileName}
+          </p>
+          <div
+            className="admin-upload-progress__bar"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={uploadProgress.total}
+            aria-valuenow={uploadProgress.current}
+            aria-label={`Upload progress: ${uploadProgress.current} of ${uploadProgress.total}`}
+          >
+            <div
+              className="admin-upload-progress__bar-fill"
+              style={{
+                width: `${Math.round((uploadProgress.current / uploadProgress.total) * 100)}%`,
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
       {scanInfo ? (
         <p className="muted" style={{ marginTop: 0 }}>
           {scanInfo}
