@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 import BrandLogo from './BrandLogo.jsx';
+import AcceptedPaymentMethods from './AcceptedPaymentMethods.jsx';
+import SslTrustBadge from './SslTrustBadge.jsx';
 import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from '../lib/siteContact.js';
 
 const WEEKDAY_HOURS = [
@@ -39,6 +41,12 @@ export default function SiteStickyBar() {
               </li>
             ))}
           </ul>
+        </div>
+        <div className="site-sticky-bar__trust">
+          <div className="site-sticky-bar__secure">
+            <SslTrustBadge />
+          </div>
+          <AcceptedPaymentMethods />
         </div>
       </div>
     </aside>
