@@ -337,32 +337,39 @@ export default function Customize() {
                 <Link to="/products">Browse the shop</Link>
               </p>
             ) : (
-              <div className="design-palette" role="listbox" aria-label="Products to customize">
+              <div className="design-palette" role="group" aria-label="Products to customize">
                 {products.map((product) => {
                   const design = productToCustomizeDesign(product);
                   const selected = form.designId === design.id;
+                  const detailPath = `/products/${product.id}`;
                   return (
-                    <button
+                    <article
                       key={product.id}
-                      type="button"
-                      role="option"
-                      aria-selected={selected}
                       className={`design-palette__card${selected ? ' design-palette__card--selected' : ''}`}
-                      onClick={() => setForm((f) => ({ ...f, designId: design.id }))}
                     >
-                      <span className="design-palette__media">
-                        <ProductImage src={design.image} alt={design.name} />
-                      </span>
-                      <span className="design-palette__name">{design.name}</span>
-                      {design.description ? (
-                        <span className="design-palette__desc muted">
-                          {truncateCustomizeDescription(design.description)}
+                      <Link className="design-palette__link" to={detailPath}>
+                        <span className="design-palette__media">
+                          <ProductImage src={design.image} alt={design.name} />
                         </span>
-                      ) : null}
-                      <span className="design-palette__price">
-                        From {formatPrice(design.basePrice)} <span className="muted">(Small)</span>
-                      </span>
-                    </button>
+                        <span className="design-palette__name">{design.name}</span>
+                        {design.description ? (
+                          <span className="design-palette__desc muted">
+                            {truncateCustomizeDescription(design.description)}
+                          </span>
+                        ) : null}
+                        <span className="design-palette__price">
+                          From {formatPrice(design.basePrice)} <span className="muted">(Small)</span>
+                        </span>
+                      </Link>
+                      <button
+                        type="button"
+                        className={`btn design-palette__select${selected ? ' design-palette__select--selected' : ''}`}
+                        aria-pressed={selected}
+                        onClick={() => setForm((f) => ({ ...f, designId: design.id }))}
+                      >
+                        {selected ? 'Selected' : 'Select'}
+                      </button>
+                    </article>
                   );
                 })}
               </div>
