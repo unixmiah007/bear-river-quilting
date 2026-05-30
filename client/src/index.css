@@ -2942,6 +2942,17 @@ h2 {
   flex: 1;
 }
 
+.admin-media-item__name-link {
+  display: block;
+  text-decoration: none;
+  color: var(--muted);
+}
+
+.admin-media-item__name-link:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
 .admin-media-item__rename-btn {
   align-self: flex-start;
   padding: 0.15rem 0.45rem;

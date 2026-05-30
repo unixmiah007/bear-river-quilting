@@ -442,9 +442,15 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
                   </div>
                 ) : (
                   <div className="admin-media-item__filename-row">
-                    <span className="admin-media-item__name" title={item.filename}>
+                    <a
+                      className="admin-media-item__name admin-media-item__name-link"
+                      href={item.path}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open ${item.filename} at full size`}
+                    >
                       {item.filename}
-                    </span>
+                    </a>
                     <button
                       type="button"
                       className="btn admin-media-item__rename-btn"
