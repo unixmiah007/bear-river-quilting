@@ -132,6 +132,11 @@ export const adminApi = {
     api('/api/admin/media/scan', { method: 'POST', body: JSON.stringify({}) }),
   deleteMediaLibraryItem: (id) =>
     api(`/api/admin/media/${encodeURIComponent(id)}`, { method: 'DELETE', body: JSON.stringify({}) }),
+  renameMediaLibraryItem: (id, filename) =>
+    api(`/api/admin/media/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ filename }),
+    }),
   seedExampleProducts: () =>
     api('/api/admin/products/seed-examples', { method: 'POST', body: JSON.stringify({}) }),
   importProductsCsv: (csv) =>

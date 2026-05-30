@@ -2926,6 +2926,13 @@ h2 {
   min-width: 0;
 }
 
+.admin-media-item__filename-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
 .admin-media-item__name {
   font-size: 0.72rem;
   color: var(--muted);
@@ -2933,6 +2940,47 @@ h2 {
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
+}
+
+.admin-media-item__rename-btn {
+  align-self: flex-start;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.68rem;
+  line-height: 1.2;
+}
+
+.admin-media-item__rename {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.admin-media-item__rename-input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.3rem 0.45rem;
+  font-size: 0.72rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+.admin-media-item__rename-input:focus {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+
+.admin-media-item__rename-actions {
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.admin-media-item__rename-save,
+.admin-media-item__rename-cancel {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.68rem;
+  line-height: 1.2;
 }
 
 .admin-media-item__badge {

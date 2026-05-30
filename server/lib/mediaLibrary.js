@@ -94,6 +94,107 @@ export async function deleteMediaAsset(pool, uploadRoot, id) {
   return { ok: true };
 }
 
+export function sanitizeMediaFilename(input, currentFilename) {
+  let name = String(input ?? '').trim();
+  if (!name) return { ok: false, error: 'Filename is required' };
+
+  name = path.basename(name.replace(/\\/g, '/'));
+  if (!name || name === '.' || name === '..' || name.includes('/') || name.includes('\\')) {
+    return { ok: false, error: 'Invalid filename' };
+  }
+
+  const currentExt = path.extname(currentFilename).toLowerCase();
+  let ext = path.extname(name).toLowerCase();
+  if (!ext && currentExt) {
+    name = `${name}${currentExt}`;
+    ext = currentExt;
+  }
+
+  if (!isImageFilename(name)) {
+    return {
+      ok: false,
+      error: 'Use a valid image extension: .jpg, .jpeg, .png, .webp, or .gif',
+    };
+  }
+
+  if (name.length > 200) {
+    return { ok: false, error: 'Filename is too long (max 200 characters)' };
+  }
+
+  if (!/^[a-zA-Z0-9._ -]+$/.test(name)) {
+    return {
+      ok: false,
+      error: 'Filename may only contain letters, numbers, spaces, dots, dashes, and underscores',
+    };
+  }
+
+  return { ok: true, filename: name };
+}
+
+export async function renameMediaAsset(pool, uploadRoot, id, newFilenameInput) {
+  const [[row]] = await pool.query(
+    'SELECT id, path, filename, source, created_at FROM media_assets WHERE id = ?',
+    [id]
+  );
+  if (!row) return { ok: false, status: 404, error: 'Media not found' };
+
+  const parsed = sanitizeMediaFilename(newFilenameInput, row.filename);
+  if (!parsed.ok) return { ok: false, status: 400, error: parsed.error };
+
+  const newFilename = parsed.filename;
+  if (newFilename === row.filename) {
+    return { ok: true, item: row };
+  }
+
+  const oldAbs = absPathFromWeb(uploadRoot, row.path);
+  if (!oldAbs || !fs.existsSync(oldAbs)) {
+    return { ok: false, status: 404, error: 'File not found on disk' };
+  }
+
+  const resolvedRoot = path.resolve(uploadRoot);
+  const resolvedOld = path.resolve(oldAbs);
+  if (resolvedOld !== resolvedRoot && !resolvedOld.startsWith(`${resolvedRoot}${path.sep}`)) {
+    return { ok: false, status: 400, error: 'Invalid file path' };
+  }
+
+  const newAbs = path.join(path.dirname(oldAbs), newFilename);
+  if (path.resolve(newAbs) === resolvedOld) {
+    return { ok: true, item: row };
+  }
+
+  if (fs.existsSync(newAbs)) {
+    return { ok: false, status: 409, error: 'A file with that name already exists in this folder' };
+  }
+
+  fs.renameSync(oldAbs, newAbs);
+  const newPath = webPathFromAbs(uploadRoot, newAbs);
+
+  try {
+    await pool.query('UPDATE media_assets SET path = ?, filename = ? WHERE id = ?', [
+      newPath,
+      newFilename,
+      id,
+    ]);
+    await pool.query('UPDATE product_images SET path = ? WHERE path = ?', [newPath, row.path]);
+    await pool.query('UPDATE products SET image_url = ? WHERE image_url = ?', [newPath, row.path]);
+  } catch (e) {
+    try {
+      if (fs.existsSync(newAbs) && !fs.existsSync(oldAbs)) {
+        fs.renameSync(newAbs, oldAbs);
+      }
+    } catch {
+      /* ignore rollback failure */
+    }
+    throw e;
+  }
+
+  const [[updated]] = await pool.query(
+    'SELECT id, path, filename, source, created_at FROM media_assets WHERE id = ?',
+    [id]
+  );
+  return { ok: true, item: updated };
+}
+
 export async function copyMediaPathsToProduct(pool, uploadRoot, productId, paths) {
   const [[p]] = await pool.query('SELECT id FROM products WHERE id = ?', [productId]);
   if (!p) return { ok: false, status: 404, error: 'Product not found' };

@@ -25,6 +25,7 @@ import {
   scanUploadsIntoMedia,
   deleteMediaAsset,
   copyMediaIdsToProduct,
+  renameMediaAsset,
 } from './lib/mediaLibrary.js';
 import {
   IMAGE_UPLOAD_MAX_BYTES,
@@ -1261,6 +1262,26 @@ app.delete('/api/admin/media/:id', authMiddleware, async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to delete media' });
+  }
+});
+
+app.patch('/api/admin/media/:id', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid media id' });
+    const filename = req.body?.filename;
+    if (filename == null || String(filename).trim() === '') {
+      return res.status(400).json({ error: 'filename is required' });
+    }
+    const result = await renameMediaAsset(pool, UPLOAD_ROOT, id, filename);
+    if (!result.ok) return res.status(result.status).json({ error: result.error });
+    res.json({ ok: true, item: result.item });
+  } catch (e) {
+    console.error(e);
+    if (e.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'A file with that name already exists' });
+    }
+    res.status(500).json({ error: 'Failed to rename media file', detail: e.message });
   }
 });
 

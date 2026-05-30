@@ -18,6 +18,9 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
   const [selected, setSelected] = useState(() => new Set());
   const [scanInfo, setScanInfo] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(null);
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameSavingId, setRenameSavingId] = useState(null);
   const [pageSize, setPageSize] = useState(15);
   const [page, setPage] = useState(1);
 
@@ -166,11 +169,64 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
         next.delete(id);
         return next;
       });
+      if (renamingId === id) {
+        setRenamingId(null);
+        setRenameValue('');
+      }
       await load();
     } catch (err) {
       onError?.(err.body?.error || err.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  function startRename(item) {
+    if (isDisabled) return;
+    setRenamingId(item.id);
+    setRenameValue(item.filename);
+    onError?.(null);
+  }
+
+  function cancelRename() {
+    setRenamingId(null);
+    setRenameValue('');
+  }
+
+  async function saveRename(item) {
+    const nextName = renameValue.trim();
+    if (!nextName || nextName === item.filename) {
+      cancelRename();
+      return;
+    }
+    setRenameSavingId(item.id);
+    onError?.(null);
+    try {
+      const data = await adminApi.renameMediaLibraryItem(item.id, nextName);
+      const updated = data?.item;
+      if (updated?.id) {
+        setItems((prev) => prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)));
+        setScanInfo(`Renamed to ${updated.filename} on disk.`);
+      } else {
+        await load();
+      }
+      cancelRename();
+    } catch (err) {
+      onError?.(
+        [err.body?.error, err.body?.detail].filter(Boolean).join(' — ') || err.message
+      );
+    } finally {
+      setRenameSavingId(null);
+    }
+  }
+
+  function onRenameKeyDown(e, item) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveRename(item);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelRename();
     }
   }
 
@@ -194,7 +250,7 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
     }
   }
 
-  const isDisabled = disabled || busy;
+  const isDisabled = disabled || busy || renameSavingId != null || renamingId != null;
 
   return (
     <div className="admin-media-library">
@@ -202,7 +258,8 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
       <p className="muted" style={{ marginTop: 0 }}>
         Upload up to {MEDIA_LIBRARY_UPLOAD_MAX} images at a time to the site library (including iPhone
         HEIC — converted to high-quality PNG) or scan the server <code>/uploads</code> folder for
-        existing files. Select images below to attach copies to this product.
+        existing files. Click <strong>Rename</strong> on any image to change its filename on disk. Select
+        images below to attach copies to this product.
       </p>
       <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
         <label className="btn" style={{ cursor: isDisabled ? 'wait' : 'pointer' }}>
@@ -331,6 +388,8 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
           <div className="admin-media-grid" role="list">
           {paginatedItems.map((item) => {
             const isSelected = selected.has(item.id);
+            const isRenaming = renamingId === item.id;
+            const isSavingRename = renameSavingId === item.id;
             return (
               <div key={item.id} className="admin-media-item" role="listitem">
                 <button
@@ -345,13 +404,57 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
                   {isSelected ? <span className="admin-media-item__check" aria-hidden="true">✓</span> : null}
                 </button>
                 <div className="admin-media-item__meta">
-                  <span className="admin-media-item__name" title={item.filename}>
-                    {item.filename}
-                  </span>
                   {item.source === 'scan' ? (
                     <span className="admin-media-item__badge">on disk</span>
                   ) : null}
                 </div>
+                {isRenaming ? (
+                  <div className="admin-media-item__rename">
+                    <input
+                      id={`media-rename-${item.id}`}
+                      className="admin-media-item__rename-input"
+                      type="text"
+                      value={renameValue}
+                      disabled={isSavingRename}
+                      aria-label={`Filename for ${item.filename}`}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => onRenameKeyDown(e, item)}
+                      autoFocus
+                    />
+                    <div className="admin-media-item__rename-actions row">
+                      <button
+                        type="button"
+                        className="btn btn-primary admin-media-item__rename-save"
+                        onClick={() => saveRename(item)}
+                        disabled={isSavingRename || !renameValue.trim()}
+                      >
+                        {isSavingRename ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn admin-media-item__rename-cancel"
+                        onClick={cancelRename}
+                        disabled={isSavingRename}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="admin-media-item__filename-row">
+                    <span className="admin-media-item__name" title={item.filename}>
+                      {item.filename}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn admin-media-item__rename-btn"
+                      onClick={() => startRename(item)}
+                      disabled={isDisabled}
+                    >
+                      Rename
+                    </button>
+                  </div>
+                )}
                 <button
                   type="button"
                   className="btn btn-danger admin-media-item__delete"
