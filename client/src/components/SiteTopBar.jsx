@@ -33,16 +33,19 @@ function PhoneIcon() {
 
 export default function SiteTopBar() {
   return (
-    <div className="site-top-bar" role="region" aria-label="Contact">
+    <div className="site-top-bar" role="region" aria-label="Contact and hours">
       <div className="site-top-bar__inner">
-        <a className="site-top-bar__link" href={`mailto:${SUPPORT_EMAIL}`}>
-          <MailIcon />
-          <span>{SUPPORT_EMAIL}</span>
-        </a>
-        <a className="site-top-bar__link" href={`tel:${SUPPORT_PHONE_TEL}`}>
-          <PhoneIcon />
-          <span>{SUPPORT_PHONE_DISPLAY}</span>
-        </a>
+        <p className="site-top-bar__hours">Hours of operation: M-F 7am-7pm EST</p>
+        <div className="site-top-bar__contact">
+          <a className="site-top-bar__link" href={`mailto:${SUPPORT_EMAIL}`}>
+            <MailIcon />
+            <span>{SUPPORT_EMAIL}</span>
+          </a>
+          <a className="site-top-bar__link" href={`tel:${SUPPORT_PHONE_TEL}`}>
+            <PhoneIcon />
+            <span>{SUPPORT_PHONE_DISPLAY}</span>
+          </a>
+        </div>
       </div>
     </div>
   );

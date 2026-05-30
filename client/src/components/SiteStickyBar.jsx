@@ -30,7 +30,7 @@ export default function SiteStickyBar() {
           </p>
         </div>
         <div className="site-sticky-bar__hours">
-          <p className="site-sticky-bar__hours-label">Customer care hours (Mountain Time)</p>
+          <p className="site-sticky-bar__hours-label">Customer care hours (Eastern Standard Time)</p>
           <ul className="site-sticky-bar__days">
             {WEEKDAY_HOURS.map(({ day, hours }) => (
               <li key={day}>
