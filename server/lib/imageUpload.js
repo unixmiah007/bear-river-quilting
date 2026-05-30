@@ -9,39 +9,92 @@ const HEIC_MIME = new Set([
   'image/heic-sequence',
   'image/heif-sequence',
 ]);
+const HEIC_FTYP_BRANDS = new Set([
+  'heic',
+  'heix',
+  'hevc',
+  'hevx',
+  'heim',
+  'heis',
+  'hevm',
+  'hevs',
+  'heif',
+  'mif1',
+  'msf1',
+]);
 const RASTER_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
 
 /** Max bytes for a single gallery upload (HEIC originals can be large). */
 export const IMAGE_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
 
-export function isHeicUpload(file) {
+export function bufferLooksLikeHeic(buffer) {
+  if (!buffer || buffer.length < 12) return false;
+  if (buffer.toString('ascii', 4, 8) !== 'ftyp') return false;
+  const brand = buffer.toString('ascii', 8, 12).toLowerCase();
+  return HEIC_FTYP_BRANDS.has(brand);
+}
+
+export function bufferLooksLikeJpeg(buffer) {
+  return buffer && buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+}
+
+export function bufferLooksLikePng(buffer) {
+  return (
+    buffer &&
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer.toString('ascii', 1, 4) === 'PNG'
+  );
+}
+
+export function readFileHead(filePath, length = 32) {
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const buf = Buffer.alloc(length);
+    const bytes = fs.readSync(fd, buf, 0, length, 0);
+    return buf.subarray(0, bytes);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+export function isHeicUpload(file, fileHead = null) {
   const ext = path.extname(file?.originalname || file?.filename || '').toLowerCase();
   if (HEIC_EXT.has(ext)) return true;
   const mime = String(file?.mimetype || '').toLowerCase();
-  return HEIC_MIME.has(mime);
+  if (HEIC_MIME.has(mime)) return true;
+  if (fileHead && bufferLooksLikeHeic(fileHead)) return true;
+  if (file?.path && fs.existsSync(file.path)) {
+    try {
+      return bufferLooksLikeHeic(readFileHead(file.path));
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
 export function isAllowedImageUpload(file) {
   if (!file) return false;
   const mime = String(file.mimetype || '').toLowerCase();
   if (mime.startsWith('image/')) return true;
-  if (mime === 'application/octet-stream' || !mime) {
-    const ext = path.extname(file.originalname || '').toLowerCase();
-    return RASTER_EXT.has(ext) || HEIC_EXT.has(ext);
-  }
   const ext = path.extname(file.originalname || '').toLowerCase();
-  return RASTER_EXT.has(ext) || HEIC_EXT.has(ext);
+  if (RASTER_EXT.has(ext) || HEIC_EXT.has(ext)) return true;
+  // iPhone/macOS often send HEIC as application/octet-stream or with an empty type.
+  if (mime === 'application/octet-stream' || mime === '') return true;
+  return false;
 }
 
 export function imageUploadFilename(file) {
   const ext = path.extname(file.originalname || '').toLowerCase();
-  if (HEIC_EXT.has(ext) || isHeicUpload(file)) {
+  const mime = String(file?.mimetype || '').toLowerCase();
+  if (HEIC_EXT.has(ext) || HEIC_MIME.has(mime)) {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.heic`;
   }
   if (RASTER_EXT.has(ext)) {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
   }
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`;
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.upload`;
 }
 
 export function imageUploadFileFilter(_req, file, cb) {
@@ -52,26 +105,57 @@ export function imageUploadFileFilter(_req, file, cb) {
   cb(null, true);
 }
 
+async function heicBufferToPng(inputBuffer) {
+  const out = await convert({
+    buffer: inputBuffer,
+    format: 'PNG',
+    quality: 1,
+  });
+  return Buffer.from(out);
+}
+
 /**
  * Converts iPhone HEIC/HEIF on disk to high-quality PNG and updates the multer file record.
  */
 export async function normalizeUploadedImageFile(file) {
   if (!file?.path || !fs.existsSync(file.path)) return file;
-  if (!isHeicUpload(file)) return file;
+
+  const head = readFileHead(file.path);
+  const ext = path.extname(file.path).toLowerCase();
+  const isHeic = isHeicUpload(file, head);
+  const dir = path.dirname(file.path);
+
+  if (!isHeic) {
+    if (ext === '.heic' || ext === '.heif') {
+      throw new Error('File has a HEIC extension but is not a valid HEIC image');
+    }
+    if (!RASTER_EXT.has(ext) && ext !== '.upload') {
+      throw new Error('Unsupported image format. Use JPEG, PNG, WebP, GIF, or iPhone HEIC.');
+    }
+    if (ext === '.upload') {
+      let outExt = '.jpg';
+      if (bufferLooksLikePng(head)) outExt = '.png';
+      else if (!bufferLooksLikeJpeg(head)) {
+        throw new Error('Unsupported image format. Use JPEG, PNG, WebP, GIF, or iPhone HEIC.');
+      }
+      const renamed = `${path.basename(file.path, ext)}${outExt}`;
+      const renamedPath = path.join(dir, renamed);
+      fs.renameSync(file.path, renamedPath);
+      file.path = renamedPath;
+      file.filename = renamed;
+      file.mimetype = outExt === '.png' ? 'image/png' : 'image/jpeg';
+    }
+    return file;
+  }
 
   const inputBuffer = fs.readFileSync(file.path);
-  const pngBuffer = await convert({
-    buffer: inputBuffer,
-    format: 'PNG',
-    quality: 1,
-  });
+  const pngBuffer = await heicBufferToPng(inputBuffer);
 
-  const dir = path.dirname(file.path);
   const base = path.basename(file.path, path.extname(file.path));
   const pngName = `${base}.png`;
   const pngPath = path.join(dir, pngName);
 
-  fs.writeFileSync(pngPath, Buffer.from(pngBuffer));
+  fs.writeFileSync(pngPath, pngBuffer);
   try {
     fs.unlinkSync(file.path);
   } catch {

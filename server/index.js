@@ -1195,14 +1195,20 @@ app.post(
           'INSERT INTO media_assets (path, filename, source) VALUES (?, ?, ?)',
           [publicPath, f.filename, 'upload']
         );
-        created.push({
-          id: result.insertId,
-          path: publicPath,
-          filename: f.filename,
-          source: 'upload',
-        });
+        created.push(result.insertId);
       }
-      res.status(201).json({ ok: true, items: created });
+      let items = [];
+      if (created.length) {
+        const placeholders = created.map(() => '?').join(',');
+        const [rows] = await pool.query(
+          `SELECT id, path, filename, source, created_at
+           FROM media_assets WHERE id IN (${placeholders})
+           ORDER BY created_at DESC, id DESC`,
+          created
+        );
+        items = rows;
+      }
+      res.status(201).json({ ok: true, items });
     } catch (e) {
       console.error(e);
       for (const f of files) {

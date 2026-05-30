@@ -75,11 +75,27 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
     setScanInfo(null);
     onError?.(null);
     try {
-      await adminApi.uploadMediaLibrary(files);
-      await load();
+      const data = await adminApi.uploadMediaLibrary(files);
+      const uploaded = Array.isArray(data?.items) ? data.items : [];
+      if (uploaded.length) {
+        setItems((prev) => {
+          const newIds = new Set(uploaded.map((item) => item.id));
+          const rest = prev.filter((item) => !newIds.has(item.id));
+          return [...uploaded, ...rest];
+        });
+        setPage(1);
+        const heicNote = uploaded.some((item) => /\.png$/i.test(item.filename))
+          ? ' HEIC photos are saved as PNG.'
+          : '';
+        setScanInfo(
+          `Added ${uploaded.length} image${uploaded.length === 1 ? '' : 's'} to the library.${heicNote}`
+        );
+      } else {
+        await load();
+      }
     } catch (err) {
       onError?.(
-        [err.body?.error, err.body?.hint].filter(Boolean).join(' — ') || err.message
+        [err.body?.error, err.body?.hint, err.body?.detail].filter(Boolean).join(' — ') || err.message
       );
     } finally {
       setBusy(false);
