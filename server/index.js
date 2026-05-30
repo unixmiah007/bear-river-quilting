@@ -26,6 +26,12 @@ import {
   deleteMediaAsset,
   copyMediaIdsToProduct,
 } from './lib/mediaLibrary.js';
+import {
+  IMAGE_UPLOAD_MAX_BYTES,
+  imageUploadFilename,
+  imageUploadFileFilter,
+  normalizeUploadedImageFiles,
+} from './lib/imageUpload.js';
 import { seedDemoProducts } from './lib/seedDemoProducts.js';
 import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './lib/mail.js';
 import { verifySendGridIfConfigured } from './lib/sendgridMail.js';
@@ -172,19 +178,11 @@ const productImageUpload = multer({
       cb(null, dir);
     },
     filename(_req, file, cb) {
-      let ext = path.extname(file.originalname || '').toLowerCase();
-      if (!['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext)) ext = '.jpg';
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`);
+      cb(null, imageUploadFilename(file));
     },
   }),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter(_req, file, cb) {
-    if (!file.mimetype.startsWith('image/')) {
-      cb(new Error('Only image files are allowed'));
-      return;
-    }
-    cb(null, true);
-  },
+  limits: { fileSize: IMAGE_UPLOAD_MAX_BYTES },
+  fileFilter: imageUploadFileFilter,
 });
 
 const mediaLibraryUpload = multer({
@@ -195,19 +193,11 @@ const mediaLibraryUpload = multer({
       cb(null, dir);
     },
     filename(_req, file, cb) {
-      let ext = path.extname(file.originalname || '').toLowerCase();
-      if (!['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext)) ext = '.jpg';
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`);
+      cb(null, imageUploadFilename(file));
     },
   }),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter(_req, file, cb) {
-    if (!file.mimetype.startsWith('image/')) {
-      cb(new Error('Only image files are allowed'));
-      return;
-    }
-    cb(null, true);
-  },
+  limits: { fileSize: IMAGE_UPLOAD_MAX_BYTES },
+  fileFilter: imageUploadFileFilter,
 });
 
 async function loadProductImages(productId) {
@@ -1066,11 +1056,12 @@ app.post(
     if (!productId) {
       return res.status(400).json({ error: 'Invalid product id' });
     }
-    const files = req.files;
+    let files = req.files;
     if (!Array.isArray(files) || files.length === 0) {
       return res.status(400).json({ error: 'No image files received (use field name "images")' });
     }
     try {
+      files = await normalizeUploadedImageFiles(files);
       const [[p]] = await pool.query('SELECT id FROM products WHERE id = ?', [productId]);
       if (!p) {
         for (const f of files) {
@@ -1124,6 +1115,10 @@ app.post(
           hint: 'Restart the API to apply automatic schema repair, or run: npm run db:init -w server',
           detail: e.sqlMessage || e.message,
         });
+      }
+      const msg = e?.message || '';
+      if (/heic/i.test(msg)) {
+        return res.status(400).json({ error: msg });
       }
       res.status(500).json({
         error: 'Failed to save uploads',
@@ -1187,11 +1182,12 @@ app.post(
     });
   },
   async (req, res) => {
-    const files = req.files;
+    let files = req.files;
     if (!Array.isArray(files) || files.length === 0) {
       return res.status(400).json({ error: 'No image files received (use field name "images")' });
     }
     try {
+      files = await normalizeUploadedImageFiles(files);
       const created = [];
       for (const f of files) {
         const publicPath = `/uploads/media/${f.filename}`;
@@ -1222,7 +1218,11 @@ app.post(
           hint: 'Restart the API to create it automatically.',
         });
       }
-      res.status(500).json({ error: 'Failed to save media uploads' });
+      const msg = e?.message || '';
+      if (/heic/i.test(msg)) {
+        return res.status(400).json({ error: msg });
+      }
+      res.status(500).json({ error: 'Failed to save media uploads', detail: msg });
     }
   }
 );

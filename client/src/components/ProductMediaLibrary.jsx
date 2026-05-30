@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminApi } from '../api.js';
+import { IMAGE_UPLOAD_ACCEPT } from '../lib/prepareUploadImages.js';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
 
@@ -148,15 +149,16 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
     <div className="admin-media-library">
       <h4 className="admin-media-library__title">Media gallery</h4>
       <p className="muted" style={{ marginTop: 0 }}>
-        Upload images to the site library or scan the server <code>/uploads</code> folder for
-        existing files. Select images below to attach copies to this product.
+        Upload images to the site library (including iPhone HEIC — converted to high-quality PNG) or
+        scan the server <code>/uploads</code> folder for existing files. Select images below to attach
+        copies to this product.
       </p>
       <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
         <label className="btn" style={{ cursor: isDisabled ? 'wait' : 'pointer' }}>
           {busy ? 'Working…' : 'Upload to library'}
           <input
             type="file"
-            accept="image/*"
+            accept={IMAGE_UPLOAD_ACCEPT}
             multiple
             disabled={isDisabled}
             onChange={onUpload}

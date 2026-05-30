@@ -85,8 +85,10 @@ export const adminApi = {
   products: () => apiJsonArray('/api/admin/products'),
   product: (id) => api(`/api/admin/products/by-id/${encodeURIComponent(id)}`),
   uploadProductImages: async (id, files) => {
+    const { prepareUploadImageFiles } = await import('./lib/prepareUploadImages.js');
+    const prepared = await prepareUploadImageFiles(files);
     const fd = new FormData();
-    for (const f of files) {
+    for (const f of prepared) {
       fd.append('images', f);
     }
     const res = await fetch(`/api/admin/products/${encodeURIComponent(id)}/images`, {
@@ -123,8 +125,10 @@ export const adminApi = {
     }),
   mediaLibrary: () => apiJsonArray('/api/admin/media'),
   uploadMediaLibrary: async (files) => {
+    const { prepareUploadImageFiles } = await import('./lib/prepareUploadImages.js');
+    const prepared = await prepareUploadImageFiles(files);
     const fd = new FormData();
-    for (const f of files) {
+    for (const f of prepared) {
       fd.append('images', f);
     }
     const res = await fetch('/api/admin/media', {

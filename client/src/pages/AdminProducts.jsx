@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { adminApi } from '../api.js';
+import { IMAGE_UPLOAD_ACCEPT } from '../lib/prepareUploadImages.js';
 import ProductImage from '../components/ProductImage.jsx';
 import ProductMediaLibrary from '../components/ProductMediaLibrary.jsx';
 import RichTextEditor from '../components/RichTextEditor.jsx';
@@ -773,7 +774,7 @@ export default function AdminProducts() {
                 {uploadBusy ? 'Uploading…' : 'Browse images'}
                 <input
                   type="file"
-                  accept="image/*"
+                  accept={IMAGE_UPLOAD_ACCEPT}
                   multiple
                   disabled={uploadBusy}
                   onChange={onGalleryFiles}
@@ -782,7 +783,10 @@ export default function AdminProducts() {
               </label>
             </div>
             {galleryImages.length === 0 ? (
-              <p className="muted">No images yet. Choose one or more files (JPEG, PNG, WebP, GIF).</p>
+              <p className="muted">
+                No images yet. Choose one or more files (JPEG, PNG, WebP, GIF, or iPhone HEIC — saved as
+                PNG).
+              </p>
             ) : (
               <div className="admin-gallery-strip">
                 {galleryImages.map((img) => (
