@@ -146,6 +146,11 @@ export const adminApi = {
     api('/api/admin/products', { method: 'POST', body: JSON.stringify(body) }),
   updateProduct: (id, body) =>
     api(`/api/admin/products/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  setProductVisibility: (id, isPublished) =>
+    api(`/api/admin/products/${encodeURIComponent(id)}/visibility`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_published: !!isPublished }),
+    }),
   deleteProduct: (id) => api(`/api/admin/products/${id}`, { method: 'DELETE' }),
   productCategoriesForProduct: (productId) =>
     apiJsonArray(`/api/admin/products/${encodeURIComponent(productId)}/categories`),

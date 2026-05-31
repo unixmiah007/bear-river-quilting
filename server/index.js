@@ -1484,6 +1484,31 @@ app.put('/api/admin/products/:id', authMiddleware, async (req, res) => {
   }
 });
 
+app.patch('/api/admin/products/:id/visibility', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid product id' });
+    if (typeof req.body?.is_published !== 'boolean') {
+      return res.status(400).json({ error: 'is_published must be a boolean' });
+    }
+    const isPublished = req.body.is_published ? 1 : 0;
+    const [result] = await pool.query('UPDATE products SET is_published = ? WHERE id = ?', [
+      isPublished,
+      id,
+    ]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    res.json({ ok: true, is_published: !!isPublished });
+  } catch (e) {
+    console.error(e);
+    if (isMissingProductColumnError(e)) {
+      return sendProductSchemaMismatch(res);
+    }
+    res.status(500).json({ error: 'Failed to update product visibility' });
+  }
+});
+
 app.delete('/api/admin/products/:id', authMiddleware, async (req, res) => {
   try {
     const id = Number(req.params.id);

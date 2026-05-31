@@ -2906,6 +2906,37 @@ h2 {
   pointer-events: none;
 }
 
+.admin-visibility-field:disabled {
+  opacity: 0.72;
+}
+
+.admin-visibility-field {
+  margin-top: 2.5rem;
+}
+
+.admin-visibility-options {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.admin-visibility-field .admin-visibility-option {
+  gap: 0.65rem;
+}
+
+.admin-visibility-field .admin-visibility-option input[type='radio'] {
+  width: auto;
+  margin: 0;
+  padding: 0.65rem;
+  border: none;
+  background: transparent;
+  accent-color: var(--text);
+}
+
+.admin-visibility-status {
+  margin: 0.65rem 0 0;
+  font-size: 0.88rem;
+}
+
 .admin-media-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));

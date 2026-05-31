@@ -163,6 +163,7 @@ export default function AdminProducts() {
   const [formCategoryIds, setFormCategoryIds] = useState([]);
   const [createBusy, setCreateBusy] = useState(false);
   const [createProgress, setCreateProgress] = useState(null);
+  const [visibilityBusy, setVisibilityBusy] = useState(false);
 
   const filteredRows = useMemo(() => {
     const term = searchQuery.trim().toLowerCase();
@@ -453,6 +454,29 @@ export default function AdminProducts() {
     }
   }
 
+  async function setProductVisibility(nextPublished) {
+    if (!!form.is_published === nextPublished) return;
+
+    const previous = !!form.is_published;
+    setForm((f) => ({ ...f, is_published: nextPublished }));
+
+    if (!editingId) return;
+
+    setVisibilityBusy(true);
+    setError(null);
+    try {
+      await adminApi.setProductVisibility(editingId, nextPublished);
+      setRows((prev) =>
+        prev.map((p) => (p.id === editingId ? { ...p, is_published: nextPublished } : p))
+      );
+    } catch (err) {
+      setForm((f) => ({ ...f, is_published: previous }));
+      setError(err.body?.error || err.message);
+    } finally {
+      setVisibilityBusy(false);
+    }
+  }
+
   async function onGalleryFiles(e) {
     const files = Array.from(e.target.files || []);
     e.target.value = '';
@@ -713,17 +737,43 @@ export default function AdminProducts() {
             placeholder="External https://… or leave empty if you use uploads"
           />
         </div>
-        <div className="field row">
-          <input
-            id="pub"
-            type="checkbox"
-            checked={!!form.is_published}
-            onChange={(e) => setForm((f) => ({ ...f, is_published: e.target.checked }))}
-          />
-          <label htmlFor="pub" style={{ margin: 0, textTransform: 'none', letterSpacing: 'normal' }}>
-            Published (visible on public pages when linked)
-          </label>
-        </div>
+        <fieldset
+          className="field admin-category-field admin-visibility-field"
+          disabled={createBusy || visibilityBusy}
+        >
+          <legend>Visibility on website</legend>
+          <div className="admin-category-checks admin-visibility-options">
+            <label className="admin-category-check admin-visibility-option">
+              <input
+                type="radio"
+                name="product-visibility"
+                checked={!!form.is_published}
+                onChange={() => setProductVisibility(true)}
+              />
+              <span>Published / Visible on website</span>
+            </label>
+            <label className="admin-category-check admin-visibility-option">
+              <input
+                type="radio"
+                name="product-visibility"
+                checked={!form.is_published}
+                onChange={() => setProductVisibility(false)}
+              />
+              <span>Unpublished / Not visible</span>
+            </label>
+          </div>
+          {visibilityBusy ? (
+            <p className="muted admin-visibility-status">Saving visibility…</p>
+          ) : editingId ? (
+            <p className="muted admin-visibility-status">
+              Changes save immediately on the server.
+            </p>
+          ) : (
+            <p className="muted admin-visibility-status">
+              Published / Visible on website is selected by default for new products.
+            </p>
+          )}
+        </fieldset>
         <div className="field row">
           <input
             id="featured"

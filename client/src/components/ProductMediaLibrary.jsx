@@ -21,7 +21,7 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
   const [renameSavingId, setRenameSavingId] = useState(null);
-  const [pageSize, setPageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(5);
   const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
