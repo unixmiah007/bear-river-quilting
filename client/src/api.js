@@ -44,6 +44,11 @@ export const publicApi = {
   featuredProducts: () => apiJsonArray('/api/products/featured'),
   bestSellers: () => apiJsonArray('/api/products/best-sellers'),
   productById: (id) => api(`/api/products/${encodeURIComponent(id)}`),
+  shareProduct: (id, body) =>
+    api(`/api/products/${encodeURIComponent(id)}/share`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   stripeConfig: () => api('/api/config/stripe'),
   createStripeCheckoutSession: (body) =>
     api('/api/checkout/stripe-session', { method: 'POST', body: JSON.stringify(body) }),

@@ -5,6 +5,7 @@ import { useAdminSession } from '../hooks/useAdminSession.js';
 import ProductImage from '../components/ProductImage.jsx';
 import CartIcon from '../components/CartIcon.jsx';
 import FavoriteProductButton from '../components/FavoriteProductButton.jsx';
+import ProductShareDialog from '../components/ProductShareDialog.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { CUSTOMER_SIZE_OPTIONS, resolveProductPrice } from '../lib/productSizes.js';
 import PageLoading from '../components/PageLoading.jsx';
@@ -66,6 +67,7 @@ export default function ProductDetail() {
 
   const [activeIdx, setActiveIdx] = useState(0);
   const [selectedSize, setSelectedSize] = useState('');
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     setActiveIdx(0);
@@ -164,7 +166,12 @@ export default function ProductDetail() {
         <div>
           <div className="product-detail-title-row">
             <h1>{product.name}</h1>
+          </div>
+          <div className="product-detail-secondary-actions">
             <FavoriteProductButton productId={product.id} productName={product.name} />
+            <button type="button" className="btn" onClick={() => setShareOpen(true)}>
+              Share with someone
+            </button>
           </div>
           <div className="field product-detail-size" style={{ marginBottom: '1rem' }}>
             <label htmlFor="product-size">Size</label>
@@ -232,6 +239,13 @@ export default function ProductDetail() {
           </div>
         </div>
       </section>
+      {shareOpen ? (
+        <ProductShareDialog
+          product={product}
+          imageSrc={mainSrc}
+          onClose={() => setShareOpen(false)}
+        />
+      ) : null}
     </>
   );
 }

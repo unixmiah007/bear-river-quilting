@@ -62,6 +62,7 @@ import {
 import { getDefaultShipFrom } from './lib/defaultShipFrom.js';
 import { buildOrderInvoicePdf, invoicePdfFilename } from './lib/orderInvoicePdf.js';
 import { emailCustomerOrderInvoice } from './lib/orderInvoiceEmail.js';
+import { sendProductShareEmail } from './lib/productShareEmail.js';
 import { ensureOrderInvoiceEmailColumn } from './lib/ensureOrderInvoiceEmailColumn.js';
 import { sendOrderTrackingNotification } from './lib/orderTracking.js';
 import { ensureOrderMessagesTable } from './lib/ensureOrderMessagesTable.js';
@@ -479,6 +480,23 @@ app.get('/api/products/:id', async (req, res) => {
       return sendProductSchemaMismatch(res);
     }
     res.status(500).json({ error: 'Failed to load product' });
+  }
+});
+
+app.post('/api/products/:id/share', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) {
+      return res.status(400).json({ error: 'Invalid product id' });
+    }
+    const result = await sendProductShareEmail(id, req.body);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json({ ok: true, emailSent: !!result.emailSent });
+  } catch (e) {
+    console.error('[products/share]', e);
+    res.status(500).json({ error: 'Could not send product share email.' });
   }
 });
 
