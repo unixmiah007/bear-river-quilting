@@ -24,6 +24,7 @@ const AdminCategories = lazy(() => import('./pages/AdminCategories.jsx'));
 const AdminPageProducts = lazy(() => import('./pages/AdminPageProducts.jsx'));
 const AdminOrders = lazy(() => import('./pages/AdminOrders.jsx'));
 const AdminCustomizeRequests = lazy(() => import('./pages/AdminCustomizeRequests.jsx'));
+const AdminCustomPayment = lazy(() => import('./pages/AdminCustomPayment.jsx'));
 
 function SuspenseRoute({ children }) {
   return <Suspense fallback={<RouteSuspenseFallback />}>{children}</Suspense>;
@@ -185,6 +186,14 @@ export default function App() {
           element={
             <SuspenseRoute>
               <AdminCustomizeRequests />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/admin/custom-payment"
+          element={
+            <SuspenseRoute>
+              <AdminCustomPayment />
             </SuspenseRoute>
           }
         />

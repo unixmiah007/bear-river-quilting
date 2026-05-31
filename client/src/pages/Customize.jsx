@@ -316,6 +316,7 @@ export default function Customize() {
         batting: form.batting,
         quiltTitle: form.quiltTitle.trim() || null,
         notes: form.notes.trim() || null,
+        ownDesignImageUrl: form.ownDesignImageUrl.trim() || null,
         estimatedPrice,
         customer: {
           name: form.contactName.trim(),

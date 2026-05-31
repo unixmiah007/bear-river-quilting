@@ -3,6 +3,7 @@ import pool from '../db.js';
 import { buildCheckoutFromBody, insertPendingOrder } from './orderCheckout.js';
 import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './mail.js';
 import { fulfillCustomQuiltFromStripeSession } from './customQuiltStripeCheckout.js';
+import { fulfillCustomOrderPaymentFromStripeSession } from './customOrderPayment.js';
 import { clientOriginPath } from './clientOrigin.js';
 
 let stripeClient = null;
@@ -203,6 +204,10 @@ export async function fulfillStripeCheckoutSession(sessionId) {
     return fulfillCustomQuiltFromStripeSession(session);
   }
 
+  if (session.metadata?.checkout_type === 'custom_order_payment') {
+    return fulfillCustomOrderPaymentFromStripeSession(session);
+  }
+
   const orderId = Number(session.metadata?.order_id);
   if (orderId) {
     return fulfillOrderFromStripeSessionWithSession(session);
@@ -218,7 +223,7 @@ export async function fulfillOrderFromStripeSession(sessionId) {
   return fulfillOrderFromStripeSessionWithSession(loaded.session);
 }
 
-async function fulfillOrderFromStripeSessionWithSession(session) {
+export async function fulfillOrderFromStripeSessionWithSession(session) {
   const orderId = Number(session.metadata?.order_id);
   if (!orderId) {
     return { ok: false, status: 400, error: 'Missing order reference on checkout session' };

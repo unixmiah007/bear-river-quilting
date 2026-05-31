@@ -96,6 +96,103 @@ function acknowledgedLabel(value) {
   return String(value || 'N').toUpperCase() === 'Y' ? 'Y' : 'N';
 }
 
+function ownDesignDownloadFilename(row) {
+  const url = String(row.own_design_image_url ?? '');
+  const filePart = url.split('/').filter(Boolean).pop() || 'customer-design.png';
+  const safeRequest = String(row.request_number ?? 'request').replace(/[^a-zA-Z0-9-_]+/g, '-');
+  if (/\.[a-z0-9]+$/i.test(filePart)) {
+    return `${safeRequest}-${filePart}`;
+  }
+  return `${safeRequest}-customer-design.png`;
+}
+
+async function downloadCustomerOwnDesign(row) {
+  const url = row.own_design_image_url;
+  if (!url) return;
+
+  const filename = ownDesignDownloadFilename(row);
+  const res = await fetch(url, { credentials: 'include' });
+  if (!res.ok) {
+    throw new Error('Could not fetch the customer image');
+  }
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+function CustomerOwnDesignPreview({ row }) {
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState(null);
+  const imageUrl =
+    row.own_design_image_url != null && String(row.own_design_image_url).trim() !== ''
+      ? String(row.own_design_image_url).trim()
+      : null;
+
+  async function handleDownload() {
+    if (!imageUrl) return;
+    setDownloadError(null);
+    setDownloading(true);
+    try {
+      await downloadCustomerOwnDesign(row);
+    } catch (e) {
+      setDownloadError(e.message || 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <div className="admin-customize-detail-dialog__own-design">
+      <h3 className="admin-customize-detail-dialog__own-heading">Customer design reference</h3>
+      {imageUrl ? (
+        <>
+          <p className="muted admin-customize-detail-dialog__own-hint">
+            Click the thumbnail to download the original image the customer uploaded.
+          </p>
+          <button
+            type="button"
+            className="admin-customize-detail-dialog__thumb-btn"
+            onClick={handleDownload}
+            disabled={downloading}
+            title="Download original customer image"
+          >
+            <img
+              className="admin-customize-detail-dialog__thumb"
+              src={imageUrl}
+              alt="Thumbnail of customer uploaded design"
+            />
+            <span className="admin-customize-detail-dialog__thumb-overlay" aria-hidden="true">
+              {downloading ? 'Downloading…' : 'Download'}
+            </span>
+          </button>
+          {downloadError ? (
+            <p className="error admin-customize-detail-dialog__download-error">{downloadError}</p>
+          ) : null}
+          <button
+            type="button"
+            className="btn admin-customize-detail-dialog__download-btn"
+            onClick={handleDownload}
+            disabled={downloading}
+          >
+            {downloading ? 'Downloading…' : 'Download original image'}
+          </button>
+        </>
+      ) : (
+        <p className="muted admin-customize-detail-dialog__own-empty">
+          No reference image was uploaded for this request. New checkouts that use &ldquo;Bring my own
+          design&rdquo; on step 2 will show a thumbnail here.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function CustomizeRequestDetailDialog({ row, savingId, onClose, onToggleAcknowledged }) {
   if (!row) return null;
 
@@ -201,14 +298,7 @@ function CustomizeRequestDetailDialog({ row, savingId, onClose, onToggleAcknowle
           ) : null}
         </dl>
 
-        {row.own_design_image_url ? (
-          <div className="admin-customize-detail-dialog__own-design">
-            <h3 className="admin-customize-detail-dialog__own-heading">Customer design reference</h3>
-            <a href={row.own_design_image_url} target="_blank" rel="noopener noreferrer">
-              <img src={row.own_design_image_url} alt="Customer uploaded design reference" />
-            </a>
-          </div>
-        ) : null}
+        <CustomerOwnDesignPreview row={row} />
 
         <div className="confirm-dialog__actions admin-customize-detail-dialog__actions">
           <button

@@ -277,4 +277,8 @@ export const adminApi = {
   customizeConfig: () => api('/api/admin/customize-config'),
   saveCustomizeConfig: (body) =>
     api('/api/admin/customize-config', { method: 'PUT', body: JSON.stringify(body) }),
+  searchOrdersForCustomPayment: (email) =>
+    api(`/api/admin/custom-payments/orders?email=${encodeURIComponent(email)}`),
+  createCustomPayment: (body) =>
+    api('/api/admin/custom-payments', { method: 'POST', body: JSON.stringify(body) }),
 };

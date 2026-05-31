@@ -90,6 +90,11 @@ import {
   ownDesignUploadRoot,
 } from './lib/customizeOwnDesignImage.js';
 import { getClientOrigin, PRODUCTION_CLIENT_ORIGIN } from './lib/clientOrigin.js';
+import { ensureOrderCustomPaymentsTable } from './lib/ensureOrderCustomPaymentsTable.js';
+import {
+  createCustomOrderPayment,
+  searchOrdersByCustomerEmail,
+} from './lib/customOrderPayment.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameRoot = path.dirname(__filename);
@@ -1691,6 +1696,39 @@ app.put('/api/admin/custom-quilt-requests/:id/acknowledged', authMiddleware, asy
   }
 });
 
+// --- Admin: custom payment links ---
+
+app.get('/api/admin/custom-payments/orders', authMiddleware, async (req, res) => {
+  try {
+    const result = await searchOrdersByCustomerEmail(req.query.email);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json({ email: result.email, orders: result.orders });
+  } catch (e) {
+    console.error('[admin/custom-payments/orders]', e);
+    res.status(500).json({ error: 'Failed to search orders' });
+  }
+});
+
+app.post('/api/admin/custom-payments', authMiddleware, async (req, res) => {
+  try {
+    const result = await createCustomOrderPayment({
+      orderId: req.body?.orderId,
+      amount: req.body?.amount,
+      adminNote: req.body?.adminNote ?? req.body?.note,
+      sendEmail: req.body?.sendEmail !== false,
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 500).json({ error: result.error });
+    }
+    res.status(201).json(result);
+  } catch (e) {
+    console.error('[admin/custom-payments]', e);
+    res.status(500).json({ error: 'Failed to create payment link' });
+  }
+});
+
 // --- Admin: orders ---
 
 app.get('/api/admin/orders', authMiddleware, async (_req, res) => {
@@ -2090,6 +2128,11 @@ async function startServer() {
     await ensureCustomQuiltRequestsTable(pool);
   } catch (e) {
     console.error('[ensureCustomQuiltRequestsTable]', e?.message || e);
+  }
+  try {
+    await ensureOrderCustomPaymentsTable(pool);
+  } catch (e) {
+    console.error('[ensureOrderCustomPaymentsTable]', e?.message || e);
   }
   try {
     await ensureCustomizeWizardConfigTable(pool);

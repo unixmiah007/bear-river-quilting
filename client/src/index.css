@@ -4734,20 +4734,76 @@ tr:last-child td {
 }
 
 .admin-customize-detail-dialog__own-heading {
-  margin: 0 0 0.65rem;
+  margin: 0 0 0.35rem;
   font-size: 0.85rem;
   font-weight: 600;
 }
 
-.admin-customize-detail-dialog__own-design img {
+.admin-customize-detail-dialog__own-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+}
+
+.admin-customize-detail-dialog__own-empty {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.admin-customize-detail-dialog__thumb-btn {
   display: block;
-  width: 100%;
-  max-width: 320px;
-  max-height: 280px;
-  object-fit: contain;
-  border-radius: 8px;
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
   border: 1px solid var(--border);
+  border-radius: 8px;
   background: #f9fafb;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-customize-detail-dialog__thumb-btn:hover:not(:disabled),
+.admin-customize-detail-dialog__thumb-btn:focus-visible {
+  border-color: #111111;
+  box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.12);
+}
+
+.admin-customize-detail-dialog__thumb-btn:disabled {
+  cursor: wait;
+  opacity: 0.85;
+}
+
+.admin-customize-detail-dialog__thumb {
+  display: block;
+  width: auto;
+  max-width: min(280px, 100%);
+  max-height: 180px;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+.admin-customize-detail-dialog__thumb-overlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  color: #ffffff;
+  background: linear-gradient(transparent, rgba(17, 17, 17, 0.72));
+  pointer-events: none;
+}
+
+.admin-customize-detail-dialog__download-error {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+}
+
+.admin-customize-detail-dialog__download-btn {
+  margin-top: 0.75rem;
 }
 
 .admin-customize-detail-dialog__actions {
@@ -4756,6 +4812,83 @@ tr:last-child td {
 
 .admin-customize-requests-table .btn {
   white-space: nowrap;
+}
+
+.admin-custom-payment__search,
+.admin-custom-payment__orders,
+.admin-custom-payment__form,
+.admin-custom-payment__success {
+  margin-bottom: 1.25rem;
+  padding: 1.15rem 1.25rem;
+}
+
+.admin-custom-payment__section-title {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+}
+
+.admin-custom-payment__email {
+  font-weight: 400;
+  font-size: 0.92rem;
+}
+
+.admin-custom-payment__row--selected {
+  background: rgba(17, 17, 17, 0.04);
+}
+
+.admin-custom-payment__selected-summary {
+  margin: 0 0 1rem;
+}
+
+.admin-custom-payment__checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.admin-custom-payment__checkbox input {
+  margin-top: 0.2rem;
+}
+
+.admin-custom-payment__success-dl {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+}
+
+.admin-custom-payment__success-dl > div {
+  display: grid;
+  grid-template-columns: minmax(8rem, 36%) 1fr;
+  gap: 0.5rem;
+}
+
+.admin-custom-payment__success-dl dt {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.admin-custom-payment__success-dl dd {
+  margin: 0;
+}
+
+.admin-custom-payment__link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.admin-custom-payment__link-input {
+  flex: 1 1 16rem;
+  min-width: 0;
+  font-size: 0.85rem;
 }
 
 .order-correspondence__form {
