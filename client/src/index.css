@@ -4832,6 +4832,16 @@ tr:last-child td {
   font-size: 0.92rem;
 }
 
+.admin-custom-payment__subsection {
+  margin: 1.25rem 0 0.65rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.admin-custom-payment__subsection:first-of-type {
+  margin-top: 0;
+}
+
 .admin-custom-payment__row--selected {
   background: rgba(17, 17, 17, 0.04);
 }

@@ -199,13 +199,14 @@ export async function fulfillStripeCheckoutSession(sessionId) {
   if (!loaded.ok) return loaded;
 
   const { session } = loaded;
-  const customQuiltId = Number(session.metadata?.custom_quilt_request_id);
-  if (customQuiltId) {
-    return fulfillCustomQuiltFromStripeSession(session);
-  }
 
   if (session.metadata?.checkout_type === 'custom_order_payment') {
     return fulfillCustomOrderPaymentFromStripeSession(session);
+  }
+
+  const customQuiltId = Number(session.metadata?.custom_quilt_request_id);
+  if (customQuiltId) {
+    return fulfillCustomQuiltFromStripeSession(session);
   }
 
   const orderId = Number(session.metadata?.order_id);

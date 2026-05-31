@@ -2,6 +2,7 @@ import pool from '../db.js';
 import { getStripe } from './stripeCheckout.js';
 import { clientOriginPath } from './clientOrigin.js';
 import { sendSendGridMail, resolveSendGridFromCustomer } from './sendgridMail.js';
+import { fulfillCustomQuiltRequestPayment } from './customQuiltRequest.js';
 
 export function customPaymentNumber() {
   return `CP${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 900 + 100)}`;
@@ -19,7 +20,7 @@ function formatUsd(amount) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(amount));
 }
 
-export async function searchOrdersByCustomerEmail(email) {
+function normalizeSearchEmail(email) {
   const normalized = String(email ?? '')
     .trim()
     .toLowerCase();
@@ -29,33 +30,71 @@ export async function searchOrdersByCustomerEmail(email) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
     return { ok: false, status: 400, error: 'Enter a valid email address' };
   }
+  return { ok: true, email: normalized };
+}
 
-  const [rows] = await pool.query(
+/** @deprecated use searchCustomerPaymentsByEmail */
+export async function searchOrdersByCustomerEmail(email) {
+  const result = await searchCustomerPaymentsByEmail(email);
+  if (!result.ok) return result;
+  return { ok: true, email: result.email, orders: result.orders };
+}
+
+export async function searchCustomerPaymentsByEmail(email) {
+  const parsed = normalizeSearchEmail(email);
+  if (!parsed.ok) return parsed;
+
+  const [orders] = await pool.query(
     `SELECT id, order_number, status, customer_name, customer_email, subtotal, tax_amount, shipping_cost, total, created_at
      FROM orders
      WHERE LOWER(TRIM(customer_email)) = ?
      ORDER BY created_at DESC
      LIMIT 50`,
-    [normalized]
+    [parsed.email]
   );
 
-  return { ok: true, email: normalized, orders: rows };
+  const [customRequests] = await pool.query(
+    `SELECT id, request_number, status, design_name, product_size, color_palette, batting,
+            customer_name, customer_email, estimated_price, created_at
+     FROM custom_quilt_requests
+     WHERE LOWER(TRIM(customer_email)) = ?
+     ORDER BY created_at DESC
+     LIMIT 50`,
+    [parsed.email]
+  );
+
+  return {
+    ok: true,
+    email: parsed.email,
+    orders,
+    customRequests,
+  };
 }
 
-export async function sendCustomPaymentLinkEmail({ to, customerName, orderNumber, paymentNumber, amount, checkoutUrl, adminNote }) {
+export async function sendCustomPaymentLinkEmail({
+  to,
+  customerName,
+  referenceType,
+  referenceNumber,
+  paymentNumber,
+  amount,
+  checkoutUrl,
+  adminNote,
+}) {
   const from = resolveSendGridFromCustomer();
   if (!from) {
     return { ok: false, error: 'SendGrid is not configured (MAIL_FROM_ADDRESS / SENDGRID_API_KEY)' };
   }
 
+  const isCustomQuilt = referenceType === 'custom_quilt';
+  const subjectNoun = isCustomQuilt ? 'custom quilt request' : 'order';
   const amountLine = formatUsd(amount);
-  const noteBlock = adminNote
-    ? `\n\nNote from our team:\n${adminNote}\n`
-    : '';
+  const noteBlock = adminNote ? `\n\nNote from our team:\n${adminNote}\n` : '';
+
   const text = [
     `Hi ${customerName || 'there'},`,
     '',
-    `Please complete payment for your Bear River Quilting order ${orderNumber}.`,
+    `Please complete payment for your Bear River Quilting ${subjectNoun} ${referenceNumber}.`,
     '',
     `Amount due: ${amountLine}`,
     `Payment reference: ${paymentNumber}`,
@@ -75,7 +114,7 @@ export async function sendCustomPaymentLinkEmail({ to, customerName, orderNumber
     : '';
 
   const html = `<p>Hi ${escapeHtml(customerName || 'there')},</p>
-<p>Please complete payment for your Bear River Quilting order <strong>${escapeHtml(orderNumber)}</strong>.</p>
+<p>Please complete payment for your Bear River Quilting ${escapeHtml(subjectNoun)} <strong>${escapeHtml(referenceNumber)}</strong>.</p>
 <p><strong>Amount due:</strong> ${escapeHtml(amountLine)}<br>
 <strong>Payment reference:</strong> ${escapeHtml(paymentNumber)}</p>
 ${noteHtml}
@@ -86,7 +125,7 @@ ${noteHtml}
   await sendSendGridMail({
     to,
     from,
-    subject: `Payment link for order ${orderNumber} — ${amountLine}`,
+    subject: `Payment link for ${subjectNoun} ${referenceNumber} — ${amountLine}`,
     text,
     html,
   });
@@ -94,15 +133,80 @@ ${noteHtml}
   return { ok: true };
 }
 
+async function createStripePaymentSession({
+  stripe,
+  customerEmail,
+  referenceNumber,
+  referenceType,
+  lineDescription,
+  amountCents,
+  paymentId,
+  paymentNumber,
+  orderId,
+  customQuiltRequestId,
+  adminNote,
+}) {
+  const metadata = {
+    checkout_type: 'custom_order_payment',
+    custom_payment_id: String(paymentId),
+    payment_number: paymentNumber,
+    reference_type: referenceType,
+  };
+  if (orderId) metadata.order_id = String(orderId);
+  if (customQuiltRequestId) metadata.custom_quilt_request_id = String(customQuiltRequestId);
+  metadata.order_number = referenceNumber;
+
+  return stripe.checkout.sessions.create({
+    mode: 'payment',
+    customer_email: customerEmail,
+    line_items: [
+      {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name:
+              referenceType === 'custom_quilt'
+                ? `Custom quilt ${referenceNumber} — payment`
+                : `Order ${referenceNumber} — payment`,
+            description: lineDescription,
+          },
+          unit_amount: amountCents,
+        },
+        quantity: 1,
+      },
+    ],
+    success_url:
+      referenceType === 'custom_quilt'
+        ? `${clientOriginPath('/customize/success')}?session_id={CHECKOUT_SESSION_ID}`
+        : `${clientOriginPath('/checkout/success')}?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url:
+      referenceType === 'custom_quilt'
+        ? clientOriginPath('/customize')
+        : `${clientOriginPath('/account')}?email=${encodeURIComponent(customerEmail)}`,
+    metadata,
+  });
+}
+
 export async function createCustomOrderPayment({ orderId, amount, adminNote, sendEmail = true }) {
+  return createCustomPayment({ orderId, amount, adminNote, sendEmail });
+}
+
+export async function createCustomPayment({
+  orderId,
+  customQuiltRequestId,
+  amount,
+  adminNote,
+  sendEmail = true,
+}) {
   const stripe = getStripe();
   if (!stripe) {
     return { ok: false, status: 503, error: 'Stripe is not configured on the server' };
   }
 
-  const id = Number(orderId);
-  if (!id) {
-    return { ok: false, status: 400, error: 'Select an order' };
+  const hasOrder = orderId != null && Number(orderId) > 0;
+  const hasCustomQuilt = customQuiltRequestId != null && Number(customQuiltRequestId) > 0;
+  if (hasOrder === hasCustomQuilt) {
+    return { ok: false, status: 400, error: 'Select exactly one shop order or custom quilt request' };
   }
 
   const amountNum = Number(amount);
@@ -110,13 +214,46 @@ export async function createCustomOrderPayment({ orderId, amount, adminNote, sen
     return { ok: false, status: 400, error: 'Enter a payment amount of at least $0.50' };
   }
 
-  const [[order]] = await pool.query(
-    `SELECT id, order_number, status, customer_name, customer_email, total
-     FROM orders WHERE id = ?`,
-    [id]
-  );
-  if (!order) {
-    return { ok: false, status: 404, error: 'Order not found' };
+  let referenceType;
+  let referenceNumber;
+  let customerName;
+  let customerEmail;
+  let sourceStatus;
+  let resolvedOrderId = null;
+  let resolvedCustomQuiltId = null;
+
+  if (hasOrder) {
+    const id = Number(orderId);
+    const [[order]] = await pool.query(
+      `SELECT id, order_number, status, customer_name, customer_email, total
+       FROM orders WHERE id = ?`,
+      [id]
+    );
+    if (!order) {
+      return { ok: false, status: 404, error: 'Order not found' };
+    }
+    referenceType = 'order';
+    referenceNumber = order.order_number;
+    customerName = order.customer_name;
+    customerEmail = order.customer_email;
+    sourceStatus = order.status;
+    resolvedOrderId = order.id;
+  } else {
+    const id = Number(customQuiltRequestId);
+    const [[request]] = await pool.query(
+      `SELECT id, request_number, status, design_name, customer_name, customer_email, estimated_price
+       FROM custom_quilt_requests WHERE id = ?`,
+      [id]
+    );
+    if (!request) {
+      return { ok: false, status: 404, error: 'Custom quilt request not found' };
+    }
+    referenceType = 'custom_quilt';
+    referenceNumber = request.request_number;
+    customerName = request.customer_name;
+    customerEmail = request.customer_email;
+    sourceStatus = request.status;
+    resolvedCustomQuiltId = request.id;
   }
 
   const paymentNumber = customPaymentNumber();
@@ -125,46 +262,45 @@ export async function createCustomOrderPayment({ orderId, amount, adminNote, sen
 
   const [insert] = await pool.query(
     `INSERT INTO order_custom_payments (
-       payment_number, order_id, order_number, customer_email, amount, admin_note, status
-     ) VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
-    [paymentNumber, order.id, order.order_number, order.customer_email, amountNum.toFixed(2), note]
+       payment_number, order_id, custom_quilt_request_id, reference_type, order_number,
+       customer_email, amount, admin_note, status
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+    [
+      paymentNumber,
+      resolvedOrderId,
+      resolvedCustomQuiltId,
+      referenceType,
+      referenceNumber,
+      customerEmail,
+      amountNum.toFixed(2),
+      note,
+    ]
   );
 
   const paymentId = insert.insertId;
+  const lineDescription =
+    note ||
+    (referenceType === 'custom_quilt'
+      ? `Payment for custom quilt request ${referenceNumber}`
+      : `Payment for Bear River Quilting order ${referenceNumber}`);
 
   try {
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      customer_email: order.customer_email,
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `Order ${order.order_number} — payment`,
-              description: note ? note.slice(0, 500) : `Payment for Bear River Quilting order ${order.order_number}`,
-            },
-            unit_amount: amountCents,
-          },
-          quantity: 1,
-        },
-      ],
-      success_url: `${clientOriginPath('/checkout/success')}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${clientOriginPath('/account')}?email=${encodeURIComponent(order.customer_email)}`,
-      metadata: {
-        checkout_type: 'custom_order_payment',
-        custom_payment_id: String(paymentId),
-        order_id: String(order.id),
-        order_number: order.order_number,
-        payment_number: paymentNumber,
-      },
+    const session = await createStripePaymentSession({
+      stripe,
+      customerEmail,
+      referenceNumber,
+      referenceType,
+      lineDescription: lineDescription.slice(0, 500),
+      amountCents,
+      paymentId,
+      paymentNumber,
+      orderId: resolvedOrderId,
+      customQuiltRequestId: resolvedCustomQuiltId,
+      adminNote: note,
     });
 
     await pool.query(
-      `UPDATE order_custom_payments SET
-         stripe_checkout_session_id = ?,
-         checkout_url = ?
-       WHERE id = ?`,
+      `UPDATE order_custom_payments SET stripe_checkout_session_id = ?, checkout_url = ? WHERE id = ?`,
       [session.id, session.url, paymentId]
     );
 
@@ -172,9 +308,10 @@ export async function createCustomOrderPayment({ orderId, amount, adminNote, sen
     if (sendEmail) {
       try {
         mail = await sendCustomPaymentLinkEmail({
-          to: order.customer_email,
-          customerName: order.customer_name,
-          orderNumber: order.order_number,
+          to: customerEmail,
+          customerName,
+          referenceType,
+          referenceNumber,
           paymentNumber,
           amount: amountNum,
           checkoutUrl: session.url,
@@ -195,14 +332,19 @@ export async function createCustomOrderPayment({ orderId, amount, adminNote, sen
       ok: true,
       paymentId,
       paymentNumber,
-      orderId: order.id,
-      orderNumber: order.order_number,
+      referenceType,
+      orderId: resolvedOrderId,
+      customQuiltRequestId: resolvedCustomQuiltId,
+      orderNumber: referenceNumber,
+      requestNumber: referenceType === 'custom_quilt' ? referenceNumber : null,
       amount: amountNum,
       checkoutUrl: session.url,
       sessionId: session.id,
       emailSent: !!mail.ok,
       emailError: mail.error ?? null,
-      orderStatus: order.status,
+      sourceStatus,
+      customerEmail,
+      customerName,
     };
   } catch (e) {
     await pool.query('DELETE FROM order_custom_payments WHERE id = ? AND status = ?', [paymentId, 'pending']);
@@ -213,8 +355,7 @@ export async function createCustomOrderPayment({ orderId, amount, adminNote, sen
 
 export async function fulfillCustomOrderPaymentFromStripeSession(session) {
   const paymentId = Number(session.metadata?.custom_payment_id);
-  const orderId = Number(session.metadata?.order_id);
-  if (!paymentId || !orderId) {
+  if (!paymentId) {
     return { ok: false, status: 400, error: 'Missing custom payment reference on checkout session' };
   }
 
@@ -224,14 +365,26 @@ export async function fulfillCustomOrderPaymentFromStripeSession(session) {
   }
 
   if (payment.status === 'paid') {
-    return {
+    const base = {
       ok: true,
       alreadyFulfilled: true,
       checkoutType: 'custom_order_payment',
-      orderId,
-      orderNumber: payment.order_number,
       customerEmail: payment.customer_email,
       paymentNumber: payment.payment_number,
+      referenceType: payment.reference_type,
+    };
+    if (payment.custom_quilt_request_id) {
+      return {
+        ...base,
+        checkoutType: 'custom_quilt',
+        requestId: payment.custom_quilt_request_id,
+        requestNumber: payment.order_number,
+      };
+    }
+    return {
+      ...base,
+      orderId: payment.order_id,
+      orderNumber: payment.order_number,
     };
   }
 
@@ -252,10 +405,37 @@ export async function fulfillCustomOrderPaymentFromStripeSession(session) {
     [session.id, paymentIntentId, paymentId]
   );
 
-  await pool.query(
-    `UPDATE orders SET total = ?, card_last4 = ? WHERE id = ?`,
-    [Number(payment.amount).toFixed(2), cardLast4, orderId]
-  );
+  if (payment.custom_quilt_request_id) {
+    await pool.query('UPDATE custom_quilt_requests SET estimated_price = ? WHERE id = ?', [
+      Number(payment.amount).toFixed(2),
+      payment.custom_quilt_request_id,
+    ]);
+
+    const quiltResult = await fulfillCustomQuiltRequestPayment(payment.custom_quilt_request_id, {
+      sessionId: session.id,
+      paymentIntentId,
+      cardLast4,
+    });
+
+    return {
+      ...quiltResult,
+      checkoutType: 'custom_quilt',
+      paymentNumber: payment.payment_number,
+      customPaymentId: paymentId,
+      referenceType: 'custom_quilt',
+    };
+  }
+
+  const orderId = Number(payment.order_id);
+  if (!orderId) {
+    return { ok: false, status: 400, error: 'Custom payment is not linked to an order or custom request' };
+  }
+
+  await pool.query(`UPDATE orders SET total = ?, card_last4 = ? WHERE id = ?`, [
+    Number(payment.amount).toFixed(2),
+    cardLast4,
+    orderId,
+  ]);
 
   const { fulfillOrderFromStripeSessionWithSession } = await import('./stripeCheckout.js');
   const orderResult = await fulfillOrderFromStripeSessionWithSession({
@@ -271,5 +451,6 @@ export async function fulfillCustomOrderPaymentFromStripeSession(session) {
     checkoutType: 'custom_order_payment',
     paymentNumber: payment.payment_number,
     customPaymentId: paymentId,
+    referenceType: 'order',
   };
 }

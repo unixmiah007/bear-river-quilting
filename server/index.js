@@ -91,10 +91,7 @@ import {
 } from './lib/customizeOwnDesignImage.js';
 import { getClientOrigin, PRODUCTION_CLIENT_ORIGIN } from './lib/clientOrigin.js';
 import { ensureOrderCustomPaymentsTable } from './lib/ensureOrderCustomPaymentsTable.js';
-import {
-  createCustomOrderPayment,
-  searchOrdersByCustomerEmail,
-} from './lib/customOrderPayment.js';
+import { createCustomPayment, searchCustomerPaymentsByEmail } from './lib/customOrderPayment.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameRoot = path.dirname(__filename);
@@ -1713,8 +1710,9 @@ app.get('/api/admin/custom-payments/orders', authMiddleware, async (req, res) =>
 
 app.post('/api/admin/custom-payments', authMiddleware, async (req, res) => {
   try {
-    const result = await createCustomOrderPayment({
+    const result = await createCustomPayment({
       orderId: req.body?.orderId,
+      customQuiltRequestId: req.body?.customQuiltRequestId,
       amount: req.body?.amount,
       adminNote: req.body?.adminNote ?? req.body?.note,
       sendEmail: req.body?.sendEmail !== false,
