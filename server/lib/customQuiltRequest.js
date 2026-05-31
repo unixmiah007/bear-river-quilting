@@ -348,8 +348,11 @@ export async function createCustomQuiltRequest(body) {
 
 export async function listCustomQuiltRequestsForAdmin() {
   const [rows] = await pool.query(
-    `SELECT id, request_number, status, acknowledged, design_name, product_size, color_palette,
-            own_design_image_url, customer_name, customer_email, estimated_price, created_at
+    `SELECT id, request_number, status, acknowledged, design_id, design_name, product_size,
+            color_palette, batting, quilt_title, notes, own_design_image_url,
+            customer_name, customer_email, customer_phone, estimated_price,
+            stripe_checkout_session_id, stripe_payment_intent_id,
+            created_at, updated_at
      FROM custom_quilt_requests
      ORDER BY created_at DESC
      LIMIT 200`

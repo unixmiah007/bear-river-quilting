@@ -24,6 +24,19 @@ function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(Number(n));
 }
 
+function humanizeSlug(value) {
+  if (value == null || String(value).trim() === '') return null;
+  return String(value)
+    .trim()
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function displayValue(value) {
+  const s = value == null ? '' : String(value).trim();
+  return s || '—';
+}
+
 function getSortValue(row, key) {
   switch (key) {
     case 'request':
@@ -83,6 +96,138 @@ function acknowledgedLabel(value) {
   return String(value || 'N').toUpperCase() === 'Y' ? 'Y' : 'N';
 }
 
+function CustomizeRequestDetailDialog({ row, savingId, onClose, onToggleAcknowledged }) {
+  if (!row) return null;
+
+  const ack = acknowledgedLabel(row.acknowledged);
+  const busy = savingId === row.id;
+  const sizeLabel = formatProductSizeLabel(row.product_size) ?? humanizeSlug(row.product_size);
+  const colorLabel = humanizeSlug(row.color_palette);
+  const battingLabel = humanizeSlug(row.batting);
+
+  return (
+    <div className="confirm-dialog-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="confirm-dialog admin-customize-detail-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="customize-request-detail-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="customize-request-detail-title" className="confirm-dialog__title">
+          {row.request_number}
+        </h2>
+        <p className="muted admin-customize-detail-dialog__meta">
+          Submitted {formatWhen(row.created_at)}
+          {row.updated_at && row.updated_at !== row.created_at
+            ? ` · Updated ${formatWhen(row.updated_at)}`
+            : ''}
+        </p>
+
+        <dl className="admin-customize-detail-dialog__dl">
+          <div>
+            <dt>Status</dt>
+            <dd>{displayValue(row.status)}</dd>
+          </div>
+          <div>
+            <dt>Acknowledged</dt>
+            <dd>
+              <span className={`badge ${ack === 'Y' ? 'badge-on' : 'badge-off'}`}>{ack}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Design</dt>
+            <dd>
+              {displayValue(row.design_name)}
+              {row.design_id ? (
+                <>
+                  <br />
+                  <span className="muted">ID: {row.design_id}</span>
+                </>
+              ) : null}
+            </dd>
+          </div>
+          <div>
+            <dt>Size</dt>
+            <dd>{sizeLabel ?? '—'}</dd>
+          </div>
+          <div>
+            <dt>Color palette</dt>
+            <dd>{colorLabel ?? displayValue(row.color_palette)}</dd>
+          </div>
+          <div>
+            <dt>Batting</dt>
+            <dd>{battingLabel ?? displayValue(row.batting)}</dd>
+          </div>
+          <div>
+            <dt>Working title</dt>
+            <dd>{displayValue(row.quilt_title)}</dd>
+          </div>
+          <div>
+            <dt>Notes for designer</dt>
+            <dd className="admin-customize-detail-dialog__notes">
+              {row.notes ? row.notes : '—'}
+            </dd>
+          </div>
+          <div>
+            <dt>Estimated price</dt>
+            <dd>{formatPrice(row.estimated_price)}</dd>
+          </div>
+          <div>
+            <dt>Customer</dt>
+            <dd>
+              {displayValue(row.customer_name)}
+              <br />
+              <a href={`mailto:${row.customer_email}`}>{displayValue(row.customer_email)}</a>
+              {row.customer_phone ? (
+                <>
+                  <br />
+                  <a href={`tel:${row.customer_phone}`}>{row.customer_phone}</a>
+                </>
+              ) : null}
+            </dd>
+          </div>
+          {row.stripe_checkout_session_id ? (
+            <div>
+              <dt>Stripe checkout session</dt>
+              <dd className="admin-customize-detail-dialog__mono">{row.stripe_checkout_session_id}</dd>
+            </div>
+          ) : null}
+          {row.stripe_payment_intent_id ? (
+            <div>
+              <dt>Stripe payment intent</dt>
+              <dd className="admin-customize-detail-dialog__mono">{row.stripe_payment_intent_id}</dd>
+            </div>
+          ) : null}
+        </dl>
+
+        {row.own_design_image_url ? (
+          <div className="admin-customize-detail-dialog__own-design">
+            <h3 className="admin-customize-detail-dialog__own-heading">Customer design reference</h3>
+            <a href={row.own_design_image_url} target="_blank" rel="noopener noreferrer">
+              <img src={row.own_design_image_url} alt="Customer uploaded design reference" />
+            </a>
+          </div>
+        ) : null}
+
+        <div className="confirm-dialog__actions admin-customize-detail-dialog__actions">
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            onClick={() => onToggleAcknowledged(row)}
+          >
+            {busy ? 'Saving…' : ack === 'Y' ? 'Mark unacknowledged' : 'Mark acknowledged'}
+          </button>
+          <button type="button" className="btn btn-primary" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminCustomizeRequests() {
   const [rows, setRows] = useState([]);
   const [err, setErr] = useState(null);
@@ -90,6 +235,7 @@ export default function AdminCustomizeRequests() {
   const [savingId, setSavingId] = useState(null);
   const [sortKey, setSortKey] = useState('created');
   const [sortDir, setSortDir] = useState('desc');
+  const [detailRow, setDetailRow] = useState(null);
 
   useEffect(() => {
     adminApi
@@ -103,6 +249,8 @@ export default function AdminCustomizeRequests() {
     if (!SORTABLE_COLUMNS.includes(sortKey)) return rows;
     return [...rows].sort((a, b) => compareRows(a, b, sortKey, sortDir));
   }, [rows, sortKey, sortDir]);
+
+  const detailFromRows = detailRow ? rows.find((r) => r.id === detailRow.id) ?? detailRow : null;
 
   function handleSort(column) {
     if (sortKey === column) {
@@ -123,6 +271,9 @@ export default function AdminCustomizeRequests() {
       setRows((prev) =>
         prev.map((r) => (r.id === row.id ? { ...r, acknowledged: next } : r))
       );
+      setDetailRow((current) =>
+        current?.id === row.id ? { ...current, acknowledged: next } : current
+      );
     } catch (e) {
       setErr(e.body?.error || e.message);
     } finally {
@@ -134,8 +285,8 @@ export default function AdminCustomizeRequests() {
     <>
       <h1>Custom quilt requests</h1>
       <p className="muted">
-        Design submissions from the Customize wizard (not paid orders). Click a row to toggle
-        acknowledged Y/N.
+        Submissions from the Customize wizard. Click a row to toggle acknowledged Y/N, or use View
+        details to see the full request.
       </p>
       {err ? <p className="error">{err}</p> : null}
       {loading ? (
@@ -203,6 +354,7 @@ export default function AdminCustomizeRequests() {
                   sortDir={sortDir}
                   onSort={handleSort}
                 />
+                <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -224,23 +376,7 @@ export default function AdminCustomizeRequests() {
                   >
                     <td>{r.request_number}</td>
                     <td>{r.status}</td>
-                    <td>
-                      {r.design_name}
-                      {r.own_design_image_url ? (
-                        <>
-                          <br />
-                          <a
-                            href={r.own_design_image_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="admin-customize-request__design-ref"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            View customer design
-                          </a>
-                        </>
-                      ) : null}
-                    </td>
+                    <td>{r.design_name}</td>
                     <td>{formatProductSizeLabel(r.product_size) ?? r.product_size}</td>
                     <td>
                       {r.customer_name}
@@ -257,6 +393,18 @@ export default function AdminCustomizeRequests() {
                       </span>
                     </td>
                     <td className="muted">{formatWhen(r.created_at)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDetailRow(r);
+                        }}
+                      >
+                        View details
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -264,6 +412,13 @@ export default function AdminCustomizeRequests() {
           </table>
         </div>
       )}
+
+      <CustomizeRequestDetailDialog
+        row={detailFromRows}
+        savingId={savingId}
+        onClose={() => setDetailRow(null)}
+        onToggleAcknowledged={toggleAcknowledged}
+      />
     </>
   );
 }
