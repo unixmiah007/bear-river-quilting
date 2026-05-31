@@ -1697,11 +1697,15 @@ app.put('/api/admin/custom-quilt-requests/:id/acknowledged', authMiddleware, asy
 
 app.get('/api/admin/custom-payments/orders', authMiddleware, async (req, res) => {
   try {
-    const result = await searchOrdersByCustomerEmail(req.query.email);
+    const result = await searchCustomerPaymentsByEmail(req.query.email);
     if (!result.ok) {
       return res.status(result.status ?? 400).json({ error: result.error });
     }
-    res.json({ email: result.email, orders: result.orders });
+    res.json({
+      email: result.email,
+      orders: result.orders,
+      customRequests: result.customRequests,
+    });
   } catch (e) {
     console.error('[admin/custom-payments/orders]', e);
     res.status(500).json({ error: 'Failed to search orders' });
