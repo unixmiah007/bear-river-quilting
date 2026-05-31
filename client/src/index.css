@@ -2258,6 +2258,15 @@ h2 {
   pointer-events: none;
 }
 
+.product-card__description {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+  margin: 0;
+}
+
 .featured-no-image {
   aspect-ratio: 4/3;
   display: grid;

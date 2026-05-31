@@ -35,7 +35,7 @@ export default function ProductCard({ product, onAddToCart, badge, showFavorite 
           </p>
         ) : null}
         {product.description ? (
-          <p className="muted">{stripRichHtml(product.description)}</p>
+          <p className="muted product-card__description">{stripRichHtml(product.description)}</p>
         ) : null}
         <div className="price">{formatPrice(product.price)}</div>
       </Link>
