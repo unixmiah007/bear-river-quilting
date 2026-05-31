@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import { useAdminSession } from '../hooks/useAdminSession.js';
@@ -6,6 +6,7 @@ import ProductImage from '../components/ProductImage.jsx';
 import CartIcon from '../components/CartIcon.jsx';
 import FavoriteProductButton from '../components/FavoriteProductButton.jsx';
 import ProductShareDialog from '../components/ProductShareDialog.jsx';
+import ShareIcon from '../components/ShareIcon.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { CUSTOMER_SIZE_OPTIONS, resolveProductPrice } from '../lib/productSizes.js';
 import PageLoading from '../components/PageLoading.jsx';
@@ -68,6 +69,8 @@ export default function ProductDetail() {
   const [activeIdx, setActiveIdx] = useState(0);
   const [selectedSize, setSelectedSize] = useState('');
   const [shareOpen, setShareOpen] = useState(false);
+  const [sizeMissing, setSizeMissing] = useState(false);
+  const purchaseFormRef = useRef(null);
 
   useEffect(() => {
     setActiveIdx(0);
@@ -106,6 +109,24 @@ export default function ProductDetail() {
   const displayPrice = product
     ? resolveProductPrice(product, sizeReady ? selectedSize : 'small')
     : 0;
+
+  function handleAddToCart(e) {
+    e.preventDefault();
+    if (!purchaseFormRef.current?.reportValidity() || !sizeReady) {
+      setSizeMissing(true);
+      return;
+    }
+    setSizeMissing(false);
+    addItem(
+      {
+        ...product,
+        product_size: selectedSize,
+        price: resolveProductPrice(product, selectedSize),
+      },
+      1
+    );
+    navigate('/cart');
+  }
 
   return (
     <>
@@ -169,74 +190,72 @@ export default function ProductDetail() {
           </div>
           <div className="product-detail-secondary-actions">
             <FavoriteProductButton productId={product.id} productName={product.name} />
-            <button type="button" className="btn" onClick={() => setShareOpen(true)}>
+            <button type="button" className="btn product-share-btn" onClick={() => setShareOpen(true)}>
+              <ShareIcon className="product-share-btn__icon" />
               Share with someone
             </button>
           </div>
-          <div className="field product-detail-size" style={{ marginBottom: '1rem' }}>
-            <label htmlFor="product-size">Size</label>
-            <select
-              id="product-size"
-              value={selectedSize}
-              onChange={(e) => setSelectedSize(e.target.value)}
-              required
-              aria-required="true"
-            >
-              <option value="">Select a size</option>
-              {CUSTOMER_SIZE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label} — {formatPrice(resolveProductPrice(product, o.value))}
-                </option>
-              ))}
-            </select>
-            {!sizeReady ? (
-              <p className="muted" style={{ margin: '0.35rem 0 0', fontSize: '0.9rem' }}>
-                Choose a size before adding to cart. Prices start at {formatPrice(product.price)}{' '}
-                (Small) and increase by $30 for each larger size.
-              </p>
-            ) : null}
-          </div>
-          <div className="price" style={{ fontSize: '1.35rem', marginBottom: '1rem' }}>
-            {formatPrice(displayPrice)}
-          </div>
-          {product.description ? (
-            <div
-              className="page-body cms-rich-content"
-              dangerouslySetInnerHTML={{ __html: product.description }}
-            />
-          ) : (
-            <p className="muted">Handmade quilt from Bear River Quilting.</p>
-          )}
-          <div className="row product-detail-actions" style={{ marginTop: '1rem' }}>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!sizeReady}
-              onClick={() => {
-                if (!sizeReady) return;
-                addItem(
-                  {
-                    ...product,
-                    product_size: selectedSize,
-                    price: resolveProductPrice(product, selectedSize),
-                  },
-                  1
-                );
-                navigate('/cart');
-              }}
-            >
-              Add to cart
-            </button>
-            <Link
-              className="btn"
-              to={`/customize?product=${encodeURIComponent(product.id)}`}
-            >
-              Customize
-            </Link>
-            <Link className="btn cart-inline-link" to="/cart">
-              <CartIcon /> View cart
-            </Link>
-          </div>
+          <form ref={purchaseFormRef} className="product-detail-purchase" onSubmit={handleAddToCart}>
+            <div className="field product-detail-size" style={{ marginBottom: '1rem' }}>
+              <label htmlFor="product-size">
+                Size <span className="field-required">(required)</span>
+              </label>
+              <select
+                id="product-size"
+                name="productSize"
+                value={selectedSize}
+                onChange={(e) => {
+                  setSelectedSize(e.target.value);
+                  if (e.target.value) setSizeMissing(false);
+                }}
+                required
+                aria-required="true"
+                aria-invalid={sizeMissing && !sizeReady}
+              >
+                <option value="">Select a size</option>
+                {CUSTOMER_SIZE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label} — {formatPrice(resolveProductPrice(product, o.value))}
+                  </option>
+                ))}
+              </select>
+              {sizeMissing && !sizeReady ? (
+                <p className="error" style={{ margin: '0.35rem 0 0', fontSize: '0.9rem' }}>
+                  Select a size before adding this quilt to your cart.
+                </p>
+              ) : !sizeReady ? (
+                <p className="muted" style={{ margin: '0.35rem 0 0', fontSize: '0.9rem' }}>
+                  Choose a size before adding to cart. Prices start at {formatPrice(product.price)}{' '}
+                  (Small) and increase by $30 for each larger size.
+                </p>
+              ) : null}
+            </div>
+            <div className="price" style={{ fontSize: '1.35rem', marginBottom: '1rem' }}>
+              {formatPrice(displayPrice)}
+            </div>
+            {product.description ? (
+              <div
+                className="page-body cms-rich-content"
+                dangerouslySetInnerHTML={{ __html: product.description }}
+              />
+            ) : (
+              <p className="muted">Handmade quilt from Bear River Quilting.</p>
+            )}
+            <div className="row product-detail-actions" style={{ marginTop: '1rem' }}>
+              <button type="submit" className="btn btn-primary">
+                Add to cart
+              </button>
+              <Link
+                className="btn"
+                to={`/customize?product=${encodeURIComponent(product.id)}`}
+              >
+                Customize
+              </Link>
+              <Link className="btn cart-inline-link" to="/cart">
+                <CartIcon /> View cart
+              </Link>
+            </div>
+          </form>
         </div>
       </section>
       {shareOpen ? (

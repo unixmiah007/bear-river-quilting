@@ -2694,6 +2694,33 @@ h2 {
   margin-bottom: 1rem;
 }
 
+.product-share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.product-share-btn__icon,
+.product-share-btn .share-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+}
+
+.product-detail-purchase {
+  margin: 0;
+}
+
+.field-required {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 0.88em;
+}
+
+.product-detail-size select[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
 .product-share-dialog {
   max-width: 34rem;
   max-height: min(92vh, 760px);
