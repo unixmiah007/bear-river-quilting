@@ -5,6 +5,7 @@ import CartNavLink from './CartNavLink.jsx';
 import AccountNavLink from './AccountNavLink.jsx';
 import AdminNavLink from './AdminNavLink.jsx';
 import ProductsNavLink from './ProductsNavLink.jsx';
+import SiteBreadcrumbs from './SiteBreadcrumbs.jsx';
 
 export function SiteNav({
   className,
@@ -151,6 +152,8 @@ export default function SiteHeader({ categories = [] }) {
           aria-label="Main navigation"
         />
       </div>
+
+      <SiteBreadcrumbs categories={categories} />
 
       <div
         id="site-mobile-nav"

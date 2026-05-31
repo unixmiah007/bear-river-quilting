@@ -436,8 +436,6 @@ button {
 .site-header {
   position: relative;
   z-index: 120;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--border);
   margin-bottom: 2rem;
 }
 
@@ -446,6 +444,53 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.site-breadcrumbs {
+  padding: 0.75rem 0 0;
+}
+
+.site-breadcrumbs__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.site-breadcrumbs__item {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.site-breadcrumbs__item:not(:last-child)::after {
+  content: '/';
+  margin: 0 0.45rem;
+  color: color-mix(in srgb, var(--muted) 70%, var(--border));
+  pointer-events: none;
+}
+
+.site-breadcrumbs__link {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.site-breadcrumbs__link:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.site-breadcrumbs__current {
+  color: var(--text);
+  font-weight: 500;
 }
 
 .nav-burger {
