@@ -94,7 +94,15 @@ export default function CustomizeSuccess() {
         )}
       </p>
       <div className="row">
-        <Link className="btn btn-primary" to="/customize">
+        {state.requestNumber && state.email ? (
+          <Link
+            className="btn btn-primary"
+            to={`/account?email=${encodeURIComponent(state.email)}&customRequest=${encodeURIComponent(state.requestNumber)}`}
+          >
+            View request status
+          </Link>
+        ) : null}
+        <Link className="btn" to="/customize">
           Start another design
         </Link>
         <Link className="btn" to="/products">

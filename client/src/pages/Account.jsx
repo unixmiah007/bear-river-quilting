@@ -10,6 +10,7 @@ import { useFavorites } from '../context/FavoritesContext.jsx';
 import { buildTrackingUrl, labelForCarrier } from '../lib/shippingCarriers.js';
 import PageLoading from '../components/PageLoading.jsx';
 import AccountVisitHistory from '../components/AccountVisitHistory.jsx';
+import AccountCustomQuiltLookup from '../components/AccountCustomQuiltLookup.jsx';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -205,10 +206,10 @@ export default function Account() {
     <>
       <h1>My account</h1>
       <p className="page-body">
-        View order status, shipping and billing addresses, and the card on file (last four digits
-        only—we never store your full card number). Enter the{' '}
-        <strong>same email you used at checkout</strong>. To jump straight to one order, add its{' '}
-        <strong>order number</strong> (from your confirmation screen or email).
+        View shop order status, shipping and billing details, and custom quilt requests from our
+        customize studio. Enter the <strong>same email you used at checkout</strong> or on your
+        custom request. Use an <strong>order number</strong> (starts with Q) or{' '}
+        <strong>custom request number</strong> (starts with CQ) to open one item directly.
       </p>
       <p className="muted" style={{ marginTop: '-0.5rem' }}>
         This page does not use a separate password. Anyone who knows your checkout email can request
@@ -344,6 +345,12 @@ export default function Account() {
           )}
         </section>
       ) : null}
+
+      <AccountCustomQuiltLookup
+        email={email}
+        onEmailChange={setEmail}
+        searchParams={searchParams}
+      />
 
       {mode === 'detail' && order ? (
         <section className="card">

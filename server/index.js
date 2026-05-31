@@ -92,6 +92,7 @@ import {
 import { getClientOrigin, PRODUCTION_CLIENT_ORIGIN } from './lib/clientOrigin.js';
 import { ensureOrderCustomPaymentsTable } from './lib/ensureOrderCustomPaymentsTable.js';
 import { createCustomPayment, searchCustomerPaymentsByEmail } from './lib/customOrderPayment.js';
+import { lookupCustomerCustomQuiltRequests } from './lib/customQuiltCustomerLookup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameRoot = path.dirname(__filename);
@@ -655,6 +656,34 @@ app.post('/api/customer/orders', async (req, res) => {
       });
     }
     res.status(500).json({ error: 'Could not load orders.' });
+  }
+});
+
+app.post('/api/customer/custom-quilt-requests', async (req, res) => {
+  try {
+    const result = await lookupCustomerCustomQuiltRequests(
+      req.body?.email,
+      req.body?.requestNumber ?? req.body?.customRequestNumber
+    );
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({
+        error: result.error,
+        hint: result.hint,
+      });
+    }
+    if (result.mode === 'detail') {
+      return res.json({ mode: 'detail', request: result.request });
+    }
+    res.json({ mode: 'list', requests: result.requests });
+  } catch (e) {
+    console.error('[customer/custom-quilt-requests]', e);
+    if (e.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        error: 'Custom quilt requests are not set up in the database yet.',
+        hint: 'Restart the API server to apply schema updates.',
+      });
+    }
+    res.status(500).json({ error: 'Could not load custom quilt requests.' });
   }
 });
 

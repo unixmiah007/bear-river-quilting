@@ -56,6 +56,8 @@ export const publicApi = {
     api(`/api/checkout/confirm?session_id=${encodeURIComponent(sessionId)}`),
   customerOrdersLookup: (body) =>
     api('/api/customer/orders', { method: 'POST', body: JSON.stringify(body) }),
+  customerCustomQuiltLookup: (body) =>
+    api('/api/customer/custom-quilt-requests', { method: 'POST', body: JSON.stringify(body) }),
   customerOrderMessages: (body) =>
     api('/api/customer/orders/messages', { method: 'POST', body: JSON.stringify(body) }),
   customerOrderMessage: (body) =>
