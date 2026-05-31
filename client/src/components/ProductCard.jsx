@@ -10,8 +10,9 @@ function formatPrice(n) {
   );
 }
 
-export default function ProductCard({ product, onAddToCart, badge, showFavorite = false }) {
+export default function ProductCard({ product, onAddToCart, badge, showFavorite = false, showCustomize = false }) {
   const detailPath = `/products/${product.id}`;
+  const customizePath = `/customize?product=${encodeURIComponent(product.id)}`;
 
   return (
     <article
@@ -46,6 +47,11 @@ export default function ProductCard({ product, onAddToCart, badge, showFavorite 
         <button type="button" className="btn btn-primary" onClick={() => onAddToCart(product)}>
           Add to cart
         </button>
+        {showCustomize ? (
+          <Link className="btn" to={customizePath}>
+            Customize
+          </Link>
+        ) : null}
       </div>
     </article>
   );

@@ -158,6 +158,7 @@ export default function Products() {
               key={p.id}
               product={p}
               showFavorite
+              showCustomize
               onAddToCart={(item) => {
                 addItem(item, 1);
                 navigate('/cart');
