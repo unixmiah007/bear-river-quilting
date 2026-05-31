@@ -41,9 +41,6 @@ export default function ProductCard({ product, onAddToCart, badge, showFavorite 
         <div className="price">{formatPrice(product.price)}</div>
       </Link>
       <div className="row card-actions">
-        <Link className="btn" to={detailPath}>
-          View
-        </Link>
         <button type="button" className="btn btn-primary" onClick={() => onAddToCart(product)}>
           Add to cart
         </button>
