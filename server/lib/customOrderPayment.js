@@ -3,6 +3,7 @@ import { getStripe } from './stripeCheckout.js';
 import { clientOriginPath } from './clientOrigin.js';
 import { sendSendGridMail, resolveSendGridFromCustomer } from './sendgridMail.js';
 import { fulfillCustomQuiltRequestPayment } from './customQuiltRequest.js';
+import { parseOrderNotifyRecipients } from './mail.js';
 
 export function customPaymentNumber() {
   return `CP${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 900 + 100)}`;
@@ -122,15 +123,21 @@ ${noteHtml}
 <p class="muted" style="font-size:0.9rem">Or copy this link:<br><a href="${escapeHtml(checkoutUrl)}">${escapeHtml(checkoutUrl)}</a></p>
 <p>— Bear River Quilting</p>`;
 
+  const customerEmail = String(to ?? '')
+    .trim()
+    .toLowerCase();
+  const cc = parseOrderNotifyRecipients().filter((addr) => addr !== customerEmail);
+
   await sendSendGridMail({
     to,
     from,
+    ...(cc.length ? { cc } : {}),
     subject: `Payment link for ${subjectNoun} ${referenceNumber} — ${amountLine}`,
     text,
     html,
   });
 
-  return { ok: true };
+  return { ok: true, ccCount: cc.length };
 }
 
 async function createStripePaymentSession({
