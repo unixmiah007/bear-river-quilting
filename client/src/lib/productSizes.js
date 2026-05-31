@@ -1,6 +1,18 @@
-/** Values match server/lib/productSize.js PRODUCT_SIZE_VALUES */
+/** Size tiers for per-size pricing (display order). Standard and Small share the base tier. */
+export const SIZE_PRICE_STEP_ORDER = ['standard', 'small', 'large', 'x-large', 'xx-large', 'xxx-large'];
+
+const SIZE_PRICE_STEP_INDEX = {
+  standard: 0,
+  small: 0,
+  large: 1,
+  'x-large': 2,
+  'xx-large': 3,
+  'xxx-large': 4,
+};
+
 export const PRODUCT_SIZE_OPTIONS = [
   { value: '', label: '— Not set —' },
+  { value: 'standard', label: 'Standard' },
   { value: 'small', label: 'Small' },
   { value: 'large', label: 'Large' },
   { value: 'x-large', label: 'X-Large' },
@@ -8,22 +20,21 @@ export const PRODUCT_SIZE_OPTIONS = [
   { value: 'xxx-large', label: 'XXX-Large' },
 ];
 
-/** Sizes shoppers can pick on the product detail page (no empty option). */
-export const CUSTOMER_SIZE_OPTIONS = PRODUCT_SIZE_OPTIONS.filter((o) => o.value !== '');
-
-/** Size tiers for pricing (lowest → highest). Base product price is the Small price. */
-export const SIZE_PRICE_STEP_ORDER = ['small', 'large', 'x-large', 'xx-large', 'xxx-large'];
+/** Sizes shoppers can pick on the product detail page. */
+export const CUSTOMER_SIZE_OPTIONS = PRODUCT_SIZE_OPTIONS.filter((o) =>
+  Object.hasOwn(SIZE_PRICE_STEP_INDEX, o.value)
+);
 
 export const SIZE_PRICE_INCREMENT = 30;
 
 export function sizePriceStepIndex(size) {
   if (size == null || String(size).trim() === '') return 0;
   const key = String(size).trim().toLowerCase();
-  const idx = SIZE_PRICE_STEP_ORDER.indexOf(key);
-  return idx >= 0 ? idx : 0;
+  if (Object.hasOwn(SIZE_PRICE_STEP_INDEX, key)) return SIZE_PRICE_STEP_INDEX[key];
+  return 0;
 }
 
-/** Base price is for Small; each step up the list adds $30. */
+/** Base price is Standard/Small tier; each step up adds $30. */
 export function priceForProductSize(basePrice, size) {
   const base = Number(basePrice);
   if (!Number.isFinite(base)) return 0;
@@ -89,6 +100,7 @@ export function sizePricesFormToPayload(sizePricesForm) {
 }
 
 const LABELS = {
+  standard: 'Standard',
   small: 'Small',
   large: 'Large',
   'x-large': 'X-Large',

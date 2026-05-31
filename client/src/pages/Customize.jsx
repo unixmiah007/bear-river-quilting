@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
+import CustomizeOwnDesignUpload from '../components/CustomizeOwnDesignUpload.jsx';
+import CustomizePurchasePreview from '../components/CustomizePurchasePreview.jsx';
 import PageLoading from '../components/PageLoading.jsx';
 import {
   estimateCustomizePrice,
@@ -100,6 +102,7 @@ const initialForm = {
   productSize: 'large',
   colorPalette: 'warm-neutrals',
   batting: 'cotton',
+  ownDesignImageUrl: '',
   quiltTitle: '',
   notes: '',
   contactName: '',
@@ -118,6 +121,10 @@ export default function Customize() {
   const [payCountdown, setPayCountdown] = useState(0);
   const [wizardConfig, setWizardConfig] = useState(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
+  const [ownDesignPreviewUrl, setOwnDesignPreviewUrl] = useState('');
+  const [ownDesignUploading, setOwnDesignUploading] = useState(false);
+  const [ownDesignUploadError, setOwnDesignUploadError] = useState(null);
+  const ownDesignBlobRef = useRef(null);
 
   const config = wizardConfig ?? getClientFallbackCustomizeConfig();
   const payPauseSeconds = Math.min(30, Math.max(0, Number(config.pay?.pauseSeconds ?? 4) || 0));
@@ -195,6 +202,15 @@ export default function Customize() {
   }, [step, payPauseSeconds]);
 
   useEffect(() => {
+    return () => {
+      if (ownDesignBlobRef.current) {
+        URL.revokeObjectURL(ownDesignBlobRef.current);
+        ownDesignBlobRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (searchParams.get('checkout') === 'cancelled') {
       setError(config.messages?.checkoutCancelled ?? 'Payment was cancelled.');
       setStep(isWizardStepEnabled(config, 5) ? 5 : maxStep);
@@ -216,15 +232,58 @@ export default function Customize() {
     [form.designId, form.productSize, products]
   );
 
+  function revokeOwnDesignBlob() {
+    if (ownDesignBlobRef.current) {
+      URL.revokeObjectURL(ownDesignBlobRef.current);
+      ownDesignBlobRef.current = null;
+    }
+  }
+
+  async function handleOwnDesignFile(file) {
+    setOwnDesignUploadError(null);
+    revokeOwnDesignBlob();
+    const blobUrl = URL.createObjectURL(file);
+    ownDesignBlobRef.current = blobUrl;
+    setOwnDesignPreviewUrl(blobUrl);
+    setOwnDesignUploading(true);
+    try {
+      const result = await publicApi.uploadCustomizeOwnDesign(file);
+      const url = result?.url ?? '';
+      setForm((f) => ({ ...f, ownDesignImageUrl: url }));
+      setOwnDesignPreviewUrl(url);
+      revokeOwnDesignBlob();
+    } catch (err) {
+      setOwnDesignUploadError(err.body?.error || err.message);
+      setForm((f) => ({ ...f, ownDesignImageUrl: '' }));
+    } finally {
+      setOwnDesignUploading(false);
+    }
+  }
+
+  function clearOwnDesign() {
+    revokeOwnDesignBlob();
+    setOwnDesignPreviewUrl('');
+    setOwnDesignUploadError(null);
+    setForm((f) => ({ ...f, ownDesignImageUrl: '' }));
+  }
+
+  const ownDesignDisplayUrl = ownDesignPreviewUrl || form.ownDesignImageUrl || '';
+
   function nextStep() {
     setError(null);
     if (step === 1 && !form.designId) {
       setError(config.messages?.chooseProduct ?? 'Choose a product from the catalog to continue.');
       return;
     }
-    if (step === 2 && (!form.productSize || !form.colorPalette)) {
-      setError(config.messages?.selectSizeColor ?? 'Select a size and color palette.');
-      return;
+    if (step === 2) {
+      if (ownDesignUploading) {
+        setError('Please wait for your design image to finish uploading.');
+        return;
+      }
+      if (!form.productSize || !form.colorPalette) {
+        setError(config.messages?.selectSizeColor ?? 'Select a size and color palette.');
+        return;
+      }
     }
     if (step === 4) {
       if (!form.contactName.trim() || !form.contactEmail.trim()) {
@@ -427,12 +486,28 @@ export default function Customize() {
                 onChange={(batting) => setForm((f) => ({ ...f, batting }))}
               />
             ) : null}
+            <CustomizeOwnDesignUpload
+              previewUrl={ownDesignDisplayUrl}
+              uploading={ownDesignUploading}
+              uploadError={ownDesignUploadError}
+              onPickFile={handleOwnDesignFile}
+              onClear={clearOwnDesign}
+            />
           </section>
         ) : null}
 
         {step === 3 && isWizardStepEnabled(config, 3) ? (
           <section className="customize-step">
             <h2>{step3?.title ?? 'Tell our designer your vision'}</h2>
+            <CustomizePurchasePreview
+              design={selectedDesign}
+              config={config}
+              productSize={form.productSize}
+              colorPalette={form.colorPalette}
+              batting={form.batting}
+              estimatedPrice={estimatedPrice}
+              ownDesignImageUrl={ownDesignDisplayUrl || null}
+            />
             <div className="field">
               <label htmlFor="quilt-title">
                 {step3?.quiltTitleLabel ?? 'Working title (optional)'}
@@ -462,6 +537,15 @@ export default function Customize() {
         {step === 4 && isWizardStepEnabled(config, 4) ? (
           <section className="customize-step">
             <h2>{step4?.title ?? 'How can we reach you?'}</h2>
+            <CustomizePurchasePreview
+              design={selectedDesign}
+              config={config}
+              productSize={form.productSize}
+              colorPalette={form.colorPalette}
+              batting={form.batting}
+              estimatedPrice={estimatedPrice}
+              ownDesignImageUrl={ownDesignDisplayUrl || null}
+            />
             <div className="field">
               <label htmlFor="custom-name">{step4?.nameLabel ?? 'Full name'}</label>
               <input
@@ -536,6 +620,18 @@ export default function Customize() {
                     <dd>{form.notes}</dd>
                   </div>
                 ) : null}
+                {ownDesignDisplayUrl ? (
+                  <div>
+                    <dt>Your design reference</dt>
+                    <dd>
+                      <img
+                        className="customize-review__own-design"
+                        src={ownDesignDisplayUrl}
+                        alt="Uploaded design reference"
+                      />
+                    </dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt>Contact</dt>
                   <dd>
@@ -592,7 +688,10 @@ export default function Customize() {
               type="button"
               className="btn btn-primary"
               onClick={nextStep}
-              disabled={step === 1 && (loadingProducts || products.length === 0)}
+              disabled={
+                (step === 1 && (loadingProducts || products.length === 0)) ||
+                (step === 2 && ownDesignUploading)
+              }
             >
               Continue
             </button>
@@ -600,7 +699,7 @@ export default function Customize() {
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={busy || estimatedPrice == null || payCountdown > 0}
+              disabled={busy || estimatedPrice == null || payCountdown > 0 || ownDesignUploading}
             >
               {busy
                 ? (step5?.payButtonBusyLabel ?? 'Redirecting to Stripe…')

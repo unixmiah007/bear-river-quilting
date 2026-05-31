@@ -3,8 +3,7 @@ import pool from '../db.js';
 import { buildCheckoutFromBody, insertPendingOrder } from './orderCheckout.js';
 import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './mail.js';
 import { fulfillCustomQuiltFromStripeSession } from './customQuiltStripeCheckout.js';
-
-const CLIENT_ORIGIN = (process.env.CLIENT_ORIGIN ?? 'http://localhost:5173').replace(/\/$/, '');
+import { clientOriginPath } from './clientOrigin.js';
 
 let stripeClient = null;
 
@@ -80,8 +79,8 @@ export async function createStripeCheckoutSession(body) {
       mode: 'payment',
       customer_email: draft.customer.email,
       line_items: lineItemsFromDraft(draft),
-      success_url: `${CLIENT_ORIGIN}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${CLIENT_ORIGIN}/cart?checkout=cancelled`,
+      success_url: `${clientOriginPath('/checkout/success')}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${clientOriginPath('/cart')}?checkout=cancelled`,
       metadata: {
         order_id: String(orderId),
         order_number: ordNo,

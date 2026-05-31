@@ -679,7 +679,7 @@ export default function AdminProducts() {
         <fieldset className="admin-size-prices">
           <legend>Prices by size (USD)</legend>
           <p className="muted admin-size-prices__hint">
-            Stored in the database per product. Small is also saved as the base catalog price.
+            Stored in the database per product. Standard and Small share the base tier; Small is saved as the catalog list price.
           </p>
           <div className="admin-size-prices__grid">
             {CUSTOMER_SIZE_OPTIONS.map((o) => (
@@ -939,7 +939,7 @@ export default function AdminProducts() {
           Download all products as CSV, edit in a spreadsheet, then upload. Required column on import:{' '}
           <strong>name</strong> (or <strong>title</strong>). Use <strong>id</strong> or <strong>sku</strong>{' '}
           to update existing rows; omit <strong>id</strong> for new products. Columns: id, sku, name,
-          description, price, stock_quantity, product_size (small, large, x-large, xx-large,
+          description, price, stock_quantity, product_size (standard, small, large, x-large, xx-large,
           xxx-large), image_url, is_published (1/0), is_featured (1/0).
         </p>
         <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>

@@ -75,6 +75,13 @@ export const QUILT_DESIGN_PALETTE = [
 /** Step 2 — size cards (values must match server product_size). */
 export const CUSTOMIZE_SIZE_OPTIONS = [
   {
+    value: 'standard',
+    label: 'Standard',
+    code: 'Std',
+    hint: 'Classic studio size · ~70" × 90"',
+    image: IMPROV_QUILTING_010_IMAGE,
+  },
+  {
     value: 'small',
     label: 'Small',
     code: 'S',
@@ -179,6 +186,7 @@ export const BATTING_OPTIONS = [
 ];
 
 const SIZE_MULTIPLIERS = {
+  standard: 0.85,
   small: 0.85,
   large: 1,
   'x-large': 1.12,

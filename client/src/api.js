@@ -65,6 +65,33 @@ export const publicApi = {
   submitCustomQuiltRequest: (body) =>
     api('/api/custom-quilt-requests', { method: 'POST', body: JSON.stringify(body) }),
   customizeConfig: () => api('/api/customize/config'),
+  uploadCustomizeOwnDesign: async (file) => {
+    const { prepareUploadImageFiles } = await import('./lib/prepareUploadImages.js');
+    const prepared = await prepareUploadImageFiles([file]);
+    const fd = new FormData();
+    fd.append('image', prepared[0]);
+    const res = await fetch('/api/customize/own-design', {
+      method: 'POST',
+      credentials: 'include',
+      body: fd,
+    });
+    const text = await res.text();
+    let data = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+    }
+    if (!res.ok) {
+      const err = new Error(data?.error || res.statusText || 'Upload failed');
+      err.status = res.status;
+      err.body = data;
+      throw err;
+    }
+    return data;
+  },
 };
 
 export const authApi = {

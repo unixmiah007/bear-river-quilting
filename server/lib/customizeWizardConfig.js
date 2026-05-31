@@ -16,6 +16,20 @@ function deepMerge(base, patch) {
   return out;
 }
 
+/** Keep saved size rows; insert any default tiers missing from older DB configs. */
+function mergeSizeOptionsWithDefaults(current, defaultOptions) {
+  if (!Array.isArray(defaultOptions) || defaultOptions.length === 0) return current;
+  const byValue = new Map((Array.isArray(current) ? current : []).map((o) => [o.value, o]));
+  const merged = defaultOptions.map((def) => {
+    const saved = byValue.get(def.value);
+    return saved ? { ...def, ...saved, value: def.value } : def;
+  });
+  for (const row of current) {
+    if (!defaultOptions.some((d) => d.value === row.value)) merged.push(row);
+  }
+  return merged;
+}
+
 function normalizeOptionList(list, { requireValue = true } = {}) {
   if (!Array.isArray(list)) return [];
   return list
@@ -61,7 +75,10 @@ export function normalizeCustomizeWizardConfig(raw) {
     })
     .filter((s) => s && typeof s.n === 'number');
 
-  merged.sizeOptions = normalizeOptionList(merged.sizeOptions);
+  merged.sizeOptions = mergeSizeOptionsWithDefaults(
+    normalizeOptionList(merged.sizeOptions),
+    defaults.sizeOptions
+  );
   merged.colorOptions = normalizeOptionList(merged.colorOptions);
   merged.battingOptions = normalizeOptionList(merged.battingOptions);
 

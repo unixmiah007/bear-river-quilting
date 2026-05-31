@@ -4,6 +4,8 @@ import {
   insertPendingCustomQuiltRequest,
   fulfillCustomQuiltRequestPayment,
 } from './customQuiltRequest.js';
+import { clientOriginPath } from './clientOrigin.js';
+
 const SIZE_LABELS = {
   small: 'Small',
   large: 'Large',
@@ -54,8 +56,8 @@ export async function createCustomQuiltStripeCheckoutSession(body) {
           quantity: 1,
         },
       ],
-      success_url: `${CLIENT_ORIGIN}/customize/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${CLIENT_ORIGIN}/customize?checkout=cancelled`,
+      success_url: `${clientOriginPath('/customize/success')}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${clientOriginPath('/customize')}?checkout=cancelled`,
       metadata: {
         checkout_type: 'custom_quilt',
         custom_quilt_request_id: String(requestId),

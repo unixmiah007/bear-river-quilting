@@ -23,6 +23,7 @@ export async function ensureCustomQuiltRequestsTable(pool) {
       batting VARCHAR(64) NULL,
       quilt_title VARCHAR(255) NULL,
       notes TEXT NULL,
+      own_design_image_url VARCHAR(512) NULL,
       customer_name VARCHAR(255) NOT NULL,
       customer_email VARCHAR(255) NOT NULL,
       customer_phone VARCHAR(64) NULL,
@@ -48,6 +49,11 @@ export async function ensureCustomQuiltRequestsTable(pool) {
   if (!(await columnExists(pool, 'custom_quilt_requests', 'stripe_payment_intent_id'))) {
     await pool.query(
       'ALTER TABLE custom_quilt_requests ADD COLUMN stripe_payment_intent_id VARCHAR(255) NULL AFTER stripe_checkout_session_id'
+    );
+  }
+  if (!(await columnExists(pool, 'custom_quilt_requests', 'own_design_image_url'))) {
+    await pool.query(
+      'ALTER TABLE custom_quilt_requests ADD COLUMN own_design_image_url VARCHAR(512) NULL AFTER notes'
     );
   }
 }

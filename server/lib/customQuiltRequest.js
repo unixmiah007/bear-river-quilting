@@ -9,6 +9,8 @@ import {
   getAllowedColorPaletteValues,
   loadCustomizeWizardConfig,
 } from './customizeWizardConfig.js';
+import { resolveOwnDesignImageUrl } from './customizeOwnDesignImage.js';
+import { getClientOrigin } from './clientOrigin.js';
 
 export function customQuiltRequestNumber() {
   return `CQ${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 900 + 100)}`;
@@ -73,6 +75,11 @@ export async function validateCustomQuiltBody(body) {
     return { ok: false, status: 400, error: 'Invalid batting option' };
   }
 
+  const ownDesign = resolveOwnDesignImageUrl(body?.ownDesignImageUrl);
+  if (!ownDesign.ok) {
+    return { ok: false, status: 400, error: ownDesign.error };
+  }
+
   return {
     ok: true,
     data: {
@@ -86,6 +93,7 @@ export async function validateCustomQuiltBody(body) {
       batting,
       quiltTitle,
       notes,
+      ownDesignImageUrl: ownDesign.url,
       estimatedPrice,
     },
   };
@@ -108,6 +116,9 @@ async function sendCustomQuiltEmails(row) {
     row.batting ? `Batting: ${row.batting}` : null,
     row.quilt_title ? `Working title: ${row.quilt_title}` : null,
     row.notes ? `Notes for designer:\n${row.notes}` : null,
+    row.own_design_image_url
+      ? `Customer design reference: ${getClientOrigin()}${row.own_design_image_url}`
+      : null,
     priceLine,
   ]
     .filter(Boolean)
@@ -184,6 +195,7 @@ function rowFromData(d, id, requestNumber) {
     batting: d.batting,
     quilt_title: d.quiltTitle,
     notes: d.notes,
+    own_design_image_url: d.ownDesignImageUrl,
     customer_name: d.customerName,
     customer_email: d.customerEmail,
     customer_phone: d.customerPhone,
@@ -208,8 +220,8 @@ export async function insertPendingCustomQuiltRequest(body) {
   const [result] = await pool.query(
     `INSERT INTO custom_quilt_requests (
        request_number, status, design_id, design_name, product_size, color_palette,
-       batting, quilt_title, notes, customer_name, customer_email, customer_phone, estimated_price
-     ) VALUES (?, 'pending_payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       batting, quilt_title, notes, own_design_image_url, customer_name, customer_email, customer_phone, estimated_price
+     ) VALUES (?, 'pending_payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       requestNumber,
       d.designId,
@@ -219,6 +231,7 @@ export async function insertPendingCustomQuiltRequest(body) {
       d.batting,
       d.quiltTitle,
       d.notes,
+      d.ownDesignImageUrl,
       d.customerName,
       d.customerEmail,
       d.customerPhone,
@@ -238,7 +251,7 @@ export async function fulfillCustomQuiltRequestPayment(requestId, { sessionId, p
   const id = Number(requestId);
   const [[existing]] = await pool.query(
     `SELECT id, request_number, status, design_id, design_name, product_size, color_palette,
-            batting, quilt_title, notes, customer_name, customer_email, customer_phone, estimated_price
+            batting, quilt_title, notes, own_design_image_url, customer_name, customer_email, customer_phone, estimated_price
      FROM custom_quilt_requests WHERE id = ?`,
     [id]
   );
@@ -297,8 +310,8 @@ export async function createCustomQuiltRequest(body) {
   const [result] = await pool.query(
     `INSERT INTO custom_quilt_requests (
        request_number, status, design_id, design_name, product_size, color_palette,
-       batting, quilt_title, notes, customer_name, customer_email, customer_phone, estimated_price
-     ) VALUES (?, 'submitted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       batting, quilt_title, notes, own_design_image_url, customer_name, customer_email, customer_phone, estimated_price
+     ) VALUES (?, 'submitted', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       requestNumber,
       d.designId,
@@ -308,6 +321,7 @@ export async function createCustomQuiltRequest(body) {
       d.batting,
       d.quiltTitle,
       d.notes,
+      d.ownDesignImageUrl,
       d.customerName,
       d.customerEmail,
       d.customerPhone,
@@ -335,7 +349,7 @@ export async function createCustomQuiltRequest(body) {
 export async function listCustomQuiltRequestsForAdmin() {
   const [rows] = await pool.query(
     `SELECT id, request_number, status, acknowledged, design_name, product_size, color_palette,
-            customer_name, customer_email, estimated_price, created_at
+            own_design_image_url, customer_name, customer_email, estimated_price, created_at
      FROM custom_quilt_requests
      ORDER BY created_at DESC
      LIMIT 200`

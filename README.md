@@ -50,5 +50,5 @@ Public pages only list products that are both **linked to that page** and **publ
 ## Production notes
 
 - Set `NODE_ENV=production`, use a strong `JWT_SECRET`, and serve the built client (`npm run build -w client`) behind your host of choice.
-- Configure `CLIENT_ORIGIN` on the server to your real frontend origin for CORS.
+- Set `CLIENT_ORIGIN=https://bearriverquilting.com` on the server (or rely on the production default). This controls Stripe return URLs such as `/customize/success?session_id=…`, cart checkout success, CORS, and email links.
 - Use HTTPS so the auth cookie can use `secure: true` (already tied to `NODE_ENV` in the server code).

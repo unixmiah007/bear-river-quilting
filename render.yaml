@@ -17,4 +17,5 @@ services:
       # MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE
       # JWT_SECRET — long random string
       # ADMIN_PASSWORD — admin login for /admin
-      # Optional: CLIENT_ORIGIN=https://bear-river-quilting.onrender.com if API and UI use different hosts
+      - key: CLIENT_ORIGIN
+        value: https://bearriverquilting.com

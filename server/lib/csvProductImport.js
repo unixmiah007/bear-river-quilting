@@ -92,7 +92,7 @@ function normalizeProductRow(norm) {
   const sizeRaw = pickRaw(norm, ['product_size', 'size', 'quilt_size']);
   const product_size = sizeRaw ? normalizeProductSize(sizeRaw) : null;
   if (sizeRaw && !product_size) {
-    return { error: `Invalid product_size "${sizeRaw}". Use: small, large, x-large, xx-large, xxx-large` };
+    return { error: `Invalid product_size "${sizeRaw}". Use: standard, small, large, x-large, xx-large, xxx-large` };
   }
 
   return {

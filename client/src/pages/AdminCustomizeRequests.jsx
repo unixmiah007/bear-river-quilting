@@ -224,7 +224,23 @@ export default function AdminCustomizeRequests() {
                   >
                     <td>{r.request_number}</td>
                     <td>{r.status}</td>
-                    <td>{r.design_name}</td>
+                    <td>
+                      {r.design_name}
+                      {r.own_design_image_url ? (
+                        <>
+                          <br />
+                          <a
+                            href={r.own_design_image_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="admin-customize-request__design-ref"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            View customer design
+                          </a>
+                        </>
+                      ) : null}
+                    </td>
                     <td>{formatProductSizeLabel(r.product_size) ?? r.product_size}</td>
                     <td>
                       {r.customer_name}

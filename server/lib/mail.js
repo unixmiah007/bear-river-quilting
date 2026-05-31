@@ -4,12 +4,11 @@ import {
   resolveSendGridFromStaff,
   isSendGridConfigured,
 } from './sendgridMail.js';
+import { getClientOrigin } from './clientOrigin.js';
 
 /** Comma-separated override via ORDER_NOTIFY_EMAILS in server/.env */
 const DEFAULT_ORDER_NOTIFY_EMAILS =
   'shaj.k.miah@gmail.com,tracyalto@brqllc.com,nadimamin101@gmail.com';
-
-const CLIENT_ORIGIN = (process.env.CLIENT_ORIGIN ?? 'http://localhost:5173').replace(/\/$/, '');
 
 /** Public account page deep link — opens order status when email + order match checkout. */
 export function buildCustomerOrderAccountUrl(email, orderNumber) {
@@ -17,17 +16,17 @@ export function buildCustomerOrderAccountUrl(email, orderNumber) {
     email: String(email ?? '').trim().toLowerCase(),
     order: String(orderNumber ?? '').trim(),
   });
-  return `${CLIENT_ORIGIN}/account?${params.toString()}`;
+  return `${getClientOrigin()}/account?${params.toString()}`;
 }
 
 /** Admin orders page — opens order detail after sign-in when not authenticated. */
 export function buildAdminOrderUrl(orderId) {
   const id = Number(orderId);
   if (!Number.isFinite(id) || id <= 0) {
-    return `${CLIENT_ORIGIN}/admin/orders`;
+    return `${getClientOrigin()}/admin/orders`;
   }
   const params = new URLSearchParams({ order: String(id) });
-  return `${CLIENT_ORIGIN}/admin/orders?${params.toString()}`;
+  return `${getClientOrigin()}/admin/orders?${params.toString()}`;
 }
 
 export function parseOrderNotifyRecipients() {

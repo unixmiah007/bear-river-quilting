@@ -80,6 +80,13 @@ export function getDefaultCustomizeWizardConfig() {
       pauseSeconds: 4,
     },
     sizeOptions: [
+      {
+        value: 'standard',
+        label: 'Standard',
+        code: 'Std',
+        hint: 'Classic studio size · ~70" × 90"',
+        enabled: true,
+      },
       { value: 'small', label: 'Small', code: 'S', hint: 'Throw / lap · ~50" × 65"', enabled: true },
       { value: 'large', label: 'Large', code: 'L', hint: 'Full / queen · ~90" × 90"', enabled: true },
       {

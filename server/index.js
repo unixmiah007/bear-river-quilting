@@ -85,12 +85,18 @@ import {
   loadCustomizeWizardConfig,
   saveCustomizeWizardConfig,
 } from './lib/customizeWizardConfig.js';
+import {
+  OWN_DESIGN_URL_PREFIX,
+  ownDesignUploadRoot,
+} from './lib/customizeOwnDesignImage.js';
+import { getClientOrigin, PRODUCTION_CLIENT_ORIGIN } from './lib/clientOrigin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameRoot = path.dirname(__filename);
 const UPLOAD_ROOT = path.join(__dirnameRoot, 'uploads');
 
 fs.mkdirSync(path.join(UPLOAD_ROOT, 'products'), { recursive: true });
+fs.mkdirSync(ownDesignUploadRoot(UPLOAD_ROOT), { recursive: true });
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 4000);
@@ -100,7 +106,7 @@ const COOKIE_NAME = 'cms_token';
 
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN ?? 'http://localhost:5173',
+    origin: getClientOrigin(),
     credentials: true,
   })
 );
@@ -141,7 +147,7 @@ function parseProductSizeInput(body) {
   if (!v) {
     return {
       ok: false,
-      error: 'Invalid product_size. Allowed: small, large, x-large, xx-large, xxx-large',
+      error: 'Invalid product_size. Allowed: standard, small, large, x-large, xx-large, xxx-large',
     };
   }
   return { ok: true, value: v };
@@ -200,6 +206,21 @@ const mediaLibraryUpload = multer({
     },
   }),
   limits: { fileSize: IMAGE_UPLOAD_MAX_BYTES },
+  fileFilter: imageUploadFileFilter,
+});
+
+const customizeOwnDesignUpload = multer({
+  storage: multer.diskStorage({
+    destination(_req, _file, cb) {
+      const dir = ownDesignUploadRoot(UPLOAD_ROOT);
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename(_req, file, cb) {
+      cb(null, imageUploadFilename(file));
+    },
+  }),
+  limits: { fileSize: IMAGE_UPLOAD_MAX_BYTES, files: 1 },
   fileFilter: imageUploadFileFilter,
 });
 
@@ -517,6 +538,34 @@ app.get('/api/customize/config', async (_req, res) => {
   } catch (e) {
     console.error('[customize/config]', e);
     res.status(500).json({ error: 'Failed to load customize wizard config' });
+  }
+});
+
+app.post('/api/customize/own-design', (req, res, next) => {
+  customizeOwnDesignUpload.single('image')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message || 'Upload failed' });
+    next();
+  });
+}, async (req, res) => {
+  const file = req.file;
+  if (!file) {
+    return res.status(400).json({ error: 'No image file received (use field name "image")' });
+  }
+  try {
+    const [normalized] = await normalizeUploadedImageFiles([file]);
+    const f = normalized ?? file;
+    const url = `${OWN_DESIGN_URL_PREFIX}${f.filename}`;
+    res.status(201).json({ ok: true, url });
+  } catch (e) {
+    console.error('[customize/own-design]', e);
+    if (file?.path && fs.existsSync(file.path)) {
+      try {
+        fs.unlinkSync(file.path);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    res.status(400).json({ error: e.message || 'Could not process image' });
   }
 });
 
@@ -1978,16 +2027,18 @@ app.post('/api/admin/test-email', authMiddleware, async (req, res) => {
   }
 });
 
-/** Production: serve Vite build from same origin so /api and /uploads work without CORS changes. */
-// --- Static file serving & SPA fallback ---
+/** Production: serve Vite build from same origin so /customize/success and /api share one host. */
 const clientDist = path.join(__dirnameRoot, '..', 'client', 'dist');
 const clientIndexHtml = path.join(clientDist, 'index.html');
-
-app.use(express.static(clientDist));
-
-app.get('*', (_req, res) => {
-  res.sendFile(clientIndexHtml);
-});
+if (fs.existsSync(clientIndexHtml)) {
+  app.use(express.static(clientDist));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+      return next();
+    }
+    res.sendFile(clientIndexHtml, (err) => (err ? next(err) : undefined));
+  });
+}
 
 async function startServer() {
   try {
@@ -2068,7 +2119,15 @@ async function startServer() {
   }
   app.listen(PORT, async () => {
     const stripeOk = !!process.env.STRIPE_SECRET_KEY;
+    const clientOrigin = getClientOrigin();
     console.log(`[stripe] ${stripeOk ? 'configured (test/live per secret key)' : 'not configured — set STRIPE_SECRET_KEY'}`);
+    console.log(`[client] CLIENT_ORIGIN=${clientOrigin}`);
+    if (process.env.NODE_ENV === 'production' && !process.env.CLIENT_ORIGIN) {
+      console.log(
+        `[client] Using default production origin ${PRODUCTION_CLIENT_ORIGIN} (set CLIENT_ORIGIN to override)`
+      );
+    }
+    console.log(`[stripe] Custom quilt success URL: ${clientOrigin}/customize/success?session_id={CHECKOUT_SESSION_ID}`);
     console.log(`API listening on http://localhost:${PORT}`);
     await verifySendGridIfConfigured();
   });

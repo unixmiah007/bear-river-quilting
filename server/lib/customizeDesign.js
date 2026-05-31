@@ -27,6 +27,7 @@ const LEGACY_BASE_PRICES = {
 };
 
 const LEGACY_SIZE_MULTIPLIERS = {
+  standard: 0.85,
   small: 0.85,
   large: 1,
   'x-large': 1.12,
