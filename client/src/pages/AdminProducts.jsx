@@ -161,6 +161,8 @@ export default function AdminProducts() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [allCategories, setAllCategories] = useState([]);
   const [formCategoryIds, setFormCategoryIds] = useState([]);
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createProgress, setCreateProgress] = useState(null);
 
   const filteredRows = useMemo(() => {
     const term = searchQuery.trim().toLowerCase();
@@ -331,7 +333,10 @@ export default function AdminProducts() {
 
   async function onCreate(e) {
     e.preventDefault();
+    if (createBusy) return;
     setError(null);
+    setCreateBusy(true);
+    setCreateProgress({ phase: 'Saving product to database…', percent: 20 });
     try {
       const pricePayload = sizePricesFormToPayload(form.size_prices);
       const { id } = await adminApi.createProduct({
@@ -342,11 +347,14 @@ export default function AdminProducts() {
         is_published: !!form.is_published,
         is_featured: !!form.is_featured,
       });
+      setCreateProgress({ phase: 'Saving categories…', percent: 55 });
       await saveProductCategories(id);
-      setEditingId(id);
-      await refresh();
+      setCreateProgress({ phase: 'Opening product for editing…', percent: 90 });
+      window.location.assign(`/admin/products?edit=${encodeURIComponent(id)}`);
     } catch (err) {
       setError(err.body?.error || err.message);
+      setCreateBusy(false);
+      setCreateProgress(null);
     }
   }
 
@@ -609,6 +617,7 @@ export default function AdminProducts() {
         {editingId ? 'Edit product' : 'New product'}
       </h2>
       <form className="form admin-product-form" onSubmit={editingId ? onUpdate : onCreate}>
+        <fieldset className="admin-product-form__fields" disabled={createBusy}>
         <div className="field">
           <label htmlFor="sku">SKU</label>
           <input
@@ -773,11 +782,38 @@ export default function AdminProducts() {
               </button>
             </>
           ) : (
-            <button type="submit" className="btn btn-primary">
-              Create product
+            <button type="submit" className="btn btn-primary" disabled={createBusy}>
+              {createBusy ? 'Saving…' : 'Create product'}
             </button>
           )}
         </div>
+        </fieldset>
+        {createProgress ? (
+          <div
+            className="admin-upload-progress admin-save-progress"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <div className="admin-upload-progress__header">
+              <span className="admin-upload-progress__phase">{createProgress.phase}</span>
+              <span className="admin-upload-progress__counts muted">Please wait</span>
+            </div>
+            <div
+              className="admin-upload-progress__bar admin-save-progress__bar"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={createProgress.percent}
+              aria-label={createProgress.phase}
+            >
+              <div
+                className="admin-upload-progress__bar-fill admin-save-progress__bar-fill"
+                style={{ width: `${createProgress.percent}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
       </form>
 
       <section className="card admin-gallery-section" style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>

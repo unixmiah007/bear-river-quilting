@@ -2868,6 +2868,42 @@ h2 {
   .admin-upload-progress__bar-fill {
     transition: none;
   }
+
+  .admin-save-progress__bar-fill {
+    animation: none;
+  }
+}
+
+.admin-save-progress {
+  margin-top: 0.85rem;
+}
+
+.admin-save-progress__bar-fill {
+  transition: width 0.35s ease;
+  background: linear-gradient(90deg, #111 0%, #555 50%, #111 100%);
+  background-size: 200% 100%;
+  animation: admin-save-progress-shimmer 1.1s linear infinite;
+}
+
+@keyframes admin-save-progress-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.admin-product-form__fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.admin-product-form__fields:disabled {
+  opacity: 0.72;
+  pointer-events: none;
 }
 
 .admin-media-grid {
