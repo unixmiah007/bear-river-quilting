@@ -35,6 +35,7 @@ import {
   normalizeUploadedImageFiles,
 } from './lib/imageUpload.js';
 import { seedDemoProducts } from './lib/seedDemoProducts.js';
+import { generateNextProductSku } from './lib/productSku.js';
 import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './lib/mail.js';
 import { verifySendGridIfConfigured } from './lib/sendgridMail.js';
 import { normalizeProductSize } from './lib/productSize.js';
@@ -1014,6 +1015,19 @@ app.get('/api/admin/products', authMiddleware, async (_req, res) => {
       return sendProductSchemaMismatch(res);
     }
     res.status(500).json({ error: 'Failed to list products' });
+  }
+});
+
+app.get('/api/admin/products/next-sku', authMiddleware, async (_req, res) => {
+  try {
+    const sku = await generateNextProductSku(pool);
+    res.json({ sku });
+  } catch (e) {
+    console.error(e);
+    if (isMissingProductColumnError(e)) {
+      return sendProductSchemaMismatch(res);
+    }
+    res.status(500).json({ error: 'Failed to generate SKU', detail: e.message });
   }
 });
 

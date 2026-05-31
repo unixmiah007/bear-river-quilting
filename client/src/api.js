@@ -83,6 +83,7 @@ export const adminApi = {
   deletePage: (id) => api(`/api/admin/pages/${id}`, { method: 'DELETE' }),
 
   products: () => apiJsonArray('/api/admin/products'),
+  nextProductSku: () => api('/api/admin/products/next-sku'),
   product: (id) => api(`/api/admin/products/by-id/${encodeURIComponent(id)}`),
   uploadProductImages: async (id, files) => {
     const { prepareUploadImageFiles } = await import('./lib/prepareUploadImages.js');

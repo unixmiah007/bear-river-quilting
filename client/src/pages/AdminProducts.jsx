@@ -25,7 +25,7 @@ const emptyForm = {
   stock_quantity: '0',
   product_size: '',
   image_url: '',
-  is_published: false,
+  is_published: true,
   is_featured: false,
 };
 
@@ -240,6 +240,24 @@ export default function AdminProducts() {
     setRows(Array.isArray(data) ? data : []);
   }
 
+  const loadNextSku = useCallback(async () => {
+    try {
+      const data = await adminApi.nextProductSku();
+      if (data?.sku) {
+        setForm((f) => ({ ...f, sku: data.sku }));
+      }
+    } catch {
+      /* keep current SKU field value */
+    }
+  }, []);
+
+  async function resetNewProductForm() {
+    setEditingId(null);
+    setFormCategoryIds([]);
+    setGalleryImages([]);
+    setForm({ ...emptyForm });
+  }
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -259,6 +277,11 @@ export default function AdminProducts() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (loading || editingId) return;
+    loadNextSku();
+  }, [loading, editingId, loadNextSku]);
 
   useEffect(() => {
     if (!editingId) {
@@ -415,10 +438,7 @@ export default function AdminProducts() {
         is_featured: !!form.is_featured,
       });
       await saveProductCategories(editingId);
-      setEditingId(null);
-      setForm(emptyForm);
-      setFormCategoryIds([]);
-      setGalleryImages([]);
+      resetNewProductForm();
       await refresh();
     } catch (err) {
       setError(err.body?.error || err.message);
@@ -489,9 +509,7 @@ export default function AdminProducts() {
     try {
       await adminApi.deleteProduct(deleteTarget.id);
       if (editingId === deleteTarget.id) {
-        setEditingId(null);
-        setForm(emptyForm);
-        setGalleryImages([]);
+        resetNewProductForm();
       }
       setDeleteTarget(null);
       await refresh();
@@ -597,9 +615,14 @@ export default function AdminProducts() {
             id="sku"
             value={form.sku}
             onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
-            placeholder="Optional, unique"
+            placeholder={editingId ? 'Unique product code' : 'Auto-generated from database'}
             maxLength={64}
           />
+          {!editingId ? (
+            <p className="muted" style={{ margin: '0.35rem 0 0', fontSize: '0.82rem' }}>
+              Suggested SKU loaded automatically; you can edit it before saving.
+            </p>
+          ) : null}
         </div>
         <div className="field">
           <label htmlFor="name">Name</label>
@@ -743,10 +766,7 @@ export default function AdminProducts() {
                 type="button"
                 className="btn"
                 onClick={() => {
-                  setEditingId(null);
-                  setForm(emptyForm);
-                  setFormCategoryIds([]);
-                  setGalleryImages([]);
+                  resetNewProductForm();
                 }}
               >
                 Cancel
