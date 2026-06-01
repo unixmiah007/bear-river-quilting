@@ -6,7 +6,6 @@ import ProductImage from '../components/ProductImage.jsx';
 import CartIcon from '../components/CartIcon.jsx';
 import FavoriteProductButton from '../components/FavoriteProductButton.jsx';
 import ProductShareButton from '../components/ProductShareButton.jsx';
-import ShareIcon from '../components/ShareIcon.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { CUSTOMER_SIZE_OPTIONS, resolveProductPrice } from '../lib/productSizes.js';
 import PageLoading from '../components/PageLoading.jsx';
@@ -189,10 +188,7 @@ export default function ProductDetail() {
           </div>
           <div className="product-detail-secondary-actions">
             <FavoriteProductButton productId={product.id} productName={product.name} />
-            <button type="button" className="btn product-share-btn" onClick={() => setShareOpen(true)}>
-              <ShareIcon className="product-share-btn__icon" />
-              Share with someone
-            </button>
+            <ProductShareButton product={product} imageSrc={mainSrc} />
           </div>
           <form ref={purchaseFormRef} className="product-detail-purchase" onSubmit={handleAddToCart}>
             <div className="field product-detail-size" style={{ marginBottom: '1rem' }}>
