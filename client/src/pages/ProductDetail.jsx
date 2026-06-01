@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import { useAdminSession } from '../hooks/useAdminSession.js';
 import ProductImage from '../components/ProductImage.jsx';
+import AccountIcon from '../components/AccountIcon.jsx';
 import CartIcon from '../components/CartIcon.jsx';
 import FavoriteProductButton from '../components/FavoriteProductButton.jsx';
 import ProductShareButton from '../components/ProductShareButton.jsx';
@@ -238,13 +239,13 @@ export default function ProductDetail() {
             )}
             <div className="row product-detail-actions" style={{ marginTop: '1rem' }}>
               <button type="submit" className="btn btn-primary">
-                Add to cart
+                <CartIcon /> Add to cart
               </button>
               <Link
                 className="btn"
                 to={`/customize?product=${encodeURIComponent(product.id)}`}
               >
-                Customize
+                <AccountIcon /> Customize
               </Link>
               <Link className="btn cart-inline-link" to="/cart">
                 <CartIcon /> View cart

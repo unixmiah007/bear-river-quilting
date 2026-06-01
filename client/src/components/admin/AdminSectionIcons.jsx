@@ -361,6 +361,19 @@ export function BattingOptionsIcon({ className = '' }) {
   );
 }
 
+export function EmailBlastIcon({ className = '' }) {
+  return (
+    <IconBase className={className}>
+      <path
+        d="M4 6.5 12 12l8-5.5M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+    </IconBase>
+  );
+}
+
 export function ValidationMessagesIcon({ className = '' }) {
   return (
     <IconBase className={className}>

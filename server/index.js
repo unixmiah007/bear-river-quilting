@@ -63,6 +63,8 @@ import { getDefaultShipFrom } from './lib/defaultShipFrom.js';
 import { buildOrderInvoicePdf, invoicePdfFilename } from './lib/orderInvoicePdf.js';
 import { emailCustomerOrderInvoice, loadOrderInvoiceContext } from './lib/orderInvoiceEmail.js';
 import { sendProductShareEmail } from './lib/productShareEmail.js';
+import { ensureProductEmailBlastsTable } from './lib/ensureProductEmailBlastsTable.js';
+import { listProductEmailBlasts, sendProductEmailBlast } from './lib/productEmailBlast.js';
 import { ensureOrderInvoiceEmailColumn } from './lib/ensureOrderInvoiceEmailColumn.js';
 import { sendOrderTrackingNotification } from './lib/orderTracking.js';
 import { sendCustomQuiltTrackingNotification } from './lib/customQuiltTracking.js';
@@ -1637,6 +1639,32 @@ app.put('/api/admin/products/:id', authMiddleware, async (req, res) => {
   }
 });
 
+app.get('/api/admin/products/:id/email-blasts', authMiddleware, async (req, res) => {
+  try {
+    const result = await listProductEmailBlasts(req.params.id);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result.blasts);
+  } catch (e) {
+    console.error('[admin/product-email-blasts]', e);
+    res.status(500).json({ error: 'Failed to load email blast history.' });
+  }
+});
+
+app.post('/api/admin/products/:id/email-blast', authMiddleware, async (req, res) => {
+  try {
+    const result = await sendProductEmailBlast(req.params.id, req.body ?? {});
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error('[admin/product-email-blast]', e);
+    res.status(500).json({ error: 'Failed to send product email blast.' });
+  }
+});
+
 app.patch('/api/admin/products/:id/visibility', authMiddleware, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -2516,6 +2544,11 @@ async function startServer() {
     await ensureOrderAdjustmentColumns(pool);
   } catch (e) {
     console.error('[ensureOrderAdjustmentColumns]', e?.message || e);
+  }
+  try {
+    await ensureProductEmailBlastsTable(pool);
+  } catch (e) {
+    console.error('[ensureProductEmailBlastsTable]', e?.message || e);
   }
   app.listen(PORT, async () => {
     const stripeOk = !!process.env.STRIPE_SECRET_KEY;

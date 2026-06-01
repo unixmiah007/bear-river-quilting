@@ -6,6 +6,7 @@ import ProductImage from '../components/ProductImage.jsx';
 import ProductMediaLibrary from '../components/ProductMediaLibrary.jsx';
 import RichTextEditor from '../components/RichTextEditor.jsx';
 import AdminCustomizeWizardPanel from '../components/AdminCustomizeWizardPanel.jsx';
+import AdminProductEmailBlast from '../components/admin/AdminProductEmailBlast.jsx';
 import AdminSectionTitle, { AdminSectionLegend } from '../components/admin/AdminSectionTitle.jsx';
 import {
   CsvImportIcon,
@@ -639,6 +640,8 @@ export default function AdminProducts() {
       {info ? <p className="muted">{info}</p> : null}
 
       <AdminCustomizeWizardPanel />
+
+      <AdminProductEmailBlast products={rows} editingId={editingId} />
 
       <section
         ref={editSectionRef}

@@ -191,6 +191,13 @@ export const adminApi = {
       body: JSON.stringify({ is_published: !!isPublished }),
     }),
   deleteProduct: (id) => api(`/api/admin/products/${id}`, { method: 'DELETE' }),
+  productEmailBlasts: (productId) =>
+    apiJsonArray(`/api/admin/products/${encodeURIComponent(productId)}/email-blasts`),
+  sendProductEmailBlast: (productId, body) =>
+    api(`/api/admin/products/${encodeURIComponent(productId)}/email-blast`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   productCategoriesForProduct: (productId) =>
     apiJsonArray(`/api/admin/products/${encodeURIComponent(productId)}/categories`),
   setProductCategories: (productId, categoryIds) =>
