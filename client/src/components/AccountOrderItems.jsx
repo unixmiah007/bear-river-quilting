@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import OrderTotalProductLinks from './OrderTotalProductLinks.jsx';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -22,7 +23,7 @@ function issuedRefundTotal(items) {
   }, 0);
 }
 
-function lineItemWasChanged(it) {
+export function lineItemWasChanged(it) {
   if (!it.original_product_name) return false;
   return (
     Number(it.original_product_id) !== Number(it.product_id) ||
@@ -84,15 +85,21 @@ export default function AccountOrderItems({ order, items }) {
           ) : null}
           <div className="account-order-adjustment__totals">
             {hasOriginalTotals ? (
-              <div className="account-order-adjustment__row">
-                <span className="account-order-adjustment__label">Original order total</span>
+              <div className="account-order-adjustment__row account-order-adjustment__row--with-links">
+                <span className="account-order-adjustment__label">
+                  Original order total
+                  <OrderTotalProductLinks items={items} variant="original" />
+                </span>
                 <span className="account-order-adjustment__value muted">
                   {formatPrice(order.original_total)}
                 </span>
               </div>
             ) : null}
-            <div className="account-order-adjustment__row">
-              <span className="account-order-adjustment__label">Current order total</span>
+            <div className="account-order-adjustment__row account-order-adjustment__row--with-links">
+              <span className="account-order-adjustment__label">
+                Current order total
+                <OrderTotalProductLinks items={items} variant="current" />
+              </span>
               <span className="account-order-adjustment__value">
                 <strong>{formatPrice(order.total)}</strong>
               </span>

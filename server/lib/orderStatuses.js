@@ -7,7 +7,7 @@ export const ORDER_STATUS_OPTIONS = [
   { value: 'on_hold', label: 'On hold' },
   { value: 'cancelled', label: 'Cancelled' },
   { value: 'return', label: 'Return' },
-  { value: 'refunded', label: 'Refunded' },
+  { value: 'refunded', label: 'Refund' },
   { value: 'fulfilled', label: 'Fulfilled' },
   { value: 'shipped', label: 'Shipped' },
   { value: 'complete', label: 'Complete' },

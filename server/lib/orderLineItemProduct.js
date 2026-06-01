@@ -94,6 +94,24 @@ async function loadOrderItems(orderId) {
   return items;
 }
 
+async function loadUpdatedOrder(orderId) {
+  const [[row]] = await pool.query(
+    `SELECT id, order_number, status, customer_name, customer_email, customer_phone,
+            shipping_address1, shipping_address2, shipping_city, shipping_state, shipping_postal_code, shipping_country,
+            shipping_method, shipping_cost,
+            billing_name, billing_address1, billing_address2, billing_city, billing_state, billing_postal_code, billing_country,
+            card_last4, subtotal, tax_amount, total, created_at,
+            original_subtotal, original_tax_amount, original_total, order_adjusted_at,
+            tracking_carrier, tracking_number, tracking_notified_at, invoice_emailed_at,
+            label_from_name, label_from_address1, label_from_address2,
+            label_from_city, label_from_state, label_from_postal_code, label_from_country, label_from_phone,
+            stripe_payment_intent_id
+     FROM orders WHERE id = ?`,
+    [orderId]
+  );
+  return row ?? null;
+}
+
 async function clearItemRefundMeta(itemId) {
   await pool.query(
     `UPDATE order_items SET
@@ -290,21 +308,6 @@ export async function changeOrderLineItemProduct({ orderId, itemId, productId })
     );
     await conn.commit();
 
-    const [[updatedOrder]] = await pool.query(
-      `SELECT id, order_number, status, customer_name, customer_email, customer_phone,
-              shipping_address1, shipping_address2, shipping_city, shipping_state, shipping_postal_code, shipping_country,
-              shipping_method, shipping_cost,
-              billing_name, billing_address1, billing_address2, billing_city, billing_state, billing_postal_code, billing_country,
-              card_last4, subtotal, tax_amount, total, created_at,
-              original_subtotal, original_tax_amount, original_total, order_adjusted_at,
-              tracking_carrier, tracking_number, tracking_notified_at, invoice_emailed_at,
-              label_from_name, label_from_address1, label_from_address2,
-              label_from_city, label_from_state, label_from_postal_code, label_from_country, label_from_phone,
-              stripe_payment_intent_id
-       FROM orders WHERE id = ?`,
-      [oid]
-    );
-
     const newTotal = totals.total;
 
     const adjustment = {
@@ -327,7 +330,7 @@ export async function changeOrderLineItemProduct({ orderId, itemId, productId })
           const itemsWithRefund = await loadOrderItems(oid);
           return {
             ok: true,
-            order: updatedOrder,
+            order: await loadUpdatedOrder(oid),
             items: itemsWithRefund,
             adjustment: {
               ...adjustment,
@@ -347,7 +350,7 @@ export async function changeOrderLineItemProduct({ orderId, itemId, productId })
           const itemsWithRefund = await loadOrderItems(oid);
           return {
             ok: true,
-            order: updatedOrder,
+            order: await loadUpdatedOrder(oid),
             items: itemsWithRefund,
             adjustment: {
               ...adjustment,
@@ -380,6 +383,8 @@ export async function changeOrderLineItemProduct({ orderId, itemId, productId })
             status: 'issued',
             refundId: refund.id,
           });
+
+          await pool.query('UPDATE orders SET status = ? WHERE id = ?', ['refunded', oid]);
 
           let emailSent = false;
           let emailError = null;
@@ -451,7 +456,7 @@ export async function changeOrderLineItemProduct({ orderId, itemId, productId })
 
     return {
       ok: true,
-      order: updatedOrder,
+      order: await loadUpdatedOrder(oid),
       items: finalItems,
       adjustment,
       previousProductName: item.product_name,

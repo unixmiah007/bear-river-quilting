@@ -9,6 +9,8 @@ import PageLoading from '../components/PageLoading.jsx';
 import { labelForCarrier, SHIPPING_CARRIER_OPTIONS } from '../lib/shippingCarriers.js';
 import { ORDER_STATUS_OPTIONS, normalizeOrderStatusForForm, labelForOrderStatus } from '../lib/orderStatuses.js';
 import { formatProductPriceRange } from '../lib/productSizes.js';
+import { lineItemWasChanged } from '../components/AccountOrderItems.jsx';
+import AdminOrderAdjustmentHistory from '../components/admin/AdminOrderAdjustmentHistory.jsx';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
 const SORTABLE_COLUMNS = ['order', 'customer', 'status', 'total', 'created'];
@@ -122,7 +124,7 @@ function formatLineItemChangeMessage(result) {
   if (adj.type === 'refund') {
     if (adj.refundIssued) {
       parts.push(
-        `Refund of ${formatPrice(adj.refundAmount)} issued (${formatPrice(adj.priorTotal)} → ${formatPrice(adj.newTotal)}).`
+        `Refund of ${formatPrice(adj.refundAmount)} issued (${formatPrice(adj.priorTotal)} → ${formatPrice(adj.newTotal)}). Order status set to Refund.`
       );
       if (adj.emailSent) parts.push('Customer notified by email.');
       else if (adj.emailError) parts.push(`Refund email failed: ${adj.emailError}`);
@@ -432,8 +434,13 @@ export default function AdminOrders() {
         itemId,
         productId
       );
-      setDetails({ order: result.order, items: result.items });
-      setItemProductMsg(formatLineItemChangeMessage(result));
+      const msg = formatLineItemChangeMessage(result);
+      const orderId = details.order.id;
+      await loadDetails(orderId);
+      setItemProductMsg(msg);
+      if (result.adjustment?.refundStatus === 'issued') {
+        setStatusForm('refunded');
+      }
       await refresh();
     } catch (err) {
       setError(err.body?.error || err.message);
@@ -855,6 +862,11 @@ export default function AdminOrders() {
               {itemProductMsg}
             </p>
           ) : null}
+          <AdminOrderAdjustmentHistory
+            order={details.order}
+            items={details.items}
+            customPayments={details.customPayments}
+          />
           <div className="table-wrap">
             <table className="admin-order-items-table">
               <thead>
@@ -913,6 +925,20 @@ export default function AdminOrders() {
                         >
                           Calculating refund…
                         </span>
+                      ) : null}
+                      {lineItemWasChanged(it) ? (
+                        <div className="admin-order-item-original" style={{ marginTop: '0.35rem' }}>
+                          <span className="account-order-item-tag account-order-item-tag--original">
+                            Original order
+                          </span>
+                          <span className="admin-order-item-original__name">
+                            {it.original_product_name}
+                          </span>
+                          <span className="muted admin-order-item-original__amounts">
+                            {formatPrice(it.original_unit_price)} × {it.quantity} ={' '}
+                            {formatPrice(it.original_line_total)}
+                          </span>
+                        </div>
                       ) : null}
                       <OrderLineItemRefundNote
                         item={it}

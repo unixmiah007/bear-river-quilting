@@ -61,7 +61,7 @@ import {
 } from './lib/shippingLabel.js';
 import { getDefaultShipFrom } from './lib/defaultShipFrom.js';
 import { buildOrderInvoicePdf, invoicePdfFilename } from './lib/orderInvoicePdf.js';
-import { emailCustomerOrderInvoice } from './lib/orderInvoiceEmail.js';
+import { emailCustomerOrderInvoice, loadOrderInvoiceContext } from './lib/orderInvoiceEmail.js';
 import { sendProductShareEmail } from './lib/productShareEmail.js';
 import { ensureOrderInvoiceEmailColumn } from './lib/ensureOrderInvoiceEmailColumn.js';
 import { sendOrderTrackingNotification } from './lib/orderTracking.js';
@@ -1907,23 +1907,12 @@ app.get('/api/admin/orders', authMiddleware, async (_req, res) => {
 app.get('/api/admin/orders/:id/invoice.pdf', authMiddleware, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const [[order]] = await pool.query(
-      `SELECT id, order_number, status, customer_name, customer_email, customer_phone,
-              shipping_address1, shipping_address2, shipping_city, shipping_state, shipping_postal_code, shipping_country,
-              shipping_method, shipping_cost,
-              billing_name, billing_address1, billing_address2, billing_city, billing_state, billing_postal_code, billing_country,
-              card_last4, subtotal, tax_amount, total, created_at,
-              tracking_carrier, tracking_number
-       FROM orders WHERE id = ?`,
-      [id]
-    );
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-    const [items] = await pool.query(
-      `SELECT product_name, unit_price, quantity, line_total
-       FROM order_items WHERE order_id = ? ORDER BY id ASC`,
-      [id]
-    );
-    const pdf = await buildOrderInvoicePdf(order, items);
+    const ctx = await loadOrderInvoiceContext(pool, id);
+    if (!ctx.ok) {
+      return res.status(ctx.status ?? 404).json({ error: ctx.error });
+    }
+    const { order, items, customPayments } = ctx;
+    const pdf = await buildOrderInvoicePdf(order, items, { customPayments });
     const filename = invoicePdfFilename(order.order_number);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -1960,6 +1949,7 @@ app.get('/api/admin/orders/:id', authMiddleware, async (req, res) => {
               shipping_method, shipping_cost,
               billing_name, billing_address1, billing_address2, billing_city, billing_state, billing_postal_code, billing_country,
               card_last4, subtotal, tax_amount, total, created_at,
+              original_subtotal, original_tax_amount, original_total, order_adjusted_at,
               tracking_carrier, tracking_number, tracking_notified_at, invoice_emailed_at,
               label_from_name, label_from_address1, label_from_address2,
               label_from_city, label_from_state, label_from_postal_code, label_from_country, label_from_phone,
@@ -1970,11 +1960,26 @@ app.get('/api/admin/orders/:id', authMiddleware, async (req, res) => {
     if (!order) return res.status(404).json({ error: 'Order not found' });
     const [items] = await pool.query(
       `SELECT id, product_id, product_name, unit_price, quantity, line_total,
-              line_refund_amount, line_refund_status, stripe_refund_id, line_refund_at
+              line_refund_amount, line_refund_status, stripe_refund_id, line_refund_at,
+              original_product_id, original_product_name, original_unit_price, original_line_total
        FROM order_items WHERE order_id = ? ORDER BY id ASC`,
       [id]
     );
-    res.json({ order, items });
+    let customPayments = [];
+    try {
+      const [payments] = await pool.query(
+        `SELECT id, payment_number, amount, status, admin_note, checkout_url,
+                email_sent_at, paid_at, created_at, updated_at
+         FROM order_custom_payments
+         WHERE order_id = ?
+         ORDER BY created_at ASC`,
+        [id]
+      );
+      customPayments = payments;
+    } catch (e) {
+      if (e.code !== 'ER_NO_SUCH_TABLE') throw e;
+    }
+    res.json({ order, items, customPayments });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to load order details' });

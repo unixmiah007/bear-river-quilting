@@ -3956,6 +3956,125 @@ tr:last-child td {
   color: #065f46;
 }
 
+.admin-order-history {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #f8fafc;
+}
+
+.admin-order-history__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.admin-order-history__when,
+.admin-order-history__compare {
+  margin: 0 0 0.65rem;
+  font-size: 0.85rem;
+}
+
+.admin-order-history__totals {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.65rem;
+}
+
+.admin-order-history__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+  font-size: 0.9rem;
+}
+
+.admin-order-history__row--with-links {
+  align-items: flex-start;
+}
+
+.admin-order-history__row-label {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.order-total-product-links {
+  display: inline;
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+.order-total-product-links__wrap a {
+  white-space: nowrap;
+}
+
+.account-order-adjustment__row--with-links {
+  align-items: flex-start;
+}
+
+.account-order-adjustment__row--with-links .account-order-adjustment__label {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.admin-order-history__payments-heading {
+  margin: 0.5rem 0 0.35rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.admin-order-history__payment-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-order-history__payment {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+
+.admin-order-history__payment:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.admin-order-history__payment-ref {
+  font-family: ui-monospace, monospace;
+  font-size: 0.82rem;
+  color: var(--muted, #6b7280);
+}
+
+.admin-order-history__payment-meta,
+.admin-order-history__payment-note {
+  font-size: 0.82rem;
+}
+
+.admin-order-history__payment-link {
+  font-size: 0.82rem;
+}
+
+.admin-order-item-original {
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.admin-order-item-original__name {
+  display: block;
+}
+
+.admin-order-item-original__amounts {
+  display: block;
+  font-size: 0.82rem;
+}
+
 .admin-section-title {
   display: inline-flex;
   align-items: center;
