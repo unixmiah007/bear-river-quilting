@@ -11,6 +11,7 @@ import { buildTrackingUrl, labelForCarrier } from '../lib/shippingCarriers.js';
 import { labelForOrderStatus } from '../lib/orderStatuses.js';
 import AccountVisitHistory from '../components/AccountVisitHistory.jsx';
 import AccountCustomQuiltLookup from '../components/AccountCustomQuiltLookup.jsx';
+import PageLoading from '../components/PageLoading.jsx';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
