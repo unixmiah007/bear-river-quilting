@@ -115,6 +115,11 @@ export const adminApi = {
   updatePage: (id, body) =>
     api(`/api/admin/pages/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deletePage: (id) => api(`/api/admin/pages/${id}`, { method: 'DELETE' }),
+  setPageVisibility: (id, isPublished) =>
+    api(`/api/admin/pages/${encodeURIComponent(id)}/visibility`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_published: !!isPublished }),
+    }),
 
   products: () => apiJsonArray('/api/admin/products'),
   nextProductSku: () => api('/api/admin/products/next-sku'),

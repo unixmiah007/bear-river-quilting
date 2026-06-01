@@ -32,6 +32,9 @@ export default function AdminPages() {
   const [builderBusy, setBuilderBusy] = useState(false);
   const [dropZoneActive, setDropZoneActive] = useState(false);
   const [productFilter, setProductFilter] = useState('');
+  const [visibilityBusyId, setVisibilityBusyId] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -196,14 +199,56 @@ export default function AdminPages() {
     }
   }
 
-  async function onDelete(id) {
-    if (!window.confirm('Delete this page and its product links?')) return;
+  function openDeleteConfirm(page) {
+    setDeleteTarget({ id: page.id, title: page.title });
+  }
+
+  function closeDeleteConfirm() {
+    if (deleteBusy) return;
+    setDeleteTarget(null);
+  }
+
+  useEffect(() => {
+    if (!deleteTarget) return undefined;
+    function onKeyDown(e) {
+      if (e.key === 'Escape' && !deleteBusy) setDeleteTarget(null);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [deleteTarget, deleteBusy]);
+
+  async function confirmDeletePage() {
+    if (!deleteTarget || deleteBusy) return;
+    setDeleteBusy(true);
     setError(null);
     try {
-      await adminApi.deletePage(id);
+      await adminApi.deletePage(deleteTarget.id);
+      if (editingId === deleteTarget.id) {
+        setEditingId(null);
+        setForm(emptyForm);
+      }
+      setDeleteTarget(null);
       await refresh();
     } catch (err) {
       setError(err.body?.error || err.message);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
+  async function togglePagePublished(page) {
+    const nextPublished = !page.is_published;
+    setVisibilityBusyId(page.id);
+    setError(null);
+    try {
+      await adminApi.setPageVisibility(page.id, nextPublished);
+      setRows((prev) =>
+        prev.map((p) => (p.id === page.id ? { ...p, is_published: nextPublished } : p))
+      );
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setVisibilityBusyId(null);
     }
   }
 
@@ -370,6 +415,7 @@ export default function AdminPages() {
             <tr>
               <th>Title</th>
               <th>Slug</th>
+              <th>Status</th>
               <th>Updated</th>
               <th />
             </tr>
@@ -377,33 +423,67 @@ export default function AdminPages() {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="muted">
+                <td colSpan={5} className="muted">
                   No pages yet.
                 </td>
               </tr>
             ) : (
-              rows.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.title}</td>
-                  <td>
-                    <Link to={`/p/${p.slug}`}>{p.slug}</Link>
-                  </td>
-                  <td className="muted">{new Date(p.updated_at).toLocaleString()}</td>
-                  <td>
-                    <div className="row" style={{ justifyContent: 'flex-end' }}>
-                      <Link className="btn" to={`/admin/pages/${p.id}/products`}>
-                        Products
+              rows.map((p) => {
+                const published = !!p.is_published;
+                const visibilityBusy = visibilityBusyId === p.id;
+                return (
+                  <tr key={p.id}>
+                    <td>{p.title}</td>
+                    <td>
+                      <Link
+                        to={`/p/${p.slug}`}
+                        title={
+                          published
+                            ? 'Open public page'
+                            : 'Unpublished: public page is hidden until you publish'
+                        }
+                      >
+                        {p.slug}
                       </Link>
-                      <button type="button" className="btn" onClick={() => startEdit(p)}>
-                        Edit
-                      </button>
-                      <button type="button" className="btn btn-danger" onClick={() => onDelete(p.id)}>
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td>
+                      <span className={published ? 'badge badge-on' : 'badge badge-off'}>
+                        {published ? 'Published' : 'Unpublished'}
+                      </span>
+                    </td>
+                    <td className="muted">{new Date(p.updated_at).toLocaleString()}</td>
+                    <td>
+                      <div className="row" style={{ justifyContent: 'flex-end' }}>
+                        <button
+                          type="button"
+                          className="btn"
+                          disabled={visibilityBusy}
+                          onClick={() => togglePagePublished(p)}
+                        >
+                          {visibilityBusy
+                            ? 'Saving…'
+                            : published
+                              ? 'Unpublish'
+                              : 'Publish'}
+                        </button>
+                        <Link className="btn" to={`/admin/pages/${p.id}/products`}>
+                          Products
+                        </Link>
+                        <button type="button" className="btn" onClick={() => startEdit(p)}>
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-danger"
+                          onClick={() => openDeleteConfirm(p)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -465,6 +545,49 @@ export default function AdminPages() {
           )}
         </div>
       </form>
+
+      {deleteTarget ? (
+        <div
+          className="confirm-dialog-backdrop"
+          role="presentation"
+          onClick={closeDeleteConfirm}
+        >
+          <div
+            className="confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-page-title"
+            aria-describedby="delete-page-desc"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="delete-page-title" className="confirm-dialog__title">
+              Delete page?
+            </h2>
+            <p id="delete-page-desc" className="muted confirm-dialog__body">
+              <strong>{deleteTarget.title}</strong> and its product links will be removed
+              permanently. This cannot be undone.
+            </p>
+            <div className="row confirm-dialog__actions">
+              <button
+                type="button"
+                className="btn"
+                onClick={closeDeleteConfirm}
+                disabled={deleteBusy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={confirmDeletePage}
+                disabled={deleteBusy}
+              >
+                {deleteBusy ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

@@ -1,5 +1,5 @@
 /**
- * Align legacy `pages` tables with routes that expect created_at / updated_at.
+ * Align legacy `pages` tables with routes that expect timestamps and publish state.
  */
 export async function ensurePagesTable(conn) {
   const [[{ cnt }]] = await conn.query(
@@ -22,6 +22,11 @@ export async function ensurePagesTable(conn) {
   if (!names.has('updated_at')) {
     await conn.query(
       'ALTER TABLE pages ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'
+    );
+  }
+  if (!names.has('is_published')) {
+    await conn.query(
+      'ALTER TABLE pages ADD COLUMN is_published TINYINT(1) NOT NULL DEFAULT 1'
     );
   }
 }

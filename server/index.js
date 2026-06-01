@@ -268,12 +268,19 @@ function deleteDiskPath(webPath) {
 
 // --- Public ---
 
+function mapPageRows(rows) {
+  return rows.map((row) => ({
+    ...row,
+    is_published: !!row.is_published,
+  }));
+}
+
 app.get('/api/pages', async (_req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, slug, title, updated_at FROM pages ORDER BY title ASC'
+      'SELECT id, slug, title, updated_at FROM pages WHERE is_published = 1 ORDER BY title ASC'
     );
-    res.json(hydrateProductRows(rows));
+    res.json(rows);
   } catch (e) {
     console.error(e);
     if (e.code === 'ER_NO_SUCH_TABLE') {
@@ -849,9 +856,9 @@ app.get('/api/auth/me', (req, res) => {
 app.get('/api/admin/pages', authMiddleware, async (_req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, slug, title, body, updated_at FROM pages ORDER BY title ASC'
+      'SELECT id, slug, title, body, updated_at, is_published FROM pages ORDER BY title ASC'
     );
-    res.json(hydrateProductRows(rows));
+    res.json(mapPageRows(rows));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to list pages' });
@@ -866,7 +873,7 @@ app.post('/api/admin/pages', authMiddleware, async (req, res) => {
     }
     const finalSlug = slugify(slug || title);
     const [result] = await pool.query(
-      'INSERT INTO pages (slug, title, body) VALUES (?, ?, ?)',
+      'INSERT INTO pages (slug, title, body, is_published) VALUES (?, ?, ?, 1)',
       [finalSlug, title, body ?? null]
     );
     res.status(201).json({ id: result.insertId, slug: finalSlug });
@@ -901,6 +908,34 @@ app.put('/api/admin/pages/:id', authMiddleware, async (req, res) => {
     }
     console.error(e);
     res.status(500).json({ error: 'Failed to update page' });
+  }
+});
+
+app.patch('/api/admin/pages/:id/visibility', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid page id' });
+    if (typeof req.body?.is_published !== 'boolean') {
+      return res.status(400).json({ error: 'is_published must be a boolean' });
+    }
+    const isPublished = req.body.is_published ? 1 : 0;
+    const [result] = await pool.query('UPDATE pages SET is_published = ? WHERE id = ?', [
+      isPublished,
+      id,
+    ]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Page not found' });
+    }
+    res.json({ ok: true, is_published: !!isPublished });
+  } catch (e) {
+    console.error(e);
+    if (e.code === 'ER_BAD_FIELD_ERROR' || String(e.sqlMessage || '').includes('Unknown column')) {
+      return res.status(500).json({
+        error: 'The pages table is missing is_published.',
+        hint: 'Restart the API so it can run pages schema repair.',
+      });
+    }
+    res.status(500).json({ error: 'Failed to update page visibility' });
   }
 });
 
