@@ -6,6 +6,7 @@ import ProductImage from '../components/ProductImage.jsx';
 import CartIcon from '../components/CartIcon.jsx';
 import FavoriteProductButton from '../components/FavoriteProductButton.jsx';
 import ProductShareButton from '../components/ProductShareButton.jsx';
+import ShareIcon from '../components/ShareIcon.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { CUSTOMER_SIZE_OPTIONS, resolveProductPrice } from '../lib/productSizes.js';
 import PageLoading from '../components/PageLoading.jsx';
