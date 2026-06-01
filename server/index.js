@@ -100,6 +100,7 @@ import {
   changeOrderLineItemProduct,
   previewOrderLineItemProductChange,
 } from './lib/orderLineItemProduct.js';
+import { addOrderLineItem, previewAddOrderLineItem } from './lib/addOrderLineItem.js';
 import { ensureOrderAdjustmentColumns } from './lib/ensureOrderAdjustmentColumns.js';
 import { getAdminNavBadgeCounts } from './lib/adminNavBadgeCounts.js';
 import { lookupCustomerCustomQuiltRequests } from './lib/customQuiltCustomerLookup.js';
@@ -2121,6 +2122,42 @@ app.put('/api/admin/orders/:orderId/items/:itemId/product', authMiddleware, asyn
   } catch (e) {
     console.error('[admin] line item product change failed:', e);
     res.status(500).json({ error: e.message || 'Failed to update line item product' });
+  }
+});
+
+app.post('/api/admin/orders/:orderId/items/preview', authMiddleware, async (req, res) => {
+  try {
+    const result = await previewAddOrderLineItem({
+      orderId: req.params.orderId,
+      productId: req.body?.productId,
+      quantity: req.body?.quantity,
+      productSize: req.body?.productSize,
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error('[admin] add line item preview failed:', e);
+    res.status(500).json({ error: e.message || 'Failed to preview add line item' });
+  }
+});
+
+app.post('/api/admin/orders/:orderId/items', authMiddleware, async (req, res) => {
+  try {
+    const result = await addOrderLineItem({
+      orderId: req.params.orderId,
+      productId: req.body?.productId,
+      quantity: req.body?.quantity,
+      productSize: req.body?.productSize,
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.status(201).json(result);
+  } catch (e) {
+    console.error('[admin] add line item failed:', e);
+    res.status(500).json({ error: e.message || 'Failed to add line item' });
   }
 });
 

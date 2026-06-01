@@ -86,7 +86,7 @@ async function snapshotOrderAdjustmentOriginals(conn, orderId, itemId, item, ord
   );
 }
 
-async function loadOrderItems(orderId) {
+export async function loadOrderItems(orderId) {
   const [items] = await pool.query(
     `SELECT ${ORDER_ITEM_COLUMNS} FROM order_items WHERE order_id = ? ORDER BY id ASC`,
     [orderId]
@@ -94,7 +94,7 @@ async function loadOrderItems(orderId) {
   return items;
 }
 
-async function loadUpdatedOrder(orderId) {
+export async function loadUpdatedOrder(orderId) {
   const [[row]] = await pool.query(
     `SELECT id, order_number, status, customer_name, customer_email, customer_phone,
             shipping_address1, shipping_address2, shipping_city, shipping_state, shipping_postal_code, shipping_country,

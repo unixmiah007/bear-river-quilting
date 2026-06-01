@@ -8,7 +8,11 @@ import { OrderStatusIcon, TrackingEmailIcon } from '../components/admin/AdminSec
 import PageLoading from '../components/PageLoading.jsx';
 import { labelForCarrier, SHIPPING_CARRIER_OPTIONS } from '../lib/shippingCarriers.js';
 import { ORDER_STATUS_OPTIONS, normalizeOrderStatusForForm, labelForOrderStatus } from '../lib/orderStatuses.js';
-import { formatProductPriceRange } from '../lib/productSizes.js';
+import {
+  CUSTOMER_SIZE_OPTIONS,
+  formatProductPriceRange,
+  resolveProductPrice,
+} from '../lib/productSizes.js';
 import { lineItemWasChanged } from '../components/AccountOrderItems.jsx';
 import AdminOrderAdjustmentHistory from '../components/admin/AdminOrderAdjustmentHistory.jsx';
 
@@ -146,6 +150,42 @@ function formatLineItemChangeMessage(result) {
   return parts.join(' ');
 }
 
+function formatAddLineItemMessage(result) {
+  const parts = [];
+  if (result.addedProductName) {
+    const qty = result.adjustment?.addedQuantity ?? 1;
+    parts.push(
+      qty > 1
+        ? `Added ${qty}× ${result.addedProductName} to the order.`
+        : `Added ${result.addedProductName} to the order.`
+    );
+  } else {
+    parts.push('Product added to the order.');
+  }
+
+  const adj = result.adjustment;
+  if (!adj?.paid || adj.type === 'none' || Math.abs(adj.delta ?? 0) < 0.01) {
+    parts.push('Order totals recalculated.');
+    return parts.join(' ');
+  }
+
+  if (adj.type === 'payment_due') {
+    parts.push(
+      `Balance due: ${formatPrice(adj.amountDue ?? adj.delta)} (${formatPrice(adj.priorTotal)} → ${formatPrice(adj.newTotal)}).`
+    );
+    if (adj.paymentCreated) {
+      parts.push('Stripe payment link created and emailed to the customer.');
+      if (adj.emailError) parts.push(`Email issue: ${adj.emailError}`);
+    } else if (adj.warning) {
+      parts.push(adj.warning);
+    }
+  } else if (adj.warning) {
+    parts.push(adj.warning);
+  }
+
+  return parts.join(' ');
+}
+
 function OrderLineItemRefundNote({ item, processing }) {
   const amount = item.line_refund_amount != null ? Number(item.line_refund_amount) : null;
   const status = item.line_refund_status;
@@ -225,6 +265,11 @@ export default function AdminOrders() {
   const [itemProductPreviewBusy, setItemProductPreviewBusy] = useState(null);
   const [itemProductMsg, setItemProductMsg] = useState(null);
   const [refundConfirm, setRefundConfirm] = useState(null);
+  const [addProductId, setAddProductId] = useState('');
+  const [addProductSize, setAddProductSize] = useState('small');
+  const [addQuantity, setAddQuantity] = useState('1');
+  const [addBusy, setAddBusy] = useState(false);
+  const [addPaymentConfirm, setAddPaymentConfirm] = useState(null);
 
   const filteredOrders = useMemo(() => {
     const term = searchQuery.trim().toLowerCase();
@@ -340,6 +385,7 @@ export default function AdminOrders() {
     setStatusMsg(null);
     setItemProductMsg(null);
     setRefundConfirm(null);
+    setAddPaymentConfirm(null);
     try {
       const data = await adminApi.orderById(id);
       setDetails(data);
@@ -513,6 +559,86 @@ export default function AdminOrders() {
   }
 
   const invoiceEmailed = Boolean(details?.order?.invoice_emailed_at);
+
+  const addProductRow = useMemo(
+    () => catalogProducts.find((p) => Number(p.id) === Number(addProductId)),
+    [catalogProducts, addProductId]
+  );
+
+  const addLineEstimate = useMemo(() => {
+    if (!addProductRow) return null;
+    const qty = Math.max(1, Math.floor(Number(addQuantity) || 1));
+    const unit = resolveProductPrice(addProductRow, addProductSize);
+    return { unit, line: Number((unit * qty).toFixed(2)), qty };
+  }, [addProductRow, addProductSize, addQuantity]);
+
+  const itemsSectionBusy =
+    itemProductBusy != null ||
+    itemProductPreviewBusy != null ||
+    addBusy ||
+    refundConfirm != null ||
+    addPaymentConfirm != null;
+
+  async function addProductToOrder() {
+    if (!details?.order?.id || !addProductId) return;
+    setAddBusy(true);
+    setItemProductMsg(null);
+    setError(null);
+    try {
+      const result = await adminApi.addOrderLineItem(details.order.id, {
+        productId: Number(addProductId),
+        quantity: Math.max(1, Math.floor(Number(addQuantity) || 1)),
+        productSize: addProductSize,
+      });
+      const orderId = details.order.id;
+      await loadDetails(orderId);
+      setItemProductMsg(formatAddLineItemMessage(result));
+      setAddProductId('');
+      setAddQuantity('1');
+      await refresh();
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setAddBusy(false);
+      setAddPaymentConfirm(null);
+    }
+  }
+
+  async function requestAddProductToOrder() {
+    if (!details?.order?.id || !addProductId) {
+      setError('Choose a product to add.');
+      return;
+    }
+    setAddBusy(true);
+    setError(null);
+    try {
+      const previewResult = await adminApi.previewAddOrderLineItem(details.order.id, {
+        productId: Number(addProductId),
+        quantity: Math.max(1, Math.floor(Number(addQuantity) || 1)),
+        productSize: addProductSize,
+      });
+      if (previewResult.requiresPaymentConfirmation && previewResult.preview) {
+        setAddPaymentConfirm(previewResult.preview);
+        setAddBusy(false);
+        return;
+      }
+      setAddBusy(false);
+      await addProductToOrder();
+    } catch (err) {
+      setError(err.body?.error || err.message);
+      setAddBusy(false);
+    }
+  }
+
+  function closeAddPaymentConfirm() {
+    if (addBusy) return;
+    setAddPaymentConfirm(null);
+  }
+
+  async function confirmAddProductWithPaymentLink() {
+    setAddPaymentConfirm(null);
+    await addProductToOrder();
+  }
 
   return (
     <>
@@ -853,9 +979,9 @@ export default function AdminOrders() {
           </form>
 
           <p className="muted admin-order-items-hint" style={{ margin: '1rem 0 0.5rem' }}>
-            Choose a product for each line item to correct the order. Totals (subtotal, tax, and
-            total) update automatically. For paid orders, a lower total triggers a Stripe refund and
-            customer email; a higher total sends a payment link for the difference.
+            Change line items or add products below. Totals update automatically. For paid orders, a
+            lower total triggers a refund; a higher total (including new products) emails a Stripe
+            payment link for the difference.
           </p>
           {itemProductMsg ? (
             <p className="page-body" style={{ color: '#065f46', margin: '0 0 0.75rem' }}>
@@ -888,9 +1014,7 @@ export default function AdminOrders() {
                           itemProductBusy === it.id ||
                           itemProductPreviewBusy === it.id ||
                           catalogProducts.length === 0 ||
-                          itemProductBusy != null ||
-                          itemProductPreviewBusy != null ||
-                          refundConfirm != null
+                          itemsSectionBusy
                         }
                         aria-label={`Product for ${it.product_name}`}
                         onClick={(e) => e.stopPropagation()}
@@ -953,6 +1077,88 @@ export default function AdminOrders() {
               </tbody>
             </table>
           </div>
+
+          <section className="admin-order-add-item" aria-labelledby="admin-order-add-item-heading">
+            <h4 id="admin-order-add-item-heading" style={{ margin: '1.25rem 0 0.5rem' }}>
+              Add product
+            </h4>
+            <div className="admin-order-add-item__fields row">
+              <div className="field" style={{ flex: 2, minWidth: '12rem' }}>
+                <label htmlFor="admin-order-add-product">Product</label>
+                <select
+                  id="admin-order-add-product"
+                  value={addProductId}
+                  disabled={itemsSectionBusy || catalogProducts.length === 0}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setAddProductId(id);
+                    const p = catalogProducts.find((row) => String(row.id) === id);
+                    if (p?.product_size) {
+                      setAddProductSize(p.product_size);
+                    }
+                  }}
+                >
+                  <option value="">Select product…</option>
+                  {catalogProducts.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {productOptionLabel(p)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field" style={{ flex: 1, minWidth: '8rem' }}>
+                <label htmlFor="admin-order-add-size">Size</label>
+                <select
+                  id="admin-order-add-size"
+                  value={addProductSize}
+                  disabled={itemsSectionBusy || !addProductId}
+                  onChange={(e) => setAddProductSize(e.target.value)}
+                >
+                  {CUSTOMER_SIZE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field" style={{ width: '5rem', minWidth: '5rem' }}>
+                <label htmlFor="admin-order-add-qty">Qty</label>
+                <input
+                  id="admin-order-add-qty"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={addQuantity}
+                  disabled={itemsSectionBusy || !addProductId}
+                  onChange={(e) => setAddQuantity(e.target.value)}
+                />
+              </div>
+              <div className="field" style={{ alignSelf: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={itemsSectionBusy || !addProductId}
+                  onClick={requestAddProductToOrder}
+                >
+                  {addBusy ? 'Adding…' : 'Add to order'}
+                </button>
+              </div>
+            </div>
+            {addLineEstimate ? (
+              <p className="muted admin-order-add-item__estimate" style={{ margin: '0.35rem 0 0' }}>
+                Line estimate: {formatPrice(addLineEstimate.unit)} × {addLineEstimate.qty} ={' '}
+                <strong>{formatPrice(addLineEstimate.line)}</strong>
+                {details.order.stripe_payment_intent_id ? (
+                  <span>
+                    {' '}
+                    — on paid orders, tax is recalculated and a payment link is emailed for any
+                    balance due.
+                  </span>
+                ) : null}
+              </p>
+            ) : null}
+          </section>
+
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <span className="muted">Subtotal</span>
             <strong>{formatPrice(details.order.subtotal)}</strong>
@@ -992,6 +1198,59 @@ export default function AdminOrders() {
             customerName={details.order.customer_name}
             onFeedback={setMessagingFeedback}
           />
+        </div>
+      ) : null}
+
+      {addPaymentConfirm ? (
+        <div
+          className="confirm-dialog-backdrop"
+          role="presentation"
+          onClick={closeAddPaymentConfirm}
+        >
+          <div
+            className="confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="order-add-payment-confirm-title"
+            aria-describedby="order-add-payment-confirm-desc"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="order-add-payment-confirm-title" className="confirm-dialog__title">
+              Send payment link?
+            </h3>
+            <div id="order-add-payment-confirm-desc" className="confirm-dialog__body">
+              <p style={{ marginTop: 0 }}>
+                Adding this product increases the order total. A Stripe payment link will be emailed
+                to the customer for the additional amount.
+              </p>
+              <p style={{ margin: '0.75rem 0 0' }}>
+                <strong>{addPaymentConfirm.productName}</strong>
+                {addPaymentConfirm.quantity > 1 ? ` × ${addPaymentConfirm.quantity}` : null}
+                {' — '}
+                {formatPrice(addPaymentConfirm.lineTotal)}
+              </p>
+              <p style={{ margin: '0.5rem 0 0' }}>
+                <strong>Payment due:</strong> {formatPrice(addPaymentConfirm.amountDue)}
+              </p>
+              <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
+                Order total: {formatPrice(addPaymentConfirm.priorTotal)} →{' '}
+                {formatPrice(addPaymentConfirm.newTotal)}
+              </p>
+            </div>
+            <div className="confirm-dialog__actions">
+              <button type="button" className="btn" onClick={closeAddPaymentConfirm} disabled={addBusy}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={confirmAddProductWithPaymentLink}
+                disabled={addBusy}
+              >
+                {addBusy ? 'Adding…' : `Add & email ${formatPrice(addPaymentConfirm.amountDue)} link`}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
 
