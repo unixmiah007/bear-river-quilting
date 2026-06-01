@@ -378,6 +378,88 @@ export async function sendOrderStatusUpdateEmail({
   console.log('[mail] Sent order status update', { orderNumber, status, to: toAddr });
 }
 
+/** Partial refund after admin changes a line item product on a paid order. */
+export async function sendOrderLineItemRefundEmail({
+  to,
+  customerName,
+  orderNumber,
+  refundAmount,
+  priorTotal,
+  newTotal,
+  productName,
+}) {
+  const toAddr = String(to ?? '')
+    .trim()
+    .toLowerCase();
+  if (!toAddr || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toAddr)) {
+    throw new Error('Invalid customer email on order');
+  }
+
+  if (!isSendGridConfigured()) {
+    throw new Error('SendGrid is not configured — set SENDGRID_API_KEY in server/.env');
+  }
+
+  const from = resolveSendGridFromCustomer();
+  if (!from) {
+    throw new Error('Set MAIL_FROM_ADDRESS or MAIL_FROM to a verified SendGrid sender');
+  }
+
+  const refundFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
+    Number(refundAmount)
+  );
+  const priorFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
+    Number(priorTotal)
+  );
+  const newFmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
+    Number(newTotal)
+  );
+  const accountUrl = buildCustomerOrderAccountUrl(toAddr, orderNumber);
+
+  const text = [
+    `Hi ${customerName},`,
+    '',
+    `We updated an item on your Bear River Quilting order ${orderNumber}.`,
+    productName ? `Updated line item: ${productName}` : null,
+    '',
+    `Previous order total: ${priorFmt}`,
+    `Revised order total: ${newFmt}`,
+    `Refund issued to your original payment method: ${refundFmt}`,
+    '',
+    `View your order: ${accountUrl}`,
+    '',
+    'Please allow a few business days for the refund to appear on your statement.',
+    '',
+    '— Bear River Quilting',
+  ]
+    .filter((line) => line !== null)
+    .join('\n');
+
+  const html = `
+<p>Hi ${escapeHtml(customerName)},</p>
+<p>We updated an item on your Bear River Quilting order <strong>${escapeHtml(orderNumber)}</strong>.</p>
+${productName ? `<p><strong>Updated line item:</strong> ${escapeHtml(productName)}</p>` : ''}
+<table cellpadding="6" cellspacing="0" style="border-collapse:collapse;margin:1rem 0">
+<tbody>
+<tr><td style="padding:4px 12px 4px 0;color:#6b7280">Previous total</td><td>${escapeHtml(priorFmt)}</td></tr>
+<tr><td style="padding:4px 12px 4px 0;color:#6b7280">Revised total</td><td><strong>${escapeHtml(newFmt)}</strong></td></tr>
+<tr><td style="padding:4px 12px 4px 0;color:#6b7280">Refund</td><td><strong>${escapeHtml(refundFmt)}</strong></td></tr>
+</tbody>
+</table>
+<p>The refund was sent to your original payment method. It may take a few business days to appear on your statement.</p>
+<p><a href="${escapeHtml(accountUrl)}" style="display:inline-block;padding:0.7rem 1.15rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">View order</a></p>
+<p>— Bear River Quilting</p>`.trim();
+
+  await sendSendGridMail({
+    to: toAddr,
+    from,
+    subject: `Refund for order ${orderNumber} — ${refundFmt}`,
+    text,
+    html,
+  });
+
+  console.log('[mail] Sent line-item refund notice', { orderNumber, to: toAddr, refundAmount });
+}
+
 /**
  * Emails the customer shipment tracking for a custom quilt request.
  */

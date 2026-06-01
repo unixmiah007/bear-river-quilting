@@ -248,6 +248,22 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify({ status }),
     }),
+  previewOrderLineItemProduct: (orderId, itemId, productId) =>
+    api(
+      `/api/admin/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}/product-preview`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ productId }),
+      }
+    ),
+  updateOrderLineItemProduct: (orderId, itemId, productId) =>
+    api(
+      `/api/admin/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}/product`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ productId }),
+      }
+    ),
   sendOrderTracking: (id, body) =>
     api(`/api/admin/orders/${id}/tracking`, {
       method: 'POST',

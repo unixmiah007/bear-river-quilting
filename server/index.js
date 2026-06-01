@@ -96,6 +96,11 @@ import {
 import { getClientOrigin, PRODUCTION_CLIENT_ORIGIN } from './lib/clientOrigin.js';
 import { ensureOrderCustomPaymentsTable } from './lib/ensureOrderCustomPaymentsTable.js';
 import { createCustomPayment, searchCustomerPaymentsByEmail } from './lib/customOrderPayment.js';
+import {
+  changeOrderLineItemProduct,
+  previewOrderLineItemProductChange,
+} from './lib/orderLineItemProduct.js';
+import { ensureOrderItemRefundColumns } from './lib/ensureOrderItemRefundColumns.js';
 import { lookupCustomerCustomQuiltRequests } from './lib/customQuiltCustomerLookup.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1905,13 +1910,15 @@ app.get('/api/admin/orders/:id', authMiddleware, async (req, res) => {
               card_last4, subtotal, tax_amount, total, created_at,
               tracking_carrier, tracking_number, tracking_notified_at, invoice_emailed_at,
               label_from_name, label_from_address1, label_from_address2,
-              label_from_city, label_from_state, label_from_postal_code, label_from_country, label_from_phone
+              label_from_city, label_from_state, label_from_postal_code, label_from_country, label_from_phone,
+              stripe_payment_intent_id
        FROM orders WHERE id = ?`,
       [id]
     );
     if (!order) return res.status(404).json({ error: 'Order not found' });
     const [items] = await pool.query(
-      `SELECT id, product_id, product_name, unit_price, quantity, line_total
+      `SELECT id, product_id, product_name, unit_price, quantity, line_total,
+              line_refund_amount, line_refund_status, stripe_refund_id, line_refund_at
        FROM order_items WHERE order_id = ? ORDER BY id ASC`,
       [id]
     );
@@ -2019,6 +2026,44 @@ app.post('/api/admin/orders/:id/tracking', authMiddleware, async (req, res) => {
   } catch (e) {
     console.error('[tracking] notify failed:', e);
     res.status(500).json({ error: 'Failed to send tracking notification' });
+  }
+});
+
+app.post(
+  '/api/admin/orders/:orderId/items/:itemId/product-preview',
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const result = await previewOrderLineItemProductChange({
+        orderId: req.params.orderId,
+        itemId: req.params.itemId,
+        productId: req.body?.productId,
+      });
+      if (!result.ok) {
+        return res.status(result.status ?? 400).json({ error: result.error });
+      }
+      res.json(result);
+    } catch (e) {
+      console.error('[admin] line item product preview failed:', e);
+      res.status(500).json({ error: e.message || 'Failed to preview line item change' });
+    }
+  }
+);
+
+app.put('/api/admin/orders/:orderId/items/:itemId/product', authMiddleware, async (req, res) => {
+  try {
+    const result = await changeOrderLineItemProduct({
+      orderId: req.params.orderId,
+      itemId: req.params.itemId,
+      productId: req.body?.productId,
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error('[admin] line item product change failed:', e);
+    res.status(500).json({ error: e.message || 'Failed to update line item product' });
   }
 });
 
@@ -2267,6 +2312,11 @@ async function startServer() {
     await ensureOrderMessagesTable(pool);
   } catch (e) {
     console.error('[ensureOrderMessagesTable]', e?.message || e);
+  }
+  try {
+    await ensureOrderItemRefundColumns(pool);
+  } catch (e) {
+    console.error('[ensureOrderItemRefundColumns]', e?.message || e);
   }
   app.listen(PORT, async () => {
     const stripeOk = !!process.env.STRIPE_SECRET_KEY;

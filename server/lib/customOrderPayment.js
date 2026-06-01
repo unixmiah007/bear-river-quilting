@@ -153,6 +153,7 @@ async function createStripePaymentSession({
   orderId,
   customQuiltRequestId,
   adminNote,
+  paymentPurpose,
 }) {
   const metadata = {
     checkout_type: 'custom_order_payment',
@@ -163,6 +164,7 @@ async function createStripePaymentSession({
   if (orderId) metadata.order_id = String(orderId);
   if (customQuiltRequestId) metadata.custom_quilt_request_id = String(customQuiltRequestId);
   metadata.order_number = referenceNumber;
+  if (paymentPurpose) metadata.payment_purpose = paymentPurpose;
 
   return stripe.checkout.sessions.create({
     mode: 'payment',
@@ -205,6 +207,7 @@ export async function createCustomPayment({
   amount,
   adminNote,
   sendEmail = true,
+  paymentPurpose,
 }) {
   const stripe = getStripe();
   if (!stripe) {
@@ -305,6 +308,7 @@ export async function createCustomPayment({
       orderId: resolvedOrderId,
       customQuiltRequestId: resolvedCustomQuiltId,
       adminNote: note,
+      paymentPurpose,
     });
 
     await pool.query(
@@ -439,20 +443,42 @@ export async function fulfillCustomOrderPaymentFromStripeSession(session) {
     return { ok: false, status: 400, error: 'Custom payment is not linked to an order or custom request' };
   }
 
-  await pool.query(`UPDATE orders SET total = ?, card_last4 = ? WHERE id = ?`, [
-    Number(payment.amount).toFixed(2),
-    cardLast4,
-    orderId,
-  ]);
+  const isLineAdjustment = session.metadata?.payment_purpose === 'order_line_adjustment';
 
-  const { fulfillOrderFromStripeSessionWithSession } = await import('./stripeCheckout.js');
-  const orderResult = await fulfillOrderFromStripeSessionWithSession({
-    ...session,
-    metadata: {
-      ...session.metadata,
-      order_id: String(orderId),
-    },
-  });
+  if (!isLineAdjustment) {
+    await pool.query(`UPDATE orders SET total = ?, card_last4 = ? WHERE id = ?`, [
+      Number(payment.amount).toFixed(2),
+      cardLast4,
+      orderId,
+    ]);
+  } else {
+    await pool.query('UPDATE orders SET card_last4 = ? WHERE id = ?', [cardLast4, orderId]);
+  }
+
+  let orderResult;
+  if (isLineAdjustment) {
+    const [[order]] = await pool.query(
+      'SELECT id, order_number, customer_email, status FROM orders WHERE id = ?',
+      [orderId]
+    );
+    orderResult = {
+      ok: true,
+      checkoutType: 'order',
+      orderId,
+      orderNumber: order?.order_number,
+      customerEmail: order?.customer_email,
+      lineAdjustmentPaid: true,
+    };
+  } else {
+    const { fulfillOrderFromStripeSessionWithSession } = await import('./stripeCheckout.js');
+    orderResult = await fulfillOrderFromStripeSessionWithSession({
+      ...session,
+      metadata: {
+        ...session.metadata,
+        order_id: String(orderId),
+      },
+    });
+  }
 
   return {
     ...orderResult,

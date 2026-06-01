@@ -95,6 +95,96 @@ function isInteractiveRowTarget(target) {
   return !!target.closest('a, button, input, select, textarea, label');
 }
 
+function formatLineItemChangeMessage(result) {
+  const parts = [];
+  if (result.previousProductName && result.newProductName) {
+    parts.push(`Line item updated to ${result.newProductName}.`);
+  } else {
+    parts.push('Line item product updated.');
+  }
+
+  const adj = result.adjustment;
+  if (!adj?.paid || adj.type === 'none' || Math.abs(adj.delta ?? 0) < 0.01) {
+    parts.push('Order totals recalculated.');
+    return parts.join(' ');
+  }
+
+  if (adj.type === 'refund') {
+    if (adj.refundIssued) {
+      parts.push(
+        `Refund of ${formatPrice(adj.refundAmount)} issued (${formatPrice(adj.priorTotal)} → ${formatPrice(adj.newTotal)}).`
+      );
+      if (adj.emailSent) parts.push('Customer notified by email.');
+      else if (adj.emailError) parts.push(`Refund email failed: ${adj.emailError}`);
+    } else if (adj.warning) {
+      parts.push(adj.warning);
+    }
+  } else if (adj.type === 'payment_due') {
+    parts.push(
+      `Balance due: ${formatPrice(adj.amountDue ?? adj.delta)} (${formatPrice(adj.priorTotal)} → ${formatPrice(adj.newTotal)}).`
+    );
+    if (adj.paymentCreated) {
+      parts.push('Stripe payment link created and emailed to the customer.');
+      if (adj.emailError) parts.push(`Email issue: ${adj.emailError}`);
+    } else if (adj.warning) {
+      parts.push(adj.warning);
+    }
+  }
+
+  return parts.join(' ');
+}
+
+function OrderLineItemRefundNote({ item, processing }) {
+  const amount = item.line_refund_amount != null ? Number(item.line_refund_amount) : null;
+  const status = item.line_refund_status;
+
+  if (processing) {
+    return (
+      <span className="admin-order-item-refund admin-order-item-refund--pending">
+        {amount != null && amount > 0
+          ? `Issuing refund: ${formatPrice(amount)}…`
+          : 'Processing refund…'}
+      </span>
+    );
+  }
+
+  if (amount == null || !status) return null;
+
+  if (status === 'pending') {
+    return (
+      <span className="admin-order-item-refund admin-order-item-refund--pending">
+        Refund to issue: <strong>{formatPrice(amount)}</strong>
+      </span>
+    );
+  }
+
+  if (status === 'failed') {
+    return (
+      <span className="admin-order-item-refund admin-order-item-refund--failed">
+        Refund to issue: <strong>{formatPrice(amount)}</strong>
+        <span className="admin-order-item-refund__detail"> — not processed; issue manually in Stripe</span>
+      </span>
+    );
+  }
+
+  if (status === 'issued') {
+    const when = item.line_refund_at
+      ? new Date(item.line_refund_at).toLocaleString()
+      : null;
+    return (
+      <span className="admin-order-item-refund admin-order-item-refund--issued">
+        Refund issued: <strong>{formatPrice(amount)}</strong>
+        {when ? <span className="admin-order-item-refund__detail"> · {when}</span> : null}
+        {item.stripe_refund_id ? (
+          <span className="admin-order-item-refund__detail"> · Stripe {item.stripe_refund_id}</span>
+        ) : null}
+      </span>
+    );
+  }
+
+  return null;
+}
+
 export default function AdminOrders() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
@@ -118,6 +208,11 @@ export default function AdminOrders() {
   const [sortKey, setSortKey] = useState('created');
   const [sortDir, setSortDir] = useState('desc');
   const [searchQuery, setSearchQuery] = useState('');
+  const [catalogProducts, setCatalogProducts] = useState([]);
+  const [itemProductBusy, setItemProductBusy] = useState(null);
+  const [itemProductPreviewBusy, setItemProductPreviewBusy] = useState(null);
+  const [itemProductMsg, setItemProductMsg] = useState(null);
+  const [refundConfirm, setRefundConfirm] = useState(null);
 
   const filteredOrders = useMemo(() => {
     const term = searchQuery.trim().toLowerCase();
@@ -181,6 +276,13 @@ export default function AdminOrders() {
   }, []);
 
   useEffect(() => {
+    adminApi
+      .products()
+      .then((rows) => setCatalogProducts(Array.isArray(rows) ? rows : []))
+      .catch(() => setCatalogProducts([]));
+  }, []);
+
+  useEffect(() => {
     if (!ordersLoaded) return undefined;
     const raw = searchParams.get('order');
     if (raw == null || String(raw).trim() === '') return undefined;
@@ -224,6 +326,8 @@ export default function AdminOrders() {
     setMessagingFeedback(null);
     setInvoiceEmailMsg(null);
     setStatusMsg(null);
+    setItemProductMsg(null);
+    setRefundConfirm(null);
     try {
       const data = await adminApi.orderById(id);
       setDetails(data);
@@ -305,6 +409,64 @@ export default function AdminOrders() {
     } finally {
       setInvoiceBusy(false);
     }
+  }
+
+  async function changeLineItemProduct(itemId, productId) {
+    if (!details?.order?.id) return;
+    setItemProductBusy(itemId);
+    setItemProductMsg(null);
+    setError(null);
+    try {
+      const result = await adminApi.updateOrderLineItemProduct(
+        details.order.id,
+        itemId,
+        productId
+      );
+      setDetails({ order: result.order, items: result.items });
+      setItemProductMsg(formatLineItemChangeMessage(result));
+      await refresh();
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setItemProductBusy(null);
+    }
+  }
+
+  async function requestLineItemProductChange(item, nextProductId) {
+    if (!details?.order?.id) return;
+    setItemProductPreviewBusy(item.id);
+    setError(null);
+    try {
+      const previewResult = await adminApi.previewOrderLineItemProduct(
+        details.order.id,
+        item.id,
+        nextProductId
+      );
+      if (previewResult.requiresRefundConfirmation && previewResult.preview) {
+        setRefundConfirm({
+          itemId: item.id,
+          productId: nextProductId,
+          ...previewResult.preview,
+        });
+        return;
+      }
+      await changeLineItemProduct(item.id, nextProductId);
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setItemProductPreviewBusy(null);
+    }
+  }
+
+  function closeRefundConfirm() {
+    setRefundConfirm(null);
+  }
+
+  async function confirmRefundAndChangeLineItem() {
+    if (!refundConfirm) return;
+    const { itemId, productId } = refundConfirm;
+    setRefundConfirm(null);
+    await changeLineItemProduct(itemId, productId);
   }
 
   async function emailCustomerInvoice() {
@@ -673,8 +835,18 @@ export default function AdminOrders() {
             </button>
           </form>
 
+          <p className="muted admin-order-items-hint" style={{ margin: '1rem 0 0.5rem' }}>
+            Choose a product for each line item to correct the order. Totals (subtotal, tax, and
+            total) update automatically. For paid orders, a lower total triggers a Stripe refund and
+            customer email; a higher total sends a payment link for the difference.
+          </p>
+          {itemProductMsg ? (
+            <p className="page-body" style={{ color: '#065f46', margin: '0 0 0.75rem' }}>
+              {itemProductMsg}
+            </p>
+          ) : null}
           <div className="table-wrap">
-            <table>
+            <table className="admin-order-items-table">
               <thead>
                 <tr>
                   <th>Item</th>
@@ -686,7 +858,53 @@ export default function AdminOrders() {
               <tbody>
                 {details.items.map((it) => (
                   <tr key={it.id}>
-                    <td>{it.product_name}</td>
+                    <td>
+                      <select
+                        className="admin-order-item-product-select"
+                        value={String(it.product_id)}
+                        disabled={
+                          itemProductBusy === it.id ||
+                          itemProductPreviewBusy === it.id ||
+                          catalogProducts.length === 0 ||
+                          itemProductBusy != null ||
+                          itemProductPreviewBusy != null ||
+                          refundConfirm != null
+                        }
+                        aria-label={`Product for ${it.product_name}`}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          const nextId = Number(e.target.value);
+                          if (nextId && nextId !== Number(it.product_id)) {
+                            requestLineItemProductChange(it, nextId);
+                          }
+                        }}
+                      >
+                        {(catalogProducts.some((p) => Number(p.id) === Number(it.product_id))
+                          ? catalogProducts
+                          : [
+                              { id: it.product_id, sku: '', name: it.product_name },
+                              ...catalogProducts,
+                            ]
+                        ).map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.sku ? `${p.sku} — ` : ''}
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                      {itemProductPreviewBusy === it.id ? (
+                        <span
+                          className="muted"
+                          style={{ display: 'block', fontSize: '0.82rem', marginTop: '0.25rem' }}
+                        >
+                          Calculating refund…
+                        </span>
+                      ) : null}
+                      <OrderLineItemRefundNote
+                        item={it}
+                        processing={itemProductBusy === it.id}
+                      />
+                    </td>
                     <td>{it.quantity}</td>
                     <td>{formatPrice(it.unit_price)}</td>
                     <td>{formatPrice(it.line_total)}</td>
@@ -734,6 +952,61 @@ export default function AdminOrders() {
             customerName={details.order.customer_name}
             onFeedback={setMessagingFeedback}
           />
+        </div>
+      ) : null}
+
+      {refundConfirm ? (
+        <div
+          className="confirm-dialog-backdrop"
+          role="presentation"
+          onClick={closeRefundConfirm}
+        >
+          <div
+            className="confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="order-refund-confirm-title"
+            aria-describedby="order-refund-confirm-desc"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="order-refund-confirm-title" className="confirm-dialog__title">
+              Issue refund?
+            </h3>
+            <div id="order-refund-confirm-desc" className="confirm-dialog__body">
+              <p style={{ marginTop: 0 }}>
+                Changing this line item lowers the order total. A refund will be sent to the
+                customer&apos;s original payment method and they will be emailed.
+              </p>
+              <p style={{ margin: '0.75rem 0 0' }}>
+                <strong>Refund amount:</strong>{' '}
+                {formatPrice(refundConfirm.refundAmount)}
+              </p>
+              <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
+                Order total: {formatPrice(refundConfirm.priorTotal)} →{' '}
+                {formatPrice(refundConfirm.newTotal)}
+              </p>
+              {refundConfirm.previousProductName && refundConfirm.newProductName ? (
+                <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
+                  {refundConfirm.previousProductName} → {refundConfirm.newProductName}
+                </p>
+              ) : null}
+            </div>
+            <div className="confirm-dialog__actions">
+              <button type="button" className="btn" onClick={closeRefundConfirm}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={confirmRefundAndChangeLineItem}
+                disabled={itemProductBusy != null}
+              >
+                {itemProductBusy != null
+                  ? 'Processing…'
+                  : `Refund ${formatPrice(refundConfirm.refundAmount)}`}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </>
