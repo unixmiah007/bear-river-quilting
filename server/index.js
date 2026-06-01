@@ -1624,6 +1624,7 @@ app.delete('/api/admin/products/:id', authMiddleware, async (req, res) => {
     if (fs.existsSync(dir)) {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+    await pool.query('DELETE FROM order_items WHERE product_id = ?', [id]);
     const [result] = await pool.query('DELETE FROM products WHERE id = ?', [id]);
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'Product not found' });
