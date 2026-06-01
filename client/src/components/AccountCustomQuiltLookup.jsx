@@ -2,19 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
+import { labelForCustomQuiltStatus } from '../lib/orderStatuses.js';
+import OrderTrackingDisplay from './OrderTrackingDisplay.jsx';
 
 function formatPrice(n) {
   if (n == null) return '—';
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(Number(n));
-}
-
-function customRequestStatusLabel(status) {
-  const v = String(status || '').toLowerCase();
-  if (v === 'pending_payment') return 'Payment pending';
-  if (v === 'paid') return 'Paid';
-  if (v === 'submitted') return 'Submitted';
-  if (v === 'cancelled') return 'Cancelled';
-  return status || '—';
 }
 
 function statusHint(status) {
@@ -22,11 +15,23 @@ function statusHint(status) {
   if (v === 'pending_payment') {
     return 'Complete payment using the link we emailed you, or contact the studio if you need a new link.';
   }
-  if (v === 'paid') {
+  if (v === 'paid' || v === 'processing') {
     return 'Payment received. Our designer will follow up within 2–3 business days with next steps.';
   }
-  if (v === 'submitted') {
+  if (v === 'submitted' || v === 'new') {
     return 'Your request was received. We will contact you about payment and next steps.';
+  }
+  if (v === 'preparing_for_shipment' || v === 'fulfilled') {
+    return 'Your quilt is being prepared for shipment.';
+  }
+  if (v === 'shipped') {
+    return 'Your quilt has shipped. Use the tracking details below when available.';
+  }
+  if (v === 'complete') {
+    return 'Your custom quilt request is complete. Thank you for choosing Bear River Quilting.';
+  }
+  if (v === 'on_hold') {
+    return 'Your request is on hold. Contact the studio if you have questions.';
   }
   return null;
 }
@@ -214,7 +219,7 @@ export default function AccountCustomQuiltLookup({ email, onEmailChange, searchP
                       <td>
                         <strong>{r.request_number}</strong>
                       </td>
-                      <td>{customRequestStatusLabel(r.status)}</td>
+                      <td>{labelForCustomQuiltStatus(r.status)}</td>
                       <td>{r.design_name}</td>
                       <td>{formatPrice(r.estimated_price)}</td>
                       <td className="muted">{new Date(r.created_at).toLocaleString()}</td>
@@ -247,13 +252,24 @@ export default function AccountCustomQuiltLookup({ email, onEmailChange, searchP
             ) : null}
           </div>
           <p className="muted" style={{ marginTop: '0.35rem' }}>
-            <strong>Status:</strong> {customRequestStatusLabel(request.status)} · Submitted{' '}
+            <strong>Status:</strong> {labelForCustomQuiltStatus(request.status)} · Submitted{' '}
             {new Date(request.created_at).toLocaleString()}
           </p>
           {statusHint(request.status) ? (
             <p className="page-body" style={{ marginTop: '0.5rem' }}>
               {statusHint(request.status)}
             </p>
+          ) : null}
+
+          {request.tracking_number ? (
+            <>
+              <h3 style={{ marginTop: '1.25rem', marginBottom: '0.35rem' }}>Shipment tracking</h3>
+              <OrderTrackingDisplay
+                carrier={request.tracking_carrier}
+                trackingNumber={request.tracking_number}
+                notifiedAt={request.tracking_notified_at}
+              />
+            </>
           ) : null}
 
           <h3 style={{ marginTop: '1.25rem', marginBottom: '0.35rem' }}>Design</h3>
@@ -304,7 +320,7 @@ export default function AccountCustomQuiltLookup({ email, onEmailChange, searchP
           <h3 style={{ marginTop: '1.25rem', marginBottom: '0.35rem' }}>Estimated price</h3>
           <p className="muted" style={{ margin: 0 }}>
             {formatPrice(request.estimated_price)}
-            {request.status === 'paid' ? ' (paid)' : ''}
+            {(request.status === 'paid' || request.status === 'complete') ? ' (paid)' : ''}
           </p>
 
           <h3 style={{ marginTop: '1.25rem', marginBottom: '0.35rem' }}>Contact</h3>

@@ -288,4 +288,14 @@ export const adminApi = {
     api(`/api/admin/custom-payments/orders?email=${encodeURIComponent(email)}`),
   createCustomPayment: (body) =>
     api('/api/admin/custom-payments', { method: 'POST', body: JSON.stringify(body) }),
+  updateCustomQuiltRequestStatus: (id, status) =>
+    api(`/api/admin/custom-quilt-requests/${encodeURIComponent(id)}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
+  sendCustomQuiltTracking: (id, body) =>
+    api(`/api/admin/custom-quilt-requests/${encodeURIComponent(id)}/tracking`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 };

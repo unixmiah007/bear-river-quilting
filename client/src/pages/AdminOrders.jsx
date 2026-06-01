@@ -5,6 +5,7 @@ import ShippingLabelPanel from '../components/admin/ShippingLabelPanel.jsx';
 import OrderMessagingPanel from '../components/admin/OrderMessagingPanel.jsx';
 import PageLoading from '../components/PageLoading.jsx';
 import { labelForCarrier, SHIPPING_CARRIER_OPTIONS } from '../lib/shippingCarriers.js';
+import { ORDER_STATUS_OPTIONS, normalizeOrderStatusForForm, labelForOrderStatus } from '../lib/orderStatuses.js';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
 const SORTABLE_COLUMNS = ['order', 'customer', 'status', 'total', 'created'];
@@ -106,6 +107,9 @@ export default function AdminOrders() {
   const [invoiceEmailBusy, setInvoiceEmailBusy] = useState(false);
   const [invoiceEmailMsg, setInvoiceEmailMsg] = useState(null);
   const [trackingForm, setTrackingForm] = useState({ carrier: 'usps', trackingNumber: '' });
+  const [statusForm, setStatusForm] = useState('new');
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [statusMsg, setStatusMsg] = useState(null);
   const orderDetailRef = useRef(null);
   const [pageSize, setPageSize] = useState(15);
   const [page, setPage] = useState(1);
@@ -217,15 +221,44 @@ export default function AdminOrders() {
     setTrackingMsg(null);
     setMessagingFeedback(null);
     setInvoiceEmailMsg(null);
+    setStatusMsg(null);
     try {
       const data = await adminApi.orderById(id);
       setDetails(data);
+      setStatusForm(normalizeOrderStatusForForm(data.order.status));
       setTrackingForm({
         carrier: data.order.tracking_carrier || 'usps',
         trackingNumber: data.order.tracking_number || '',
       });
     } catch (e) {
       setError(e.body?.error || e.message);
+    }
+  }
+
+  async function handleStatusUpdate(e) {
+    e.preventDefault();
+    if (!details?.order?.id) return;
+    setStatusBusy(true);
+    setStatusMsg(null);
+    setError(null);
+    try {
+      const result = await adminApi.updateOrderStatus(details.order.id, statusForm);
+      if (result.emailSent) {
+        setStatusMsg(
+          `Status updated to ${result.statusLabel ?? labelForOrderStatus(statusForm)} and emailed to ${details.order.customer_email}.`
+        );
+      } else {
+        setStatusMsg(
+          result.warning ||
+            `Status updated to ${result.statusLabel ?? labelForOrderStatus(statusForm)}. Customer email was not sent — check SendGrid in server/.env.`
+        );
+      }
+      await refresh();
+      await loadDetails(details.order.id);
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setStatusBusy(false);
     }
   }
 
@@ -256,16 +289,6 @@ export default function AdminOrders() {
       setError(err.body?.error || err.message);
     } finally {
       setTrackingBusy(false);
-    }
-  }
-
-  async function setStatus(id, status) {
-    try {
-      await adminApi.updateOrderStatus(id, status);
-      await refresh();
-      if (selected === id) await loadDetails(id);
-    } catch (e) {
-      setError(e.body?.error || e.message);
     }
   }
 
@@ -462,7 +485,7 @@ export default function AdminOrders() {
                 >
                   <td>{o.order_number}</td>
                   <td>{o.customer_name}</td>
-                  <td>{o.status}</td>
+                  <td>{labelForOrderStatus(o.status)}</td>
                   <td>{formatPrice(o.total)}</td>
                   <td>{new Date(o.created_at).toLocaleString()}</td>
                   <td>
@@ -561,12 +584,50 @@ export default function AdminOrders() {
             onSaved={() => loadDetails(details.order.id)}
           />
 
+          <form className="form admin-order-status-form" onSubmit={handleStatusUpdate}>
+            <h4 className="admin-order-status-form__title">Order status</h4>
+            <p className="muted admin-order-status-form__hint">
+              Choose a status and save. The customer is emailed immediately with their current
+              order status and a link to <strong>/account</strong>.
+            </p>
+            <div className="row admin-order-status-form__fields">
+              <div className="field" style={{ flex: 1, minWidth: '14rem' }}>
+                <label htmlFor="admin-order-status">Status</label>
+                <select
+                  id="admin-order-status"
+                  value={statusForm}
+                  onChange={(e) => setStatusForm(e.target.value)}
+                  required
+                >
+                  {ORDER_STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field" style={{ alignSelf: 'flex-end' }}>
+                <button type="submit" className="btn btn-primary" disabled={statusBusy}>
+                  {statusBusy ? 'Saving…' : 'Update status & email customer'}
+                </button>
+              </div>
+            </div>
+            {statusMsg ? (
+              <p className="page-body" style={{ color: '#065f46', marginTop: '0.75rem' }}>
+                {statusMsg}
+              </p>
+            ) : null}
+            <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
+              Current in database: <strong>{labelForOrderStatus(details.order.status)}</strong>
+            </p>
+          </form>
+
           <form className="form admin-tracking-form" onSubmit={sendTrackingEmail}>
             <h4 className="admin-tracking-form__title">Email customer tracking</h4>
             <p className="muted admin-tracking-form__hint">
               Saves tracking on the order (visible on <strong>/account</strong>) and emails{' '}
               <strong>{details.order.customer_email}</strong> when SendGrid is configured. Orders
-              marked <em>paid</em> are set to <em>fulfilled</em>.
+              marked <em>paid</em> are set to <em>shipped</em> when tracking is saved.
             </p>
             <div className="row admin-tracking-form__fields">
               <div className="field" style={{ flex: 1, minWidth: '10rem' }}>
@@ -606,18 +667,6 @@ export default function AdminOrders() {
             </button>
           </form>
 
-          <div className="row">
-            {['pending', 'paid', 'fulfilled', 'cancelled'].map((status) => (
-              <button
-                key={status}
-                type="button"
-                className={`btn${details.order.status === status ? ' btn-primary' : ''}`}
-                onClick={() => setStatus(details.order.id, status)}
-              >
-                {status}
-              </button>
-            ))}
-          </div>
           <div className="table-wrap">
             <table>
               <thead>

@@ -41,7 +41,8 @@ export async function lookupCustomerCustomQuiltRequests(email, requestNumber) {
     const [[row]] = await pool.query(
       `SELECT id, request_number, status, design_id, design_name, product_size, color_palette, batting,
               quilt_title, notes, own_design_image_url, estimated_price, created_at, updated_at,
-              customer_name, customer_email, customer_phone
+              customer_name, customer_email, customer_phone,
+              tracking_carrier, tracking_number, tracking_notified_at
        FROM custom_quilt_requests
        WHERE request_number = ? AND LOWER(TRIM(customer_email)) = ?`,
       [ref, parsed.email]
@@ -58,7 +59,8 @@ export async function lookupCustomerCustomQuiltRequests(email, requestNumber) {
   }
 
   const [requests] = await pool.query(
-    `SELECT id, request_number, status, design_name, product_size, estimated_price, created_at
+    `SELECT id, request_number, status, design_name, product_size, estimated_price,
+            tracking_carrier, tracking_number, created_at
      FROM custom_quilt_requests
      WHERE LOWER(TRIM(customer_email)) = ?
      ORDER BY created_at DESC

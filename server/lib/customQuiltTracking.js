@@ -1,28 +1,32 @@
 import pool from '../db.js';
-import { sendOrderTrackingEmail } from './mail.js';
+import { sendCustomQuiltTrackingEmail } from './mail.js';
 import {
   buildTrackingUrl,
   getShippingCarrier,
   validateTrackingPayload,
 } from './shippingCarriers.js';
 
-export async function upsertOrderTracking(orderId, { carrierId, tracking, markNotified = false }) {
-  const id = Number(orderId);
-  const [[order]] = await pool.query('SELECT id, status FROM orders WHERE id = ?', [id]);
-  if (!order) {
-    return { ok: false, status: 404, error: 'Order not found' };
+export async function upsertCustomQuiltTracking(requestId, { carrierId, tracking, markNotified = false }) {
+  const id = Number(requestId);
+  const [[row]] = await pool.query('SELECT id, status FROM custom_quilt_requests WHERE id = ?', [id]);
+  if (!row) {
+    return { ok: false, status: 404, error: 'Custom quilt request not found' };
   }
 
-  let nextStatus = order.status;
-  if (order.status === 'paid' || order.status === 'pending') {
-    nextStatus = 'shipped';
-  } else if (order.status === 'preparing_for_shipment' || order.status === 'fulfilled') {
+  let nextStatus = row.status;
+  if (
+    row.status === 'paid' ||
+    row.status === 'pending_payment' ||
+    row.status === 'submitted' ||
+    row.status === 'preparing_for_shipment' ||
+    row.status === 'fulfilled'
+  ) {
     nextStatus = 'shipped';
   }
 
   if (markNotified) {
     await pool.query(
-      `UPDATE orders SET
+      `UPDATE custom_quilt_requests SET
          tracking_carrier = ?,
          tracking_number = ?,
          tracking_notified_at = CURRENT_TIMESTAMP,
@@ -32,7 +36,7 @@ export async function upsertOrderTracking(orderId, { carrierId, tracking, markNo
     );
   } else {
     await pool.query(
-      `UPDATE orders SET
+      `UPDATE custom_quilt_requests SET
          tracking_carrier = ?,
          tracking_number = ?,
          status = ?
@@ -44,31 +48,30 @@ export async function upsertOrderTracking(orderId, { carrierId, tracking, markNo
   return { ok: true, status: nextStatus };
 }
 
-export async function sendOrderTrackingNotification(orderId, { carrier, trackingNumber, sendEmail = true }) {
+export async function sendCustomQuiltTrackingNotification(requestId, { carrier, trackingNumber, sendEmail = true }) {
   const validated = validateTrackingPayload({ carrier, trackingNumber });
   if (!validated.ok) {
     return validated;
   }
 
-  const id = Number(orderId);
+  const id = Number(requestId);
   if (!id) {
-    return { ok: false, status: 400, error: 'Invalid order id' };
+    return { ok: false, status: 400, error: 'Invalid request id' };
   }
 
-  const [[order]] = await pool.query(
-    `SELECT id, order_number, status, customer_name, customer_email
-     FROM orders WHERE id = ?`,
+  const [[request]] = await pool.query(
+    `SELECT id, request_number, status, customer_name, customer_email
+     FROM custom_quilt_requests WHERE id = ?`,
     [id]
   );
-  if (!order) {
-    return { ok: false, status: 404, error: 'Order not found' };
+  if (!request) {
+    return { ok: false, status: 404, error: 'Custom quilt request not found' };
   }
 
   const carrierInfo = getShippingCarrier(validated.carrierId);
   const trackingUrl = buildTrackingUrl(validated.carrierId, validated.tracking);
 
-  // Always persist tracking so /account can show it, even if email fails.
-  const saved = await upsertOrderTracking(id, {
+  const saved = await upsertCustomQuiltTracking(id, {
     carrierId: validated.carrierId,
     tracking: validated.tracking,
     markNotified: false,
@@ -81,27 +84,28 @@ export async function sendOrderTrackingNotification(orderId, { carrier, tracking
   let emailError = null;
   if (sendEmail) {
     try {
-      await sendOrderTrackingEmail({
-        to: order.customer_email,
-        customerName: order.customer_name,
-        orderNumber: order.order_number,
+      await sendCustomQuiltTrackingEmail({
+        to: request.customer_email,
+        customerName: request.customer_name,
+        requestNumber: request.request_number,
         carrierLabel: carrierInfo.label,
         trackingNumber: validated.tracking,
         trackingUrl,
       });
       emailSent = true;
-      await pool.query('UPDATE orders SET tracking_notified_at = CURRENT_TIMESTAMP WHERE id = ?', [
-        id,
-      ]);
+      await pool.query(
+        'UPDATE custom_quilt_requests SET tracking_notified_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [id]
+      );
     } catch (e) {
       emailError = e.message || 'Failed to send tracking email';
-      console.error('[tracking] email failed (tracking still saved):', emailError);
+      console.error('[custom-quilt tracking] email failed (tracking still saved):', emailError);
     }
   }
 
   return {
     ok: true,
-    orderNumber: order.order_number,
+    requestNumber: request.request_number,
     carrier: carrierInfo.label,
     trackingNumber: validated.tracking,
     trackingUrl,

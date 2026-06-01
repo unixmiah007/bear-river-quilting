@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { adminApi } from '../api.js';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
+import { ORDER_STATUS_OPTIONS, normalizeOrderStatusForForm, normalizeCustomQuiltStatusForForm, labelForOrderStatus, labelForCustomQuiltStatus } from '../lib/orderStatuses.js';
+import { SHIPPING_CARRIER_OPTIONS, labelForCarrier } from '../lib/shippingCarriers.js';
 import PageLoading from '../components/PageLoading.jsx';
 
 function formatWhen(iso) {
@@ -41,6 +43,12 @@ export default function AdminCustomPayment() {
   const [amount, setAmount] = useState('');
   const [adminNote, setAdminNote] = useState('');
   const [sendEmail, setSendEmail] = useState(true);
+  const [orderStatus, setOrderStatus] = useState('new');
+  const [trackingCarrier, setTrackingCarrier] = useState('usps');
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [sendTrackingEmail, setSendTrackingEmail] = useState(true);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusMsg, setStatusMsg] = useState(null);
   const [err, setErr] = useState(null);
   const [success, setSuccess] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -85,6 +93,10 @@ export default function AdminCustomPayment() {
   function selectOrder(order) {
     setSelectedKey(selectionKey('order', order.id));
     setAmount(String(Number(order.total).toFixed(2)));
+    setOrderStatus(normalizeOrderStatusForForm(order.status));
+    setTrackingCarrier(order.tracking_carrier || 'usps');
+    setTrackingNumber(order.tracking_number || '');
+    setStatusMsg(null);
     setErr(null);
     setSuccess(null);
   }
@@ -92,8 +104,86 @@ export default function AdminCustomPayment() {
   function selectCustomRequest(request) {
     setSelectedKey(selectionKey('custom_quilt', request.id));
     setAmount(String(Number(request.estimated_price ?? 0).toFixed(2)));
+    setOrderStatus(normalizeCustomQuiltStatusForForm(request.status));
+    setTrackingCarrier(request.tracking_carrier || 'usps');
+    setTrackingNumber(request.tracking_number || '');
+    setStatusMsg(null);
     setErr(null);
     setSuccess(null);
+  }
+
+  async function handleSaveFulfillmentStatus(e) {
+    e.preventDefault();
+    if (!selectedOrder && !selectedCustomRequest) return;
+    setStatusSaving(true);
+    setStatusMsg(null);
+    setErr(null);
+    const customerEmail = selectedOrder?.customer_email ?? selectedCustomRequest?.customer_email;
+    const statusLabel = selectedCustomRequest
+      ? labelForCustomQuiltStatus(orderStatus)
+      : labelForOrderStatus(orderStatus);
+
+    try {
+      if (selectedOrder) {
+        await adminApi.updateOrderStatus(selectedOrder.id, orderStatus);
+      } else {
+        await adminApi.updateCustomQuiltRequestStatus(selectedCustomRequest.id, orderStatus);
+      }
+
+      const trackNum = trackingNumber.trim();
+      let trackingNote = '';
+      if (trackNum) {
+        const trackingBody = {
+          carrier: trackingCarrier,
+          trackingNumber: trackNum,
+          sendEmail: sendTrackingEmail,
+        };
+        const result = selectedOrder
+          ? await adminApi.sendOrderTracking(selectedOrder.id, trackingBody)
+          : await adminApi.sendCustomQuiltTracking(selectedCustomRequest.id, trackingBody);
+        trackingNote = sendTrackingEmail
+          ? result.emailSent
+            ? ` Tracking emailed to ${customerEmail}.`
+            : result.warning
+              ? ` ${result.warning}`
+              : ' Tracking saved.'
+          : ' Tracking saved (no email sent).';
+      }
+
+      setStatusMsg(`Status set to ${statusLabel}.${trackingNote}`);
+
+      if (selectedOrder) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === selectedOrder.id
+              ? {
+                  ...o,
+                  status: orderStatus,
+                  tracking_carrier: trackNum ? trackingCarrier : o.tracking_carrier,
+                  tracking_number: trackNum || o.tracking_number,
+                }
+              : o
+          )
+        );
+      } else {
+        setCustomRequests((prev) =>
+          prev.map((r) =>
+            r.id === selectedCustomRequest.id
+              ? {
+                  ...r,
+                  status: orderStatus,
+                  tracking_carrier: trackNum ? trackingCarrier : r.tracking_carrier,
+                  tracking_number: trackNum || r.tracking_number,
+                }
+              : r
+          )
+        );
+      }
+    } catch (ex) {
+      setErr(ex.body?.error || ex.message);
+    } finally {
+      setStatusSaving(false);
+    }
   }
 
   async function handleCreatePayment(e) {
@@ -211,7 +301,9 @@ export default function AdminCustomPayment() {
                           </td>
                           <td>{order.order_number}</td>
                           <td>
-                            <span className={statusBadgeClass(order.status)}>{order.status}</span>
+                            <span className={statusBadgeClass(order.status)}>
+                              {labelForOrderStatus(order.status)}
+                            </span>
                           </td>
                           <td>{order.customer_name}</td>
                           <td>{formatPrice(order.total)}</td>
@@ -261,7 +353,9 @@ export default function AdminCustomPayment() {
                           </td>
                           <td>{request.request_number}</td>
                           <td>
-                            <span className={statusBadgeClass(request.status)}>{request.status}</span>
+                            <span className={statusBadgeClass(request.status)}>
+                              {labelForCustomQuiltStatus(request.status)}
+                            </span>
                           </td>
                           <td>{request.design_name}</td>
                           <td>
@@ -290,7 +384,9 @@ export default function AdminCustomPayment() {
                 selectedOrder?.total ?? selectedCustomRequest?.estimated_price
               )}
             </strong>{' '}
-            ({selectedItem.status})
+            ({selectedCustomRequest
+              ? labelForCustomQuiltStatus(selectedItem.status)
+              : labelForOrderStatus(selectedItem.status)})
           </p>
           <div className="field">
             <label htmlFor="custom-pay-amount">Amount to charge (USD)</label>
@@ -328,6 +424,95 @@ export default function AdminCustomPayment() {
               : sendEmail
                 ? 'Create link & send email'
                 : 'Create payment link only'}
+          </button>
+        </form>
+      ) : null}
+
+      {selectedItem ? (
+        <form className="form card admin-custom-payment__status" onSubmit={handleSaveFulfillmentStatus}>
+          <h2 className="admin-custom-payment__section-title">
+            4. {selectedCustomRequest ? 'Request status' : 'Order status'} & tracking
+          </h2>
+          <p className="muted admin-custom-payment__selected-summary">
+            Update {selectedCustomRequest ? 'custom quilt request' : 'shop order'}{' '}
+            <strong>{referenceLabel}</strong> for {selectedItem.customer_email}. Tracking appears on
+            the customer&apos;s <strong>/account</strong> page.
+          </p>
+          <div className="field">
+            <label htmlFor="custom-pay-order-status">
+              {selectedCustomRequest ? 'Request status' : 'Order status'}
+            </label>
+            <select
+              id="custom-pay-order-status"
+              value={orderStatus}
+              onChange={(e) => setOrderStatus(e.target.value)}
+              required
+            >
+              {ORDER_STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="admin-custom-payment__tracking">
+            <h3 className="admin-custom-payment__subsection">Shipment tracking (optional)</h3>
+            <div className="row admin-tracking-form__fields">
+              <div className="field" style={{ flex: 1, minWidth: '10rem' }}>
+                <label htmlFor="custom-pay-tracking-carrier">Shipper</label>
+                <select
+                  id="custom-pay-tracking-carrier"
+                  value={trackingCarrier}
+                  onChange={(e) => setTrackingCarrier(e.target.value)}
+                >
+                  {SHIPPING_CARRIER_OPTIONS.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field" style={{ flex: 2, minWidth: '12rem' }}>
+                <label htmlFor="custom-pay-tracking-number">Tracking number</label>
+                <input
+                  id="custom-pay-tracking-number"
+                  type="text"
+                  value={trackingNumber}
+                  onChange={(e) => setTrackingNumber(e.target.value)}
+                  placeholder="e.g. 9400111899223344555555"
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+            <label className="admin-custom-payment__checkbox">
+              <input
+                type="checkbox"
+                checked={sendTrackingEmail}
+                onChange={(e) => setSendTrackingEmail(e.target.checked)}
+                disabled={!trackingNumber.trim()}
+              />
+              Email tracking to {selectedItem.customer_email}
+            </label>
+            {(selectedOrder?.tracking_number || selectedCustomRequest?.tracking_number) ? (
+              <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
+                Current on file:{' '}
+                {labelForCarrier(
+                  selectedOrder?.tracking_carrier ?? selectedCustomRequest?.tracking_carrier
+                )}{' '}
+                ·{' '}
+                <strong>
+                  {selectedOrder?.tracking_number ?? selectedCustomRequest?.tracking_number}
+                </strong>
+              </p>
+            ) : null}
+          </div>
+          {statusMsg ? (
+            <p className="page-body" style={{ color: '#065f46' }}>
+              {statusMsg}
+            </p>
+          ) : null}
+          <button type="submit" className="btn btn-primary" disabled={statusSaving}>
+            {statusSaving ? 'Saving…' : 'Save status & tracking'}
           </button>
         </form>
       ) : null}

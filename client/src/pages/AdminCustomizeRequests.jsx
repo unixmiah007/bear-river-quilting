@@ -19,6 +19,19 @@ function formatWhen(iso) {
   return new Date(iso).toLocaleString();
 }
 
+function formatWhenCompact(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: '2-digit',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 function formatPrice(n) {
   if (n == null) return '—';
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(Number(n));
@@ -424,14 +437,14 @@ export default function AdminCustomizeRequests() {
                   onSort={handleSort}
                 />
                 <SortableTh
-                  label="Est. price"
+                  label="Price"
                   column="price"
                   sortKey={sortKey}
                   sortDir={sortDir}
                   onSort={handleSort}
                 />
                 <SortableTh
-                  label="Acknowledged"
+                  label="Ack."
                   column="acknowledged"
                   sortKey={sortKey}
                   sortDir={sortDir}
@@ -444,7 +457,9 @@ export default function AdminCustomizeRequests() {
                   sortDir={sortDir}
                   onSort={handleSort}
                 />
-                <th scope="col">Actions</th>
+                <th scope="col" className="admin-customize-requests-table__actions-col">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -464,14 +479,28 @@ export default function AdminCustomizeRequests() {
                       toggleAcknowledged(r);
                     }}
                   >
-                    <td>{r.request_number}</td>
-                    <td>{r.status}</td>
-                    <td>{r.design_name}</td>
-                    <td>{formatProductSizeLabel(r.product_size) ?? r.product_size}</td>
-                    <td>
-                      {r.customer_name}
-                      <br />
-                      <span className="muted">{r.customer_email}</span>
+                    <td className="admin-customize-requests-table__clip" title={r.request_number}>
+                      {r.request_number}
+                    </td>
+                    <td className="admin-customize-requests-table__clip" title={r.status}>
+                      {r.status}
+                    </td>
+                    <td className="admin-customize-requests-table__clip" title={r.design_name}>
+                      {r.design_name}
+                    </td>
+                    <td className="admin-customize-requests-table__clip">
+                      {formatProductSizeLabel(r.product_size) ?? r.product_size}
+                    </td>
+                    <td className="admin-customize-requests-table__customer">
+                      <span className="admin-customize-requests-table__clip-line" title={r.customer_name}>
+                        {r.customer_name}
+                      </span>
+                      <span
+                        className="muted admin-customize-requests-table__clip-line"
+                        title={r.customer_email}
+                      >
+                        {r.customer_email}
+                      </span>
                     </td>
                     <td>{formatPrice(r.estimated_price)}</td>
                     <td>
@@ -479,20 +508,22 @@ export default function AdminCustomizeRequests() {
                         className={`badge ${ack === 'Y' ? 'badge-on' : 'badge-off'}`}
                         aria-live="polite"
                       >
-                        {busy ? 'Saving…' : ack}
+                        {busy ? '…' : ack}
                       </span>
                     </td>
-                    <td className="muted">{formatWhen(r.created_at)}</td>
-                    <td>
+                    <td className="muted admin-customize-requests-table__date" title={formatWhen(r.created_at)}>
+                      {formatWhenCompact(r.created_at)}
+                    </td>
+                    <td className="admin-customize-requests-table__actions-col">
                       <button
                         type="button"
-                        className="btn"
+                        className="btn btn--compact"
                         onClick={(e) => {
                           e.stopPropagation();
                           setDetailRow(r);
                         }}
                       >
-                        View details
+                        Details
                       </button>
                     </td>
                   </tr>

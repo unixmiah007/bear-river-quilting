@@ -65,6 +65,9 @@ import { emailCustomerOrderInvoice } from './lib/orderInvoiceEmail.js';
 import { sendProductShareEmail } from './lib/productShareEmail.js';
 import { ensureOrderInvoiceEmailColumn } from './lib/ensureOrderInvoiceEmailColumn.js';
 import { sendOrderTrackingNotification } from './lib/orderTracking.js';
+import { sendCustomQuiltTrackingNotification } from './lib/customQuiltTracking.js';
+import { isAllowedCustomQuiltRequestStatus } from './lib/customQuiltStatuses.js';
+import { updateAdminOrderStatus } from './lib/orderStatusUpdate.js';
 import { ensureOrderMessagesTable } from './lib/ensureOrderMessagesTable.js';
 import {
   listOrderMessages,
@@ -1741,6 +1744,55 @@ app.put('/api/admin/custom-quilt-requests/:id/acknowledged', authMiddleware, asy
   }
 });
 
+app.put('/api/admin/custom-quilt-requests/:id/status', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const status = String(req.body?.status ?? '').trim().toLowerCase();
+    if (!id) return res.status(400).json({ error: 'Invalid request id' });
+    if (!isAllowedCustomQuiltRequestStatus(status)) {
+      return res.status(400).json({ error: 'Invalid request status' });
+    }
+    const [result] = await pool.query('UPDATE custom_quilt_requests SET status = ? WHERE id = ?', [
+      status,
+      id,
+    ]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Custom quilt request not found' });
+    }
+    res.json({ ok: true, status });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to update custom quilt request status' });
+  }
+});
+
+app.post('/api/admin/custom-quilt-requests/:id/tracking', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const result = await sendCustomQuiltTrackingNotification(id, {
+      carrier: req.body?.carrier,
+      trackingNumber: req.body?.trackingNumber,
+      sendEmail: req.body?.sendEmail !== false,
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 500).json({ error: result.error });
+    }
+    res.json({
+      ok: true,
+      requestNumber: result.requestNumber,
+      carrier: result.carrier,
+      trackingNumber: result.trackingNumber,
+      trackingUrl: result.trackingUrl,
+      status: result.status,
+      emailSent: !!result.emailSent,
+      warning: result.warning ?? null,
+    });
+  } catch (e) {
+    console.error('[custom-quilt tracking] notify failed:', e);
+    res.status(500).json({ error: 'Failed to send tracking notification' });
+  }
+});
+
 // --- Admin: custom payment links ---
 
 app.get('/api/admin/custom-payments/orders', authMiddleware, async (req, res) => {
@@ -1949,6 +2001,7 @@ app.post('/api/admin/orders/:id/tracking', authMiddleware, async (req, res) => {
     const result = await sendOrderTrackingNotification(id, {
       carrier: req.body?.carrier,
       trackingNumber: req.body?.trackingNumber,
+      sendEmail: req.body?.sendEmail !== false,
     });
     if (!result.ok) {
       return res.status(result.status ?? 500).json({ error: result.error });
@@ -1972,14 +2025,19 @@ app.post('/api/admin/orders/:id/tracking', authMiddleware, async (req, res) => {
 app.put('/api/admin/orders/:id/status', authMiddleware, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const status = String(req.body?.status ?? '').trim().toLowerCase();
-    const allowed = new Set(['pending', 'paid', 'fulfilled', 'cancelled']);
-    if (!allowed.has(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
+    const result = await updateAdminOrderStatus(id, req.body?.status);
+    if (!result.ok) {
+      return res.status(result.status ?? 500).json({ error: result.error });
     }
-    const [result] = await pool.query('UPDATE orders SET status = ? WHERE id = ?', [status, id]);
-    if (result.affectedRows === 0) return res.status(404).json({ error: 'Order not found' });
-    res.json({ ok: true });
+    res.json({
+      ok: true,
+      status: result.status,
+      statusLabel: result.statusLabel,
+      emailSent: !!result.emailSent,
+      emailError: result.emailError ?? null,
+      unchanged: !!result.unchanged,
+      warning: result.warning ?? null,
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to update order status' });

@@ -46,7 +46,8 @@ export async function searchCustomerPaymentsByEmail(email) {
   if (!parsed.ok) return parsed;
 
   const [orders] = await pool.query(
-    `SELECT id, order_number, status, customer_name, customer_email, subtotal, tax_amount, shipping_cost, total, created_at
+    `SELECT id, order_number, status, customer_name, customer_email, subtotal, tax_amount, shipping_cost, total,
+            tracking_carrier, tracking_number, created_at
      FROM orders
      WHERE LOWER(TRIM(customer_email)) = ?
      ORDER BY created_at DESC
@@ -56,7 +57,7 @@ export async function searchCustomerPaymentsByEmail(email) {
 
   const [customRequests] = await pool.query(
     `SELECT id, request_number, status, design_name, product_size, color_palette, batting,
-            customer_name, customer_email, estimated_price, created_at
+            customer_name, customer_email, estimated_price, tracking_carrier, tracking_number, created_at
      FROM custom_quilt_requests
      WHERE LOWER(TRIM(customer_email)) = ?
      ORDER BY created_at DESC

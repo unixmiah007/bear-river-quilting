@@ -56,4 +56,19 @@ export async function ensureCustomQuiltRequestsTable(pool) {
       'ALTER TABLE custom_quilt_requests ADD COLUMN own_design_image_url VARCHAR(512) NULL AFTER notes'
     );
   }
+  if (!(await columnExists(pool, 'custom_quilt_requests', 'tracking_carrier'))) {
+    await pool.query(
+      'ALTER TABLE custom_quilt_requests ADD COLUMN tracking_carrier VARCHAR(32) NULL AFTER stripe_payment_intent_id'
+    );
+  }
+  if (!(await columnExists(pool, 'custom_quilt_requests', 'tracking_number'))) {
+    await pool.query(
+      'ALTER TABLE custom_quilt_requests ADD COLUMN tracking_number VARCHAR(64) NULL AFTER tracking_carrier'
+    );
+  }
+  if (!(await columnExists(pool, 'custom_quilt_requests', 'tracking_notified_at'))) {
+    await pool.query(
+      'ALTER TABLE custom_quilt_requests ADD COLUMN tracking_notified_at TIMESTAMP NULL AFTER tracking_number'
+    );
+  }
 }

@@ -3877,6 +3877,31 @@ tr:last-child td {
   margin-bottom: 0.85rem;
 }
 
+.admin-order-status-form {
+  margin: 1.25rem 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #f9fafb;
+}
+
+.admin-order-status-form__title {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.admin-order-status-form__hint {
+  margin: 0 0 0.85rem;
+  font-size: 0.85rem;
+}
+
+.admin-order-status-form__fields {
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
 .order-tracking__link {
   font-weight: 600;
   word-break: break-all;
@@ -4964,6 +4989,135 @@ tr:last-child td {
 
 .admin-customize-requests-table .btn {
   white-space: nowrap;
+}
+
+.admin-customize-requests-table {
+  overflow-x: hidden;
+}
+
+.admin-customize-requests-table table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.admin-customize-requests-table th,
+.admin-customize-requests-table td {
+  padding: 0.45rem 0.35rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+.admin-customize-requests-table th {
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+}
+
+.admin-customize-requests-table th:nth-child(1),
+.admin-customize-requests-table td:nth-child(1) {
+  width: 11%;
+}
+
+.admin-customize-requests-table th:nth-child(2),
+.admin-customize-requests-table td:nth-child(2) {
+  width: 9%;
+}
+
+.admin-customize-requests-table th:nth-child(3),
+.admin-customize-requests-table td:nth-child(3) {
+  width: 14%;
+}
+
+.admin-customize-requests-table th:nth-child(4),
+.admin-customize-requests-table td:nth-child(4) {
+  width: 7%;
+}
+
+.admin-customize-requests-table th:nth-child(5),
+.admin-customize-requests-table td:nth-child(5) {
+  width: 18%;
+}
+
+.admin-customize-requests-table th:nth-child(6),
+.admin-customize-requests-table td:nth-child(6) {
+  width: 9%;
+}
+
+.admin-customize-requests-table th:nth-child(7),
+.admin-customize-requests-table td:nth-child(7) {
+  width: 6%;
+  text-align: center;
+}
+
+.admin-customize-requests-table th:nth-child(8),
+.admin-customize-requests-table td:nth-child(8) {
+  width: 14%;
+}
+
+.admin-customize-requests-table th:nth-child(9),
+.admin-customize-requests-table td:nth-child(9),
+.admin-customize-requests-table__actions-col {
+  width: 12%;
+}
+
+.admin-customize-requests-table__clip {
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-customize-requests-table__customer {
+  max-width: 0;
+}
+
+.admin-customize-requests-table__clip-line {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-customize-requests-table__date {
+  white-space: nowrap;
+}
+
+.admin-customize-requests-table__actions-col {
+  text-align: right;
+}
+
+.admin-customize-requests-table .admin-table-sort {
+  max-width: 100%;
+  min-width: 0;
+  font-size: inherit;
+}
+
+.admin-customize-requests-table .admin-table-sort > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.admin-customize-requests-table .admin-table-sort__icon {
+  flex-shrink: 0;
+}
+
+.admin-customize-requests-table .btn--compact {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.72rem;
+}
+
+.admin-custom-payment__status {
+  margin-bottom: 1.25rem;
+  padding: 1.15rem 1.25rem;
+}
+
+.admin-custom-payment__tracking {
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
 }
 
 .admin-custom-payment__search,

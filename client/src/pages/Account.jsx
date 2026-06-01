@@ -8,7 +8,7 @@ import { publicApi } from '../api.js';
 import { useCart } from '../context/CartContext.jsx';
 import { useFavorites } from '../context/FavoritesContext.jsx';
 import { buildTrackingUrl, labelForCarrier } from '../lib/shippingCarriers.js';
-import PageLoading from '../components/PageLoading.jsx';
+import { labelForOrderStatus } from '../lib/orderStatuses.js';
 import AccountVisitHistory from '../components/AccountVisitHistory.jsx';
 import AccountCustomQuiltLookup from '../components/AccountCustomQuiltLookup.jsx';
 
@@ -37,12 +37,7 @@ function TrackingListCell({ carrier, trackingNumber }) {
 }
 
 function statusLabel(s) {
-  const v = String(s || '').toLowerCase();
-  if (v === 'pending') return 'Pending';
-  if (v === 'paid') return 'Paid';
-  if (v === 'fulfilled') return 'Fulfilled';
-  if (v === 'cancelled') return 'Cancelled';
-  return s || '—';
+  return labelForOrderStatus(s);
 }
 
 function readOrderDeepLink(locationState, searchParams) {
@@ -400,9 +395,13 @@ export default function Account() {
             />
           ) : (
             <p className="muted" style={{ margin: 0 }}>
-              {order.status === 'fulfilled' || order.status === 'paid'
-                ? 'Tracking has not been added yet. Check back soon or contact customer care.'
-                : 'Tracking will appear here once your order ships.'}
+              {['cancelled', 'refunded', 'return'].includes(String(order.status || '').toLowerCase())
+                ? 'This order is not being shipped.'
+                : ['paid', 'processing', 'preparing_for_shipment', 'fulfilled', 'shipped', 'complete'].includes(
+                      String(order.status || '').toLowerCase()
+                    )
+                  ? 'Tracking has not been added yet. Check back soon or contact customer care.'
+                  : 'Tracking will appear here once your order ships.'}
             </p>
           )}
 

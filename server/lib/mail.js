@@ -308,6 +308,160 @@ ${trackHtml}
 }
 
 /**
+ * Emails the customer when an admin updates their order status.
+ */
+export async function sendOrderStatusUpdateEmail({
+  to,
+  customerName,
+  orderNumber,
+  status,
+  statusLabel,
+  statusMessage,
+}) {
+  const toAddr = String(to ?? '')
+    .trim()
+    .toLowerCase();
+  if (!toAddr || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toAddr)) {
+    throw new Error('Invalid customer email on order');
+  }
+
+  if (!isSendGridConfigured()) {
+    throw new Error('SendGrid is not configured — set SENDGRID_API_KEY in server/.env');
+  }
+
+  const from = resolveSendGridFromCustomer();
+  if (!from) {
+    throw new Error('Set MAIL_FROM_ADDRESS or MAIL_FROM to a verified SendGrid sender');
+  }
+
+  const accountUrl = buildCustomerOrderAccountUrl(toAddr, orderNumber);
+  const label = statusLabel || String(status ?? 'updated');
+  const message =
+    statusMessage || `Your order status is now: ${label}.`;
+
+  const text = [
+    `Hi ${customerName},`,
+    '',
+    `This is an update on your Bear River Quilting order ${orderNumber}.`,
+    '',
+    `Current status: ${label}`,
+    message,
+    '',
+    `View your order details: ${accountUrl}`,
+    '',
+    'If you have questions, reply to this email.',
+    '',
+    '— Bear River Quilting',
+  ].join('\n');
+
+  const html = `
+<p>Hi ${escapeHtml(customerName)},</p>
+<p>This is an update on your Bear River Quilting order <strong>${escapeHtml(orderNumber)}</strong>.</p>
+<table cellpadding="6" cellspacing="0" style="border-collapse:collapse;margin:1rem 0">
+<tbody>
+<tr><td style="padding:4px 12px 4px 0;color:#6b7280">Status</td><td><strong>${escapeHtml(label)}</strong></td></tr>
+</tbody>
+</table>
+<p>${escapeHtml(message)}</p>
+<p><a href="${escapeHtml(accountUrl)}" style="display:inline-block;padding:0.7rem 1.15rem;background:#111;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">View order status</a></p>
+<p style="font-size:0.9rem;color:#6b7280">Or open this link:<br><a href="${escapeHtml(accountUrl)}">${escapeHtml(accountUrl)}</a></p>
+<p>— Bear River Quilting</p>`.trim();
+
+  await sendSendGridMail({
+    to: toAddr,
+    from,
+    subject: `Order ${orderNumber} — status update: ${label}`,
+    text,
+    html,
+  });
+
+  console.log('[mail] Sent order status update', { orderNumber, status, to: toAddr });
+}
+
+/**
+ * Emails the customer shipment tracking for a custom quilt request.
+ */
+export async function sendCustomQuiltTrackingEmail({
+  to,
+  customerName,
+  requestNumber,
+  carrierLabel,
+  trackingNumber,
+  trackingUrl,
+}) {
+  const toAddr = String(to ?? '')
+    .trim()
+    .toLowerCase();
+  if (!toAddr || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toAddr)) {
+    throw new Error('Invalid customer email on custom quilt request');
+  }
+
+  if (!isSendGridConfigured()) {
+    throw new Error('SendGrid is not configured — set SENDGRID_API_KEY in server/.env');
+  }
+
+  const from = resolveSendGridFromCustomer();
+  if (!from) {
+    throw new Error('Set MAIL_FROM_ADDRESS or MAIL_FROM to a verified SendGrid sender');
+  }
+
+  const accountUrl = `${getClientOrigin()}/account?${new URLSearchParams({
+    email: toAddr,
+    customRequest: String(requestNumber ?? '').trim(),
+  }).toString()}`;
+
+  const trackLine = trackingUrl
+    ? `Track your package: ${trackingUrl}`
+    : `Tracking number: ${trackingNumber}`;
+
+  const text = [
+    `Hi ${customerName},`,
+    '',
+    `Good news — your custom quilt request ${requestNumber} has shipped.`,
+    '',
+    `Carrier: ${carrierLabel}`,
+    `Tracking number: ${trackingNumber}`,
+    trackingUrl ? '' : null,
+    trackingUrl ? trackLine : null,
+    '',
+    `View your request status: ${accountUrl}`,
+    '',
+    'Thank you for choosing Bear River Quilting.',
+    '— Bear River Quilting',
+  ]
+    .filter((line) => line !== null)
+    .join('\n');
+
+  const trackHtml = trackingUrl
+    ? `<p><a href="${escapeHtml(trackingUrl)}">Track your package</a></p>`
+    : '';
+
+  const html = `
+<p>Hi ${escapeHtml(customerName)},</p>
+<p>Good news — your custom quilt request <strong>${escapeHtml(requestNumber)}</strong> has shipped.</p>
+<table cellpadding="6" cellspacing="0" style="border-collapse:collapse;margin:1rem 0">
+<tbody>
+<tr><td style="padding:4px 12px 4px 0;color:#6b7280">Carrier</td><td><strong>${escapeHtml(carrierLabel)}</strong></td></tr>
+<tr><td style="padding:4px 12px 4px 0;color:#6b7280">Tracking #</td><td><strong>${escapeHtml(trackingNumber)}</strong></td></tr>
+</tbody>
+</table>
+${trackHtml}
+<p><a href="${escapeHtml(accountUrl)}">View request status on our website</a></p>
+<p>Thank you for choosing Bear River Quilting.<br>— Bear River Quilting</p>
+`.trim();
+
+  await sendSendGridMail({
+    to: toAddr,
+    from,
+    subject: `Your custom quilt ${requestNumber} has shipped`,
+    text,
+    html,
+  });
+
+  console.log('[mail] Sent custom quilt tracking email', { requestNumber, to: toAddr, carrier: carrierLabel });
+}
+
+/**
  * Emails the customer their order invoice with PDF attached.
  */
 export async function sendOrderInvoiceEmail({
