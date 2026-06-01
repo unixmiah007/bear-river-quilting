@@ -3,6 +3,8 @@ import { adminApi } from '../api.js';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
 import PageLoading from '../components/PageLoading.jsx';
 
+const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
+
 const SORTABLE_COLUMNS = [
   'request',
   'status',
@@ -339,6 +341,8 @@ export default function AdminCustomizeRequests() {
   const [sortKey, setSortKey] = useState('created');
   const [sortDir, setSortDir] = useState('desc');
   const [detailRow, setDetailRow] = useState(null);
+  const [pageSize, setPageSize] = useState(5);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     adminApi
@@ -353,9 +357,38 @@ export default function AdminCustomizeRequests() {
     return [...rows].sort((a, b) => compareRows(a, b, sortKey, sortDir));
   }, [rows, sortKey, sortDir]);
 
+  const totalPages = useMemo(() => {
+    if (pageSize === 'all' || sortedRows.length === 0) return 1;
+    return Math.max(1, Math.ceil(sortedRows.length / pageSize));
+  }, [sortedRows.length, pageSize]);
+
+  const paginatedRows = useMemo(() => {
+    if (sortedRows.length === 0) return [];
+    if (pageSize === 'all') return sortedRows;
+    const start = (page - 1) * pageSize;
+    return sortedRows.slice(start, start + pageSize);
+  }, [sortedRows, page, pageSize]);
+
+  const listRange = useMemo(() => {
+    if (sortedRows.length === 0) return { start: 0, end: 0 };
+    if (pageSize === 'all') return { start: 1, end: sortedRows.length };
+    const start = (page - 1) * pageSize + 1;
+    const end = Math.min(page * pageSize, sortedRows.length);
+    return { start, end };
+  }, [sortedRows.length, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize, sortKey, sortDir]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
   const detailFromRows = detailRow ? rows.find((r) => r.id === detailRow.id) ?? detailRow : null;
 
   function handleSort(column) {
+    setPage(1);
     if (sortKey === column) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -397,6 +430,54 @@ export default function AdminCustomizeRequests() {
       ) : rows.length === 0 ? (
         <p className="muted">No requests yet.</p>
       ) : (
+        <>
+        <div className="admin-pagination">
+          <div className="admin-pagination__size">
+            <label htmlFor="admin-customize-requests-page-size">Show</label>
+            <select
+              id="admin-customize-requests-page-size"
+              value={String(pageSize)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setPageSize(v === 'all' ? 'all' : Number(v));
+              }}
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={String(n)}>
+                  {n === 'all' ? 'All' : n}
+                </option>
+              ))}
+            </select>
+            <span className="muted">
+              {pageSize === 'all'
+                ? `All ${sortedRows.length} shown`
+                : `Showing ${listRange.start}–${listRange.end} of ${sortedRows.length}`}
+            </span>
+          </div>
+          {pageSize !== 'all' && totalPages > 1 ? (
+            <div className="admin-pagination__nav row">
+              <button
+                type="button"
+                className="btn"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </button>
+              <span className="muted admin-pagination__status">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                className="btn"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </button>
+            </div>
+          ) : null}
+        </div>
         <div className="table-wrap admin-customize-requests-table">
           <table>
             <thead>
@@ -463,7 +544,7 @@ export default function AdminCustomizeRequests() {
               </tr>
             </thead>
             <tbody>
-              {sortedRows.map((r) => {
+              {paginatedRows.map((r) => {
                 const ack = acknowledgedLabel(r.acknowledged);
                 const busy = savingId === r.id;
                 return (
@@ -532,6 +613,7 @@ export default function AdminCustomizeRequests() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <CustomizeRequestDetailDialog
