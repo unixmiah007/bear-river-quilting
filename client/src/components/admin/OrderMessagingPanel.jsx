@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { adminApi } from '../../api.js';
+import AdminSectionTitle from './AdminSectionTitle.jsx';
+import { CustomerMessagingIcon } from './AdminSectionIcons.jsx';
 
 function formatMessageWhen(value) {
   if (!value) return '—';
@@ -92,9 +94,13 @@ export default function OrderMessagingPanel({
 
   return (
     <section className="admin-order-messaging" aria-labelledby="admin-order-messaging-heading">
-      <h4 id="admin-order-messaging-heading" className="admin-order-messaging__title">
+      <AdminSectionTitle
+        id="admin-order-messaging-heading"
+        icon={CustomerMessagingIcon}
+        className="admin-order-messaging__title"
+      >
         Customer messaging
-      </h4>
+      </AdminSectionTitle>
       <p className="muted admin-order-messaging__hint">
         Send an email to <strong>{customerEmail}</strong>
         {customerName ? ` (${customerName})` : ''}. Messages are saved below for correspondence

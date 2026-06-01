@@ -2,6 +2,8 @@ import { useEffect, useId, useState } from 'react';
 import { adminApi } from '../../api.js';
 import { emptyLabelAddress, formatLabelBlock } from '../../lib/shippingLabel.js';
 import { SITE_LOGO_ALT, SITE_LOGO_URL } from '../../lib/siteBrand.js';
+import AdminSectionTitle from './AdminSectionTitle.jsx';
+import { ShippingLabelIcon } from './AdminSectionIcons.jsx';
 
 function AddressFields({ title, value, onChange }) {
   const id = useId();
@@ -157,7 +159,7 @@ export default function ShippingLabelPanel({ orderId, orderNumber, tracking, onS
 
   return (
     <section className="admin-shipping-label card" style={{ marginTop: '1.25rem' }}>
-      <h4 style={{ marginTop: 0 }}>Shipping label</h4>
+      <AdminSectionTitle icon={ShippingLabelIcon}>Shipping label</AdminSectionTitle>
       <p className="muted" style={{ marginTop: 0 }}>
         Adjust the return address and ship-to address, save, then print a 4×6-style label for packing.
       </p>

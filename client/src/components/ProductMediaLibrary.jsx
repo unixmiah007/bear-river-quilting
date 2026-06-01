@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminApi } from '../api.js';
+import AdminSectionTitle from './admin/AdminSectionTitle.jsx';
+import { MediaGalleryIcon } from './admin/AdminSectionIcons.jsx';
 import { IMAGE_UPLOAD_ACCEPT } from '../lib/prepareUploadImages.js';
 import { MEDIA_LIBRARY_UPLOAD_MAX } from '../lib/mediaLibraryUpload.js';
 
@@ -254,7 +256,9 @@ export default function ProductMediaLibrary({ productId, disabled, onImagesAdded
 
   return (
     <div className="admin-media-library">
-      <h4 className="admin-media-library__title">Media gallery</h4>
+      <AdminSectionTitle icon={MediaGalleryIcon} className="admin-media-library__title">
+        Media gallery
+      </AdminSectionTitle>
       <p className="muted" style={{ marginTop: 0 }}>
         Upload up to {MEDIA_LIBRARY_UPLOAD_MAX} images at a time to the site library (including iPhone
         HEIC — converted to high-quality PNG) or scan the server <code>/uploads</code> folder for

@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { adminApi } from '../api.js';
 import ShippingLabelPanel from '../components/admin/ShippingLabelPanel.jsx';
 import OrderMessagingPanel from '../components/admin/OrderMessagingPanel.jsx';
+import AdminSectionTitle from '../components/admin/AdminSectionTitle.jsx';
+import { OrderStatusIcon, TrackingEmailIcon } from '../components/admin/AdminSectionIcons.jsx';
 import PageLoading from '../components/PageLoading.jsx';
 import { labelForCarrier, SHIPPING_CARRIER_OPTIONS } from '../lib/shippingCarriers.js';
 import { ORDER_STATUS_OPTIONS, normalizeOrderStatusForForm, labelForOrderStatus } from '../lib/orderStatuses.js';
@@ -585,7 +587,9 @@ export default function AdminOrders() {
           />
 
           <form className="form admin-order-status-form" onSubmit={handleStatusUpdate}>
-            <h4 className="admin-order-status-form__title">Order status</h4>
+            <AdminSectionTitle icon={OrderStatusIcon} className="admin-order-status-form__title">
+              Order status
+            </AdminSectionTitle>
             <p className="muted admin-order-status-form__hint">
               Choose a status and save. The customer is emailed immediately with their current
               order status and a link to <strong>/account</strong>.
@@ -623,7 +627,9 @@ export default function AdminOrders() {
           </form>
 
           <form className="form admin-tracking-form" onSubmit={sendTrackingEmail}>
-            <h4 className="admin-tracking-form__title">Email customer tracking</h4>
+            <AdminSectionTitle icon={TrackingEmailIcon} className="admin-tracking-form__title">
+              Email customer tracking
+            </AdminSectionTitle>
             <p className="muted admin-tracking-form__hint">
               Saves tracking on the order (visible on <strong>/account</strong>) and emails{' '}
               <strong>{details.order.customer_email}</strong> when SendGrid is configured. Orders

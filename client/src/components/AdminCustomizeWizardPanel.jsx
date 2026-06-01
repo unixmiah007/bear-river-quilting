@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi } from '../api.js';
+import AdminSectionTitle, { AdminSectionLegend } from './admin/AdminSectionTitle.jsx';
+import {
+  BattingOptionsIcon,
+  ColorPalettesIcon,
+  CustomizePageIcon,
+  PageHeaderIcon,
+  PayStepIcon,
+  QuiltSizesIcon,
+  Step2SectionsIcon,
+  ValidationMessagesIcon,
+  WizardStepsIcon,
+} from './admin/AdminSectionIcons.jsx';
 
 function Field({ label, children, hint }) {
   return (
@@ -93,9 +105,15 @@ export default function AdminCustomizeWizardPanel() {
     <section className="admin-customize-wizard card" aria-labelledby="admin-customize-wizard-heading">
       <header className="admin-customize-wizard__head">
         <div>
-          <h2 id="admin-customize-wizard-heading" style={{ margin: 0 }}>
+          <AdminSectionTitle
+            as="h2"
+            id="admin-customize-wizard-heading"
+            icon={CustomizePageIcon}
+            className="admin-section-title--h2"
+            style={{ margin: 0 }}
+          >
             Customize page (/customize)
-          </h2>
+          </AdminSectionTitle>
           <p className="muted" style={{ margin: '0.35rem 0 0' }}>
             Edit wizard steps, copy, size/color/batting options, and pay-step behavior shown on the
             public customize flow.
@@ -128,7 +146,7 @@ export default function AdminCustomizeWizardPanel() {
             <form className="form admin-customize-wizard__form" onSubmit={onSave}>
               <div className="admin-customize-wizard__grid">
                 <fieldset className="admin-customize-wizard__block">
-                  <legend>Page header</legend>
+                  <AdminSectionLegend icon={PageHeaderIcon}>Page header</AdminSectionLegend>
                   <Field label="Wizard enabled">
                     <label className="row" style={{ margin: 0 }}>
                       <input
@@ -161,7 +179,7 @@ export default function AdminCustomizeWizardPanel() {
                 </fieldset>
 
                 <fieldset className="admin-customize-wizard__block">
-                  <legend>Pay step</legend>
+                  <AdminSectionLegend icon={PayStepIcon}>Pay step</AdminSectionLegend>
                   <Field label="Review pause (seconds)" hint="Delay before Pay with Stripe unlocks.">
                     <input
                       type="number"
@@ -195,7 +213,7 @@ export default function AdminCustomizeWizardPanel() {
               </div>
 
               <fieldset className="admin-customize-wizard__block">
-                <legend>Wizard steps</legend>
+                <AdminSectionLegend icon={WizardStepsIcon}>Wizard steps</AdminSectionLegend>
                 <div className="admin-customize-steps">
                   {config.steps?.map((step) => (
                     <article key={step.n} className="admin-customize-step-card">
@@ -275,7 +293,7 @@ export default function AdminCustomizeWizardPanel() {
               </fieldset>
 
               <fieldset className="admin-customize-wizard__block">
-                <legend>Step 2 sections</legend>
+                <AdminSectionLegend icon={Step2SectionsIcon}>Step 2 sections</AdminSectionLegend>
                 <div className="admin-customize-wizard__grid">
                   {['sizes', 'colors', 'batting'].map((key) => (
                     <div key={key} className="admin-customize-section-toggle">
@@ -298,7 +316,7 @@ export default function AdminCustomizeWizardPanel() {
               </fieldset>
 
               <fieldset className="admin-customize-wizard__block">
-                <legend>Quilt sizes</legend>
+                <AdminSectionLegend icon={QuiltSizesIcon}>Quilt sizes</AdminSectionLegend>
                 <div className="table-wrap">
                   <table className="admin-customize-options-table">
                     <thead>
@@ -377,7 +395,7 @@ export default function AdminCustomizeWizardPanel() {
               </fieldset>
 
               <fieldset className="admin-customize-wizard__block">
-                <legend>Color palettes</legend>
+                <AdminSectionLegend icon={ColorPalettesIcon}>Color palettes</AdminSectionLegend>
                 <p className="muted admin-customize-field__hint">
                   Swatch colors: comma-separated hex values (e.g. #f7f2ea, #e8d4b8). Use stripes
                   layout only on scrappy-rainbow (set in JSON via API if needed).
@@ -463,7 +481,7 @@ export default function AdminCustomizeWizardPanel() {
               </fieldset>
 
               <fieldset className="admin-customize-wizard__block">
-                <legend>Batting options</legend>
+                <AdminSectionLegend icon={BattingOptionsIcon}>Batting options</AdminSectionLegend>
                 <div className="table-wrap">
                   <table className="admin-customize-options-table">
                     <thead>
@@ -558,7 +576,7 @@ export default function AdminCustomizeWizardPanel() {
               </fieldset>
 
               <fieldset className="admin-customize-wizard__block">
-                <legend>Validation messages</legend>
+                <AdminSectionLegend icon={ValidationMessagesIcon}>Validation messages</AdminSectionLegend>
                 <div className="admin-customize-wizard__grid">
                   {Object.entries(config.messages ?? {}).map(([key, text]) => (
                     <Field key={key} label={key}>

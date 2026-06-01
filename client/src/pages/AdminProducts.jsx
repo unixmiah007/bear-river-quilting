@@ -6,6 +6,15 @@ import ProductImage from '../components/ProductImage.jsx';
 import ProductMediaLibrary from '../components/ProductMediaLibrary.jsx';
 import RichTextEditor from '../components/RichTextEditor.jsx';
 import AdminCustomizeWizardPanel from '../components/AdminCustomizeWizardPanel.jsx';
+import AdminSectionTitle, { AdminSectionLegend } from '../components/admin/AdminSectionTitle.jsx';
+import {
+  CsvImportIcon,
+  ProductCategoriesIcon,
+  ProductEditIcon,
+  ProductImagesIcon,
+  ProductVisibilityIcon,
+  SizePricesIcon,
+} from '../components/admin/AdminSectionIcons.jsx';
 import PageLoading from '../components/PageLoading.jsx';
 import { normalizeRichHtml } from '../lib/richText.js';
 import {
@@ -637,9 +646,15 @@ export default function AdminProducts() {
         className="admin-product-edit-section"
         aria-labelledby="admin-product-edit-heading"
       >
-      <h2 id="admin-product-edit-heading" style={{ marginTop: 0 }}>
+      <AdminSectionTitle
+        as="h2"
+        id="admin-product-edit-heading"
+        icon={ProductEditIcon}
+        className="admin-section-title--h2"
+        style={{ marginTop: 0 }}
+      >
         {editingId ? 'Edit product' : 'New product'}
-      </h2>
+      </AdminSectionTitle>
       <form className="form admin-product-form" onSubmit={editingId ? onUpdate : onCreate}>
         <fieldset className="admin-product-form__fields" disabled={createBusy}>
         <div className="field">
@@ -677,7 +692,7 @@ export default function AdminProducts() {
           />
         </div>
         <fieldset className="admin-size-prices">
-          <legend>Prices by size (USD)</legend>
+          <AdminSectionLegend icon={SizePricesIcon}>Prices by size (USD)</AdminSectionLegend>
           <p className="muted admin-size-prices__hint">
             Stored in the database per product. Standard and Small share the base tier; Small is saved as the catalog list price.
           </p>
@@ -741,7 +756,7 @@ export default function AdminProducts() {
           className="field admin-category-field admin-visibility-field"
           disabled={createBusy || visibilityBusy}
         >
-          <legend>Visibility on website</legend>
+          <AdminSectionLegend icon={ProductVisibilityIcon}>Visibility on website</AdminSectionLegend>
           <div className="admin-category-checks admin-visibility-options">
             <label className="admin-category-check admin-visibility-option">
               <input
@@ -789,7 +804,7 @@ export default function AdminProducts() {
           </label>
         </div>
         <fieldset className="field admin-category-field">
-          <legend>Product categories</legend>
+          <AdminSectionLegend icon={ProductCategoriesIcon}>Product categories</AdminSectionLegend>
           <p className="muted" style={{ margin: '0 0 0.65rem', fontSize: '0.88rem' }}>
             Checked categories include this product in the storefront{' '}
             <strong>Products</strong> menu dropdown and on{' '}
@@ -867,7 +882,14 @@ export default function AdminProducts() {
       </form>
 
       <section className="card admin-gallery-section" style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>
-        <h3 style={{ marginTop: 0 }}>Product images</h3>
+        <AdminSectionTitle
+          as="h3"
+          icon={ProductImagesIcon}
+          className="admin-section-title--h3"
+          style={{ marginTop: 0 }}
+        >
+          Product images
+        </AdminSectionTitle>
         {editingId ? (
           <>
             <p className="muted" style={{ marginTop: 0 }}>
@@ -934,7 +956,14 @@ export default function AdminProducts() {
       </section>
 
       <section className="card" style={{ marginBottom: '1.5rem' }}>
-        <h2 style={{ marginTop: 0 }}>Import from CSV</h2>
+        <AdminSectionTitle
+          as="h2"
+          icon={CsvImportIcon}
+          className="admin-section-title--h2"
+          style={{ marginTop: 0 }}
+        >
+          Import from CSV
+        </AdminSectionTitle>
         <p className="muted" style={{ marginTop: 0 }}>
           Download all products as CSV, edit in a spreadsheet, then upload. Required column on import:{' '}
           <strong>name</strong> (or <strong>title</strong>). Use <strong>id</strong> or <strong>sku</strong>{' '}
