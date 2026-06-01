@@ -2,7 +2,11 @@ import pool from '../db.js';
 import { sendSendGridMail, resolveSendGridFromStaff, resolveSendGridFromCustomer } from './sendgridMail.js';
 import { parseOrderNotifyRecipients } from './mail.js';
 import { normalizeProductSize } from './productSize.js';
-import { estimateCustomizePrice, resolveCustomizeDesign } from './customizeDesign.js';
+import {
+  estimateCustomizePrice,
+  isOwnDesignId,
+  resolveCustomizeDesign,
+} from './customizeDesign.js';
 import {
   getActiveSizeOptions,
   getAllowedBattingValues,
@@ -76,7 +80,15 @@ export async function validateCustomQuiltBody(body) {
   }
 
   const ownDesign = resolveOwnDesignImageUrl(body?.ownDesignImageUrl);
-  if (!ownDesign.ok) {
+  if (isOwnDesignId(resolved.designId)) {
+    if (!ownDesign.ok || !ownDesign.url) {
+      return {
+        ok: false,
+        status: 400,
+        error: ownDesign.error || 'Upload your design image to continue',
+      };
+    }
+  } else if (!ownDesign.ok) {
     return { ok: false, status: 400, error: ownDesign.error };
   }
 

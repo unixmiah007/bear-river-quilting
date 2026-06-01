@@ -1,4 +1,5 @@
 import ProductImage from './ProductImage.jsx';
+import { isOwnDesignId } from '../lib/customizeProductDesign.js';
 import {
   labelForBattingOption,
   labelForColorOption,
@@ -21,19 +22,34 @@ export default function CustomizePurchasePreview({
 }) {
   if (!design) return null;
 
+  const ownDesign = isOwnDesignId(design.id);
+  const thumbSrc = ownDesign ? ownDesignImageUrl || design.image : design.image;
+
   return (
     <aside className="customize-purchase-preview card" aria-label={heading}>
       <h3 className="customize-purchase-preview__heading">{heading}</h3>
 
       <div className="customize-purchase-preview__product">
         <div className="customize-purchase-preview__thumb">
-          <ProductImage src={design.image} alt={design.name} />
+          {thumbSrc ? (
+            <img src={thumbSrc} alt={design.name} />
+          ) : (
+            <ProductImage src={design.image} alt={design.name} />
+          )}
         </div>
         <div className="customize-purchase-preview__product-copy">
           <p className="customize-purchase-preview__name">{design.name}</p>
           {estimatedPrice != null ? (
             <p className="customize-purchase-preview__price muted">
-              Estimated starting at <strong>{formatPrice(estimatedPrice)}</strong>
+              {ownDesign ? (
+                <>
+                  Design deposit today: <strong>{formatPrice(estimatedPrice)}</strong>
+                </>
+              ) : (
+                <>
+                  Estimated starting at <strong>{formatPrice(estimatedPrice)}</strong>
+                </>
+              )}
             </p>
           ) : null}
         </div>
@@ -54,7 +70,7 @@ export default function CustomizePurchasePreview({
         </div>
       </dl>
 
-      {ownDesignImageUrl ? (
+      {ownDesignImageUrl && !ownDesign ? (
         <div className="customize-purchase-preview__own-design">
           <p className="customize-purchase-preview__own-label">Your design reference</p>
           <img src={ownDesignImageUrl} alt="Your uploaded design reference" />

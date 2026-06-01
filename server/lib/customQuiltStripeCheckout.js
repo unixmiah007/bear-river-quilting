@@ -4,6 +4,7 @@ import {
   insertPendingCustomQuiltRequest,
   fulfillCustomQuiltRequestPayment,
 } from './customQuiltRequest.js';
+import { isOwnDesignId } from './customizeDesign.js';
 import { clientOriginPath } from './clientOrigin.js';
 
 const SIZE_LABELS = {
@@ -35,7 +36,15 @@ export async function createCustomQuiltStripeCheckoutSession(body) {
   }
 
   const sizeLabel = SIZE_LABELS[row.product_size] ?? row.product_size;
-  const productName = `Custom quilt — ${row.design_name}${sizeLabel ? ` (${sizeLabel})` : ''}`;
+  const ownDesign = isOwnDesignId(row.design_id);
+  const productName = ownDesign
+    ? `Custom quilt — your own design (deposit)`
+    : `Custom quilt — ${row.design_name}${sizeLabel ? ` (${sizeLabel})` : ''}`;
+  const stripeDescription = ownDesign
+    ? 'Design deposit for your custom quilt. Our designer will confirm final pricing before production.'
+    : row.quilt_title
+      ? `Working title: ${row.quilt_title}`
+      : 'Custom quilt design deposit';
 
   try {
     const session = await stripe.checkout.sessions.create({
@@ -47,9 +56,7 @@ export async function createCustomQuiltStripeCheckoutSession(body) {
             currency: 'usd',
             product_data: {
               name: productName,
-              description: row.quilt_title
-                ? `Working title: ${row.quilt_title}`
-                : 'Custom quilt design deposit',
+              description: stripeDescription,
             },
             unit_amount: amountCents,
           },

@@ -214,6 +214,13 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify({ productIds }),
     }),
+  adminNavBadgeCounts: ({ ordersSince, customizeSince } = {}) => {
+    const params = new URLSearchParams();
+    if (ordersSince) params.set('ordersSince', ordersSince);
+    if (customizeSince) params.set('customizeSince', customizeSince);
+    const q = params.toString();
+    return api(`/api/admin/nav-badge-counts${q ? `?${q}` : ''}`);
+  },
   orders: () => apiJsonArray('/api/admin/orders'),
   orderById: (id) => api(`/api/admin/orders/${id}`),
   downloadOrderInvoicePdf: async (orderId, orderNumber) => {

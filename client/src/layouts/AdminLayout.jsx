@@ -1,7 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { authApi } from '../api.js';
+import { adminApi, authApi } from '../api.js';
+import AdminLayoutNavLink from '../components/admin/AdminLayoutNavLink.jsx';
 import PageLoading from '../components/PageLoading.jsx';
+import {
+  ADMIN_NAV_VISIT_KEYS,
+  formatAdminNavBadge,
+  getAdminLastVisited,
+  setAdminLastVisited,
+} from '../lib/adminNavVisit.js';
 
 async function signOut() {
   await authApi.logout();
@@ -10,7 +17,23 @@ async function signOut() {
 
 export default function AdminLayout() {
   const [state, setState] = useState({ loading: true, ok: false });
+  const [navBadges, setNavBadges] = useState({ orders: 0, customizeRequests: 0 });
   const location = useLocation();
+
+  const refreshNavBadges = useCallback(async () => {
+    try {
+      const counts = await adminApi.adminNavBadgeCounts({
+        ordersSince: getAdminLastVisited(ADMIN_NAV_VISIT_KEYS.orders),
+        customizeSince: getAdminLastVisited(ADMIN_NAV_VISIT_KEYS.customizeRequests),
+      });
+      setNavBadges({
+        orders: Number(counts.orders) || 0,
+        customizeRequests: Number(counts.customizeRequests) || 0,
+      });
+    } catch {
+      /* ignore — badges are non-critical */
+    }
+  }, []);
 
   useEffect(() => {
     authApi
@@ -18,6 +41,26 @@ export default function AdminLayout() {
       .then((r) => setState({ loading: false, ok: r.authenticated }))
       .catch(() => setState({ loading: false, ok: false }));
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!state.ok) return undefined;
+
+    const path = location.pathname;
+    if (path === '/admin/orders' || path.startsWith('/admin/orders/')) {
+      setAdminLastVisited(ADMIN_NAV_VISIT_KEYS.orders);
+      setNavBadges((b) => ({ ...b, orders: 0 }));
+    } else if (
+      path === '/admin/customize-requests' ||
+      path.startsWith('/admin/customize-requests/')
+    ) {
+      setAdminLastVisited(ADMIN_NAV_VISIT_KEYS.customizeRequests);
+      setNavBadges((b) => ({ ...b, customizeRequests: 0 }));
+    }
+
+    refreshNavBadges();
+    const timer = window.setInterval(refreshNavBadges, 45_000);
+    return () => window.clearInterval(timer);
+  }, [state.ok, location.pathname, refreshNavBadges]);
 
   if (state.loading) {
     return (
@@ -61,18 +104,15 @@ export default function AdminLayout() {
             >
               Product categories
             </NavLink>
-            <NavLink
-              className={({ isActive }) => `pill${isActive ? ' active' : ''}`}
-              to="/admin/orders"
-            >
+            <AdminLayoutNavLink to="/admin/orders" badge={formatAdminNavBadge(navBadges.orders)}>
               Orders
-            </NavLink>
-            <NavLink
-              className={({ isActive }) => `pill${isActive ? ' active' : ''}`}
+            </AdminLayoutNavLink>
+            <AdminLayoutNavLink
               to="/admin/customize-requests"
+              badge={formatAdminNavBadge(navBadges.customizeRequests)}
             >
               Customize
-            </NavLink>
+            </AdminLayoutNavLink>
             <NavLink
               className={({ isActive }) => `pill${isActive ? ' active' : ''}`}
               to="/admin/custom-payment"

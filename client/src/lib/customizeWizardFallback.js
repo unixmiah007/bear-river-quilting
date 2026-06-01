@@ -22,7 +22,7 @@ export function getClientFallbackCustomizeConfig() {
         enabled: true,
         title: 'Choose a quilt to customize',
         description:
-          "Select a published product from our catalog as your starting point. You'll choose size, colors, and batting in the next step.",
+          'Start with a quilt from our shop, or upload your own design and pay a $30 deposit today. You will choose size, colors, and batting in the next step.',
         emptyProductsMessage: 'No published products are available yet.',
       },
       {
@@ -88,6 +88,7 @@ export function getClientFallbackCustomizeConfig() {
     battingOptions: BATTING_OPTIONS.map((o) => ({ ...o, enabled: true })),
     messages: {
       chooseProduct: 'Choose a product from the catalog to continue.',
+      ownDesignRequired: 'Upload your design image to continue with your own design.',
       selectSizeColor: 'Select a size and color palette.',
       contactRequired: 'Enter your name and email so our designer can reach you.',
       selectDesignPay: 'Select a design before paying.',

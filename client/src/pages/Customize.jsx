@@ -6,8 +6,12 @@ import CustomizeOwnDesignUpload from '../components/CustomizeOwnDesignUpload.jsx
 import CustomizePurchasePreview from '../components/CustomizePurchasePreview.jsx';
 import PageLoading from '../components/PageLoading.jsx';
 import {
+  OWN_DESIGN_DEPOSIT_USD,
+  OWN_DESIGN_ID,
+  buildOwnDesignSelection,
   estimateCustomizePrice,
   findCustomizeDesign,
+  isOwnDesignId,
   productDesignId,
   productToCustomizeDesign,
   truncateCustomizeDescription,
@@ -121,6 +125,7 @@ export default function Customize() {
   const [payCountdown, setPayCountdown] = useState(0);
   const [wizardConfig, setWizardConfig] = useState(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
+  const [designPath, setDesignPath] = useState('catalog');
   const [ownDesignPreviewUrl, setOwnDesignPreviewUrl] = useState('');
   const [ownDesignUploading, setOwnDesignUploading] = useState(false);
   const [ownDesignUploadError, setOwnDesignUploadError] = useState(null);
@@ -184,6 +189,7 @@ export default function Customize() {
     if (!Number.isFinite(id)) return;
     const match = products.find((p) => Number(p.id) === id);
     if (match) {
+      setDesignPath('catalog');
       setForm((f) => ({ ...f, designId: productDesignId(match.id) }));
     }
   }, [products, searchParams]);
@@ -220,17 +226,20 @@ export default function Customize() {
     }
   }, [searchParams, setSearchParams, config, maxStep]);
 
-  const selectedDesign = useMemo(
-    () => findCustomizeDesign(form.designId, products),
-    [form.designId, products]
-  );
-  const estimatedPrice = useMemo(
-    () =>
-      form.designId && form.productSize
-        ? estimateCustomizePrice(form.designId, form.productSize, products)
-        : null,
-    [form.designId, form.productSize, products]
-  );
+  const selectedDesign = useMemo(() => {
+    if (isOwnDesignId(form.designId) || designPath === 'own-design') {
+      return buildOwnDesignSelection(ownDesignPreviewUrl || form.ownDesignImageUrl);
+    }
+    return findCustomizeDesign(form.designId, products);
+  }, [form.designId, form.ownDesignImageUrl, designPath, products, ownDesignPreviewUrl]);
+  const estimatedPrice = useMemo(() => {
+    if (!form.designId) return null;
+    if (isOwnDesignId(form.designId)) {
+      return estimateCustomizePrice(form.designId, form.productSize, products);
+    }
+    if (!form.productSize) return null;
+    return estimateCustomizePrice(form.designId, form.productSize, products);
+  }, [form.designId, form.productSize, products]);
 
   function revokeOwnDesignBlob() {
     if (ownDesignBlobRef.current) {
@@ -267,13 +276,46 @@ export default function Customize() {
     setForm((f) => ({ ...f, ownDesignImageUrl: '' }));
   }
 
+  function selectCatalogPath() {
+    setDesignPath('catalog');
+    setError(null);
+    setForm((f) => ({ ...f, designId: isOwnDesignId(f.designId) ? '' : f.designId }));
+    if (isOwnDesignId(form.designId)) {
+      clearOwnDesign();
+    }
+  }
+
+  function selectOwnDesignPath() {
+    setDesignPath('own-design');
+    setError(null);
+    setForm((f) => ({ ...f, designId: OWN_DESIGN_ID }));
+  }
+
   const ownDesignDisplayUrl = ownDesignPreviewUrl || form.ownDesignImageUrl || '';
+  const isOwnDesignFlow = designPath === 'own-design' || isOwnDesignId(form.designId);
 
   function nextStep() {
     setError(null);
-    if (step === 1 && !form.designId) {
-      setError(config.messages?.chooseProduct ?? 'Choose a product from the catalog to continue.');
-      return;
+    if (step === 1) {
+      if (designPath === 'catalog') {
+        if (!form.designId || isOwnDesignId(form.designId)) {
+          setError(config.messages?.chooseProduct ?? 'Choose a product from the catalog to continue.');
+          return;
+        }
+      } else {
+        if (ownDesignUploading) {
+          setError('Please wait for your design image to finish uploading.');
+          return;
+        }
+        if (!form.ownDesignImageUrl.trim()) {
+          setError(
+            config.messages?.ownDesignRequired ??
+              'Upload your design image to continue with your own design.'
+          );
+          return;
+        }
+        setForm((f) => ({ ...f, designId: OWN_DESIGN_ID }));
+      }
     }
     if (step === 2) {
       if (ownDesignUploading) {
@@ -389,50 +431,97 @@ export default function Customize() {
           <section className="customize-step">
             <h2>{step1?.title ?? 'Choose a quilt to customize'}</h2>
             <p className="muted">{step1?.description ?? ''}</p>
-            {loadingProducts ? (
-              <PageLoading active label={config.messages?.loadingProducts ?? 'Loading products…'} inline />
-            ) : products.length === 0 ? (
-              <p className="muted">
-                {step1?.emptyProductsMessage ?? 'No published products are available yet.'}{' '}
-                <Link to="/products">Browse the shop</Link>
-              </p>
-            ) : (
-              <div className="design-palette" role="group" aria-label="Products to customize">
-                {products.map((product) => {
-                  const design = productToCustomizeDesign(product);
-                  const selected = form.designId === design.id;
-                  const detailPath = `/products/${product.id}`;
-                  return (
-                    <article
-                      key={product.id}
-                      className={`design-palette__card${selected ? ' design-palette__card--selected' : ''}`}
-                    >
-                      <Link className="design-palette__link" to={detailPath}>
-                        <span className="design-palette__media">
-                          <ProductImage src={design.image} alt={design.name} />
-                        </span>
-                        <span className="design-palette__name">{design.name}</span>
-                        {design.description ? (
-                          <span className="design-palette__desc muted">
-                            {truncateCustomizeDescription(design.description)}
-                          </span>
-                        ) : null}
-                        <span className="design-palette__price">
-                          From {formatPrice(design.basePrice)} <span className="muted">(Small)</span>
-                        </span>
-                      </Link>
-                      <button
-                        type="button"
-                        className={`btn design-palette__select${selected ? ' design-palette__select--selected' : ''}`}
-                        aria-pressed={selected}
-                        onClick={() => setForm((f) => ({ ...f, designId: design.id }))}
+
+            <div
+              className="customize-path-chooser"
+              role="tablist"
+              aria-label="How to start your custom quilt"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={designPath === 'catalog'}
+                className={`customize-path-chooser__option${designPath === 'catalog' ? ' customize-path-chooser__option--active' : ''}`}
+                onClick={selectCatalogPath}
+              >
+                <span className="customize-path-chooser__title">Shop product</span>
+                <span className="muted customize-path-chooser__hint">
+                  Pick a quilt from our catalog and pay the estimated price at checkout.
+                </span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={designPath === 'own-design'}
+                className={`customize-path-chooser__option${designPath === 'own-design' ? ' customize-path-chooser__option--active' : ''}`}
+                onClick={selectOwnDesignPath}
+              >
+                <span className="customize-path-chooser__title">Your own design</span>
+                <span className="muted customize-path-chooser__hint">
+                  Upload your design and pay a {formatPrice(OWN_DESIGN_DEPOSIT_USD)} deposit today.
+                </span>
+              </button>
+            </div>
+
+            {designPath === 'catalog' ? (
+              loadingProducts ? (
+                <PageLoading active label={config.messages?.loadingProducts ?? 'Loading products…'} inline />
+              ) : products.length === 0 ? (
+                <p className="muted">
+                  {step1?.emptyProductsMessage ?? 'No published products are available yet.'}{' '}
+                  <Link to="/products">Browse the shop</Link>
+                </p>
+              ) : (
+                <div className="design-palette" role="group" aria-label="Products to customize">
+                  {products.map((product) => {
+                    const design = productToCustomizeDesign(product);
+                    const selected = form.designId === design.id;
+                    const detailPath = `/products/${product.id}`;
+                    return (
+                      <article
+                        key={product.id}
+                        className={`design-palette__card${selected ? ' design-palette__card--selected' : ''}`}
                       >
-                        {selected ? 'Selected' : 'Select'}
-                      </button>
-                    </article>
-                  );
-                })}
-              </div>
+                        <Link className="design-palette__link" to={detailPath}>
+                          <span className="design-palette__media">
+                            <ProductImage src={design.image} alt={design.name} />
+                          </span>
+                          <span className="design-palette__name">{design.name}</span>
+                          {design.description ? (
+                            <span className="design-palette__desc muted">
+                              {truncateCustomizeDescription(design.description)}
+                            </span>
+                          ) : null}
+                          <span className="design-palette__price">
+                            From {formatPrice(design.basePrice)} <span className="muted">(Small)</span>
+                          </span>
+                        </Link>
+                        <button
+                          type="button"
+                          className={`btn design-palette__select${selected ? ' design-palette__select--selected' : ''}`}
+                          aria-pressed={selected}
+                          onClick={() => {
+                            setDesignPath('catalog');
+                            setForm((f) => ({ ...f, designId: design.id }));
+                          }}
+                        >
+                          {selected ? 'Selected' : 'Select'}
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+              )
+            ) : (
+              <CustomizeOwnDesignUpload
+                required
+                depositAmount={OWN_DESIGN_DEPOSIT_USD}
+                previewUrl={ownDesignDisplayUrl}
+                uploading={ownDesignUploading}
+                uploadError={ownDesignUploadError}
+                onPickFile={handleOwnDesignFile}
+                onClear={clearOwnDesign}
+              />
             )}
           </section>
         ) : null}
@@ -444,17 +533,35 @@ export default function Customize() {
             {selectedDesign && step2?.showSelectedProduct !== false ? (
               <div className="customize-selected-product card">
                 <div className="customize-selected-product__thumb">
-                  <ProductImage src={selectedDesign.image} alt={selectedDesign.name} />
+                  {isOwnDesignFlow && ownDesignDisplayUrl ? (
+                    <img src={ownDesignDisplayUrl} alt="" />
+                  ) : (
+                    <ProductImage src={selectedDesign.image} alt={selectedDesign.name} />
+                  )}
                 </div>
                 <p className="customize-selected-product__summary muted">
-                  {step2?.basedOnPrefix ?? 'Based on'} <strong>{selectedDesign.name}</strong>
-                  {estimatedPrice != null ? (
+                  {isOwnDesignFlow ? (
                     <>
-                      {' '}
-                      {step2?.estimatedPrefix ?? '— estimated starting at'}{' '}
-                      <strong>{formatPrice(estimatedPrice)}</strong>
+                      <strong>{selectedDesign.name}</strong>
+                      {estimatedPrice != null ? (
+                        <>
+                          {' '}
+                          — design deposit <strong>{formatPrice(estimatedPrice)}</strong>
+                        </>
+                      ) : null}
                     </>
-                  ) : null}
+                  ) : (
+                    <>
+                      {step2?.basedOnPrefix ?? 'Based on'} <strong>{selectedDesign.name}</strong>
+                      {estimatedPrice != null ? (
+                        <>
+                          {' '}
+                          {step2?.estimatedPrefix ?? '— estimated starting at'}{' '}
+                          <strong>{formatPrice(estimatedPrice)}</strong>
+                        </>
+                      ) : null}
+                    </>
+                  )}
                 </p>
               </div>
             ) : null}
@@ -487,13 +594,15 @@ export default function Customize() {
                 onChange={(batting) => setForm((f) => ({ ...f, batting }))}
               />
             ) : null}
-            <CustomizeOwnDesignUpload
-              previewUrl={ownDesignDisplayUrl}
-              uploading={ownDesignUploading}
-              uploadError={ownDesignUploadError}
-              onPickFile={handleOwnDesignFile}
-              onClear={clearOwnDesign}
-            />
+            {!isOwnDesignFlow ? (
+              <CustomizeOwnDesignUpload
+                previewUrl={ownDesignDisplayUrl}
+                uploading={ownDesignUploading}
+                uploadError={ownDesignUploadError}
+                onPickFile={handleOwnDesignFile}
+                onClear={clearOwnDesign}
+              />
+            ) : null}
           </section>
         ) : null}
 
@@ -583,7 +692,9 @@ export default function Customize() {
             <div className="customize-review card">
               {selectedDesign ? (
                 <div className="customize-review__design">
-                  {selectedDesign.image ? (
+                  {isOwnDesignFlow && ownDesignDisplayUrl ? (
+                    <img src={ownDesignDisplayUrl} alt="Your uploaded design" />
+                  ) : selectedDesign.image ? (
                     <img src={selectedDesign.image} alt="" />
                   ) : (
                     <div className="featured-no-image customize-review__no-image">No image</div>
@@ -621,7 +732,7 @@ export default function Customize() {
                     <dd>{form.notes}</dd>
                   </div>
                 ) : null}
-                {ownDesignDisplayUrl ? (
+                {ownDesignDisplayUrl && !isOwnDesignFlow ? (
                   <div>
                     <dt>Your design reference</dt>
                     <dd>
@@ -649,9 +760,12 @@ export default function Customize() {
                 </div>
                 {estimatedPrice != null ? (
                   <div>
-                    <dt>Amount due today</dt>
+                    <dt>{isOwnDesignFlow ? 'Design deposit due today' : 'Amount due today'}</dt>
                     <dd>
                       <strong>{formatPrice(estimatedPrice)}</strong>
+                      {isOwnDesignFlow ? (
+                        <span className="muted"> — final quilt price confirmed by our designer</span>
+                      ) : null}
                     </dd>
                   </div>
                 ) : null}
@@ -690,7 +804,10 @@ export default function Customize() {
               className="btn btn-primary"
               onClick={nextStep}
               disabled={
-                (step === 1 && (loadingProducts || products.length === 0)) ||
+                (step === 1 &&
+                  designPath === 'catalog' &&
+                  (loadingProducts || products.length === 0)) ||
+                (step === 1 && designPath === 'own-design' && ownDesignUploading) ||
                 (step === 2 && ownDesignUploading)
               }
             >

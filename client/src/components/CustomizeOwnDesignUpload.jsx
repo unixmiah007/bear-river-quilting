@@ -7,6 +7,8 @@ export default function CustomizeOwnDesignUpload({
   uploadError,
   onPickFile,
   onClear,
+  required = false,
+  depositAmount = 30,
 }) {
   const inputId = useId();
   const inputRef = useRef(null);
@@ -18,11 +20,21 @@ export default function CustomizeOwnDesignUpload({
   return (
     <section className="customize-own-design" aria-labelledby={`${inputId}-heading`}>
       <h3 id={`${inputId}-heading`} className="customize-choices__heading">
-        Bring my own design
+        {required ? 'Upload your design' : 'Bring my own design'}
       </h3>
       <p className="muted customize-own-design__intro">
-        Optional — upload a photo or sketch of the quilt design you have in mind. Our designer will
-        use it as a reference.
+        {required ? (
+          <>
+            Upload a photo or sketch of the quilt you want made. A{' '}
+            <strong>${Number(depositAmount).toFixed(0)} design deposit</strong> is collected at checkout;
+            our designer will confirm final pricing before production.
+          </>
+        ) : (
+          <>
+            Optional — upload a photo or sketch of the quilt design you have in mind. Our designer
+            will use it as a reference.
+          </>
+        )}
       </p>
 
       {uploadError ? <p className="error customize-own-design__error">{uploadError}</p> : null}

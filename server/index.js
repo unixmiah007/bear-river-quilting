@@ -101,6 +101,7 @@ import {
   previewOrderLineItemProductChange,
 } from './lib/orderLineItemProduct.js';
 import { ensureOrderAdjustmentColumns } from './lib/ensureOrderAdjustmentColumns.js';
+import { getAdminNavBadgeCounts } from './lib/adminNavBadgeCounts.js';
 import { lookupCustomerCustomQuiltRequests } from './lib/customQuiltCustomerLookup.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1836,6 +1837,19 @@ app.post('/api/admin/custom-payments', authMiddleware, async (req, res) => {
   } catch (e) {
     console.error('[admin/custom-payments]', e);
     res.status(500).json({ error: 'Failed to create payment link' });
+  }
+});
+
+app.get('/api/admin/nav-badge-counts', authMiddleware, async (req, res) => {
+  try {
+    const counts = await getAdminNavBadgeCounts({
+      ordersSince: req.query.ordersSince,
+      customizeSince: req.query.customizeSince,
+    });
+    res.json(counts);
+  } catch (e) {
+    console.error('[admin/nav-badge-counts]', e);
+    res.status(500).json({ error: 'Failed to load badge counts' });
   }
 });
 

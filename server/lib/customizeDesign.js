@@ -4,6 +4,15 @@ import { hydrateProductRow, resolveProductPrice } from './productSizePrices.js';
 
 export const PRODUCT_DESIGN_PREFIX = 'product-';
 
+/** Customer-uploaded design path on /customize (flat deposit at checkout). */
+export const OWN_DESIGN_ID = 'customer-own-design';
+
+export const OWN_DESIGN_DEPOSIT_USD = 30;
+
+export function isOwnDesignId(designId) {
+  return String(designId ?? '').trim() === OWN_DESIGN_ID;
+}
+
 const LEGACY_DESIGN_IDS = new Set([
   'heritage-log-cabin',
   'modern-loft-stripe',
@@ -48,6 +57,15 @@ export function isProductDesignId(designId) {
 
 export async function resolveCustomizeDesign(designId, designNameFromClient) {
   const id = String(designId ?? '').trim();
+  if (isOwnDesignId(id)) {
+    return {
+      ok: true,
+      designId: OWN_DESIGN_ID,
+      designName: 'Your own design',
+      basePrice: OWN_DESIGN_DEPOSIT_USD,
+      isOwnDesign: true,
+    };
+  }
   const productId = parseProductDesignId(id);
   if (productId) {
     const [[row]] = await pool.query(
@@ -84,6 +102,10 @@ export async function resolveCustomizeDesign(designId, designNameFromClient) {
 }
 
 export function estimateCustomizePrice(designId, productSize, basePriceOrProduct) {
+  if (isOwnDesignId(designId)) {
+    return OWN_DESIGN_DEPOSIT_USD;
+  }
+
   const base = Number(
     typeof basePriceOrProduct === 'object' ? basePriceOrProduct?.price : basePriceOrProduct
   );

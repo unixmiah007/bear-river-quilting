@@ -3297,6 +3297,29 @@ h2 {
   border-color: #111111;
 }
 
+.admin-layout-nav-link {
+  gap: 0.4rem;
+}
+
+.admin-nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: #b91c1c;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+.admin-nav .pill.active .admin-nav-badge {
+  background: #991b1b;
+}
+
 .admin-top .btn {
   background: #ffffff;
   color: #111111;
@@ -4018,6 +4041,52 @@ tr:last-child td {
   font-size: 1.5rem;
   font-weight: 400;
   margin: 0 0 0.5rem;
+}
+
+.customize-path-chooser {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 1.25rem;
+}
+
+.customize-path-chooser__option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.customize-path-chooser__option:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.customize-path-chooser__option--active {
+  border-color: #111;
+  box-shadow: 0 0 0 1px #111;
+}
+
+.customize-path-chooser__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.customize-path-chooser__hint {
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 640px) {
+  .customize-path-chooser {
+    grid-template-columns: 1fr;
+  }
 }
 
 .design-palette {

@@ -4,6 +4,15 @@ import { estimateCustomQuiltPrice, getDesignById } from './quiltDesignPalette.js
 
 export const PRODUCT_DESIGN_PREFIX = 'product-';
 
+/** Flat deposit when the customer chooses their own design on /customize. */
+export const OWN_DESIGN_ID = 'customer-own-design';
+
+export const OWN_DESIGN_DEPOSIT_USD = 30;
+
+export function isOwnDesignId(designId) {
+  return String(designId ?? '').trim() === OWN_DESIGN_ID;
+}
+
 export function productDesignId(productId) {
   return `${PRODUCT_DESIGN_PREFIX}${productId}`;
 }
@@ -28,6 +37,9 @@ export function productToCustomizeDesign(product) {
 }
 
 export function findCustomizeDesign(designId, products) {
+  if (isOwnDesignId(designId)) {
+    return null;
+  }
   const productId = parseProductDesignId(designId);
   if (productId != null) {
     const product = products.find((p) => Number(p.id) === productId);
@@ -36,7 +48,22 @@ export function findCustomizeDesign(designId, products) {
   return getDesignById(designId);
 }
 
+export function buildOwnDesignSelection(previewImageUrl) {
+  return {
+    id: OWN_DESIGN_ID,
+    name: 'Your own design',
+    description:
+      'Custom quilt from your uploaded reference. Pay a design deposit today; our designer confirms final pricing before production.',
+    image: previewImageUrl || null,
+    basePrice: OWN_DESIGN_DEPOSIT_USD,
+    isOwnDesign: true,
+  };
+}
+
 export function estimateCustomizePrice(designId, productSize, products) {
+  if (isOwnDesignId(designId)) {
+    return OWN_DESIGN_DEPOSIT_USD;
+  }
   const productId = parseProductDesignId(designId);
   if (productId != null) {
     const product = products.find((p) => Number(p.id) === productId);
