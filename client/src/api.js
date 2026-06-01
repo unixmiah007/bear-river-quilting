@@ -276,6 +276,22 @@ export const adminApi = {
         body: JSON.stringify({ productId }),
       }
     ),
+  previewOrderLineItemQuantity: (orderId, itemId, quantity) =>
+    api(
+      `/api/admin/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}/quantity-preview`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ quantity }),
+      }
+    ),
+  updateOrderLineItemQuantity: (orderId, itemId, quantity) =>
+    api(
+      `/api/admin/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}/quantity`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ quantity }),
+      }
+    ),
   previewAddOrderLineItem: (orderId, body) =>
     api(`/api/admin/orders/${encodeURIComponent(orderId)}/items/preview`, {
       method: 'POST',
@@ -285,6 +301,23 @@ export const adminApi = {
     api(`/api/admin/orders/${encodeURIComponent(orderId)}/items`, {
       method: 'POST',
       body: JSON.stringify(body),
+    }),
+  removeOrderLineItem: (orderId, itemId) =>
+    api(
+      `/api/admin/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}`,
+      { method: 'DELETE', body: JSON.stringify({}) }
+    ),
+  orderOutstandingBalance: (orderId) =>
+    api(`/api/admin/orders/${encodeURIComponent(orderId)}/outstanding-balance`),
+  sendOrderPaymentLink: (orderId, body) =>
+    api(`/api/admin/orders/${encodeURIComponent(orderId)}/send-payment-link`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  deleteOrder: (orderId) =>
+    api(`/api/admin/orders/${encodeURIComponent(orderId)}`, {
+      method: 'DELETE',
+      body: JSON.stringify({}),
     }),
   sendOrderTracking: (id, body) =>
     api(`/api/admin/orders/${id}/tracking`, {

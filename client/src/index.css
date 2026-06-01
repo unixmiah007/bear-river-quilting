@@ -2501,6 +2501,32 @@ h2 {
   margin-top: 0.35rem;
 }
 
+.card-actions.card-actions--triple {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
+.card-actions.card-actions--triple > .btn,
+.card-actions.card-actions--triple > a.btn {
+  width: 100%;
+  min-width: 0;
+  padding: 0.5rem 0.35rem;
+  font-size: 0.76rem;
+  line-height: 1.2;
+  text-align: center;
+  white-space: normal;
+}
+
+.card-actions.card-actions--triple .product-share-btn {
+  gap: 0.3rem;
+}
+
+.card-actions.card-actions--triple .product-share-btn--compact {
+  gap: 0;
+}
+
 .product-detail {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -2721,12 +2747,6 @@ h2 {
   border-color: var(--danger);
 }
 
-.product-share-dialog {
-  max-width: 34rem;
-  max-height: min(92vh, 760px);
-  overflow: auto;
-}
-
 .product-share-dialog__intro {
   margin: 0 0 1rem;
   font-size: 0.92rem;
@@ -2734,11 +2754,11 @@ h2 {
 
 .product-share-dialog__preview {
   display: grid;
-  grid-template-columns: 7rem 1fr;
-  gap: 0.85rem;
+  grid-template-columns: 10rem 1fr;
+  gap: 1rem;
   align-items: start;
   margin-bottom: 1.25rem;
-  padding: 0.85rem;
+  padding: 1rem;
 }
 
 .product-share-dialog__thumb {
@@ -2768,10 +2788,6 @@ h2 {
 .product-share-dialog__price {
   margin-top: 0.5rem !important;
   font-weight: 600;
-}
-
-.product-share-dialog__form {
-  margin: 0;
 }
 
 @media (max-width: 520px) {
@@ -3932,6 +3948,13 @@ tr:last-child td {
   min-width: 14rem;
 }
 
+.admin-order-item-qty-input {
+  width: 4rem;
+  max-width: 100%;
+  padding: 0.35rem 0.45rem;
+  font-size: 0.9rem;
+}
+
 .admin-order-item-refund {
   display: block;
   margin-top: 0.35rem;
@@ -4079,6 +4102,24 @@ tr:last-child td {
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 0.75rem;
+}
+
+.admin-order-add-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.admin-order-add-preview {
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #f8fafc;
+  font-size: 0.9rem;
+}
+
+.admin-order-add-preview__due {
+  color: #065f46;
 }
 
 .admin-order-add-item__estimate {
@@ -5002,6 +5043,18 @@ tr:last-child td {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+}
+
+.confirm-dialog.product-share-dialog {
+  width: min(92vw, 42rem);
+  max-width: min(92vw, 42rem);
+  max-height: min(92vh, 800px);
+  overflow: auto;
+}
+
+.confirm-dialog.product-share-dialog .product-share-dialog__form {
+  margin: 0;
+  max-width: none;
 }
 
 .confirm-dialog__title {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import ProductImage from './ProductImage.jsx';
 import { publicApi } from '../api.js';
 import { stripRichHtml } from '../lib/richText.js';
@@ -52,7 +53,7 @@ export default function ProductShareDialog({ product, imageSrc, onClose }) {
     }
   }
 
-  return (
+  return createPortal(
     <div className="confirm-dialog-backdrop" role="presentation" onClick={busy ? undefined : onClose}>
       <div
         className="confirm-dialog product-share-dialog"
@@ -62,11 +63,11 @@ export default function ProductShareDialog({ product, imageSrc, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="product-share-title" className="confirm-dialog__title">
-          Share with someone
+          Share this product
         </h2>
         <p className="muted product-share-dialog__intro">
-          Send a brief preview of this quilt by email. Your recipient can open the product page on
-          our website to learn more.
+          Forward this quilt to a friend or relative by email. They can open the product page on our
+          website to learn more.
         </p>
 
         <div className="product-share-dialog__preview card">
@@ -149,6 +150,7 @@ export default function ProductShareDialog({ product, imageSrc, onClose }) {
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

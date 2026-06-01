@@ -98,9 +98,16 @@ import { ensureOrderCustomPaymentsTable } from './lib/ensureOrderCustomPaymentsT
 import { createCustomPayment, searchCustomerPaymentsByEmail } from './lib/customOrderPayment.js';
 import {
   changeOrderLineItemProduct,
+  changeOrderLineItemQuantity,
   previewOrderLineItemProductChange,
+  previewOrderLineItemQuantityChange,
 } from './lib/orderLineItemProduct.js';
 import { addOrderLineItem, previewAddOrderLineItem } from './lib/addOrderLineItem.js';
+import { removeOrderLineItem, deleteAdminOrder } from './lib/removeOrderLineItem.js';
+import {
+  computeOrderOutstandingBalance,
+  sendOrderBalancePaymentLink,
+} from './lib/sendOrderBalancePaymentLink.js';
 import { ensureOrderAdjustmentColumns } from './lib/ensureOrderAdjustmentColumns.js';
 import { getAdminNavBadgeCounts } from './lib/adminNavBadgeCounts.js';
 import { lookupCustomerCustomQuiltRequests } from './lib/customQuiltCustomerLookup.js';
@@ -2108,6 +2115,44 @@ app.post(
   }
 );
 
+app.post(
+  '/api/admin/orders/:orderId/items/:itemId/quantity-preview',
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const result = await previewOrderLineItemQuantityChange({
+        orderId: req.params.orderId,
+        itemId: req.params.itemId,
+        quantity: req.body?.quantity,
+      });
+      if (!result.ok) {
+        return res.status(result.status ?? 400).json({ error: result.error });
+      }
+      res.json(result);
+    } catch (e) {
+      console.error('[admin] line item quantity preview failed:', e);
+      res.status(500).json({ error: e.message || 'Failed to preview quantity change' });
+    }
+  }
+);
+
+app.put('/api/admin/orders/:orderId/items/:itemId/quantity', authMiddleware, async (req, res) => {
+  try {
+    const result = await changeOrderLineItemQuantity({
+      orderId: req.params.orderId,
+      itemId: req.params.itemId,
+      quantity: req.body?.quantity,
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error('[admin] line item quantity change failed:', e);
+    res.status(500).json({ error: e.message || 'Failed to update line item quantity' });
+  }
+});
+
 app.put('/api/admin/orders/:orderId/items/:itemId/product', authMiddleware, async (req, res) => {
   try {
     const result = await changeOrderLineItemProduct({
@@ -2150,6 +2195,7 @@ app.post('/api/admin/orders/:orderId/items', authMiddleware, async (req, res) =>
       productId: req.body?.productId,
       quantity: req.body?.quantity,
       productSize: req.body?.productSize,
+      sendPaymentLink: req.body?.sendPaymentLink === true,
     });
     if (!result.ok) {
       return res.status(result.status ?? 400).json({ error: result.error });
@@ -2158,6 +2204,65 @@ app.post('/api/admin/orders/:orderId/items', authMiddleware, async (req, res) =>
   } catch (e) {
     console.error('[admin] add line item failed:', e);
     res.status(500).json({ error: e.message || 'Failed to add line item' });
+  }
+});
+
+app.delete('/api/admin/orders/:orderId/items/:itemId', authMiddleware, async (req, res) => {
+  try {
+    const result = await removeOrderLineItem({
+      orderId: req.params.orderId,
+      itemId: req.params.itemId,
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error('[admin] remove line item failed:', e);
+    res.status(500).json({ error: e.message || 'Failed to remove line item' });
+  }
+});
+
+app.get('/api/admin/orders/:orderId/outstanding-balance', authMiddleware, async (req, res) => {
+  try {
+    const result = await computeOrderOutstandingBalance(req.params.orderId);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error('[admin] outstanding balance failed:', e);
+    res.status(500).json({ error: 'Failed to compute balance due' });
+  }
+});
+
+app.post('/api/admin/orders/:orderId/send-payment-link', authMiddleware, async (req, res) => {
+  try {
+    const result = await sendOrderBalancePaymentLink({
+      orderId: req.params.orderId,
+      amount: req.body?.amount,
+      adminNote: req.body?.adminNote ?? req.body?.note,
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.status(201).json(result);
+  } catch (e) {
+    console.error('[admin] send payment link failed:', e);
+    res.status(500).json({ error: e.message || 'Failed to send payment link' });
+  }
+});
+
+app.delete('/api/admin/orders/:id', authMiddleware, async (req, res) => {
+  try {
+    const result = await deleteAdminOrder(req.params.id);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error('[admin] delete order failed:', e);
+    res.status(500).json({ error: e.message || 'Failed to delete order' });
   }
 });
 

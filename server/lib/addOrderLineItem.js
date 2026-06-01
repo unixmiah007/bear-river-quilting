@@ -207,7 +207,13 @@ export async function previewAddOrderLineItem({ orderId, productId, quantity = 1
   }
 }
 
-export async function addOrderLineItem({ orderId, productId, quantity = 1, productSize }) {
+export async function addOrderLineItem({
+  orderId,
+  productId,
+  quantity = 1,
+  productSize,
+  sendPaymentLink = false,
+}) {
   const conn = await pool.getConnection();
   try {
     const built = await buildAddLineItemContext(conn, orderId, productId, quantity, productSize);
@@ -258,7 +264,9 @@ export async function addOrderLineItem({ orderId, productId, quantity = 1, produ
       addedLineTotal: lineTotal,
     };
 
-    await applyBalanceDueAdjustment(order, oid, delta, productName, adjustment);
+    if (sendPaymentLink) {
+      await applyBalanceDueAdjustment(order, oid, delta, productName, adjustment);
+    }
 
     const finalItems = await loadOrderItems(oid);
 

@@ -230,6 +230,339 @@ async function buildLineItemProductChange(conn, orderId, itemId, productId) {
   };
 }
 
+async function applyLineItemTotalAdjustment({
+  order,
+  oid,
+  iid,
+  priorTotal,
+  newTotal,
+  delta,
+  paid,
+  productLabel,
+  refundReason,
+  paymentNote,
+}) {
+  const adjustment = {
+    itemId: iid,
+    priorTotal,
+    newTotal,
+    delta,
+    paid,
+    type: 'none',
+  };
+
+  if (!paid || Math.abs(delta) < 0.01) {
+    await clearItemRefundMeta(iid);
+    return adjustment;
+  }
+
+  if (delta < 0) {
+    const refundAmount = Math.abs(delta);
+    adjustment.type = 'refund';
+    adjustment.refundAmount = refundAmount;
+
+    async function failEarly(warning) {
+      return {
+        _earlyExit: {
+          ok: true,
+          order: await loadUpdatedOrder(oid),
+          items: await loadOrderItems(oid),
+          adjustment: {
+            ...adjustment,
+            refundIssued: false,
+            refundStatus: 'failed',
+            warning,
+          },
+        },
+      };
+    }
+
+    if (!order.stripe_payment_intent_id) {
+      await setItemRefundMeta(iid, { amount: refundAmount, status: 'failed' });
+      return failEarly(
+        'Order totals were updated, but no Stripe payment is on file — issue the refund manually.'
+      );
+    }
+
+    const stripe = getStripe();
+    if (!stripe) {
+      await setItemRefundMeta(iid, { amount: refundAmount, status: 'failed' });
+      return failEarly(
+        'Order totals were updated, but Stripe is not configured — issue the refund manually.'
+      );
+    }
+
+    await setItemRefundMeta(iid, { amount: refundAmount, status: 'pending' });
+
+    try {
+      const refund = await stripe.refunds.create({
+        payment_intent: order.stripe_payment_intent_id,
+        amount: Math.round(refundAmount * 100),
+        metadata: {
+          order_id: String(oid),
+          order_number: order.order_number,
+          order_item_id: String(iid),
+          reason: refundReason,
+        },
+      });
+
+      await setItemRefundMeta(iid, {
+        amount: refundAmount,
+        status: 'issued',
+        refundId: refund.id,
+      });
+
+      await pool.query('UPDATE orders SET status = ? WHERE id = ?', ['refunded', oid]);
+
+      let emailSent = false;
+      let emailError = null;
+      try {
+        await sendOrderLineItemRefundEmail({
+          to: order.customer_email,
+          customerName: order.customer_name,
+          orderNumber: order.order_number,
+          refundAmount,
+          priorTotal,
+          newTotal,
+          productName: productLabel,
+        });
+        emailSent = true;
+      } catch (e) {
+        emailError = e.message || 'Failed to send refund email';
+        console.error('[order-line-item] refund email failed:', emailError);
+      }
+
+      adjustment.refundIssued = true;
+      adjustment.refundStatus = 'issued';
+      adjustment.refundId = refund.id;
+      adjustment.emailSent = emailSent;
+      adjustment.emailError = emailError;
+    } catch (e) {
+      console.error('[order-line-item] Stripe refund failed:', e);
+      await setItemRefundMeta(iid, { amount: refundAmount, status: 'failed' });
+      adjustment.refundIssued = false;
+      adjustment.refundStatus = 'failed';
+      adjustment.warning = e.message || 'Stripe refund failed';
+    }
+    return adjustment;
+  }
+
+  if (delta >= MIN_PAYMENT_LINK_USD) {
+    await clearItemRefundMeta(iid);
+    const paymentResult = await createCustomPayment({
+      orderId: oid,
+      amount: delta,
+      adminNote: paymentNote,
+      sendEmail: true,
+      paymentPurpose: 'order_line_adjustment',
+    });
+
+    adjustment.type = 'payment_due';
+    adjustment.amountDue = delta;
+
+    if (!paymentResult.ok) {
+      adjustment.paymentCreated = false;
+      adjustment.warning = paymentResult.error || 'Failed to create payment link';
+    } else {
+      adjustment.paymentCreated = true;
+      adjustment.paymentNumber = paymentResult.paymentNumber;
+      adjustment.checkoutUrl = paymentResult.checkoutUrl;
+      adjustment.emailSent = paymentResult.emailSent;
+      adjustment.emailError = paymentResult.emailError ?? null;
+    }
+    return adjustment;
+  }
+
+  await clearItemRefundMeta(iid);
+  adjustment.type = 'payment_due';
+  adjustment.amountDue = delta;
+  adjustment.paymentCreated = false;
+  adjustment.warning = `Balance due is ${delta.toFixed(2)} — below the $${MIN_PAYMENT_LINK_USD.toFixed(2)} minimum for a Stripe payment link. Collect manually or adjust the order again.`;
+  return adjustment;
+}
+
+async function buildLineItemQuantityChange(conn, orderId, itemId, quantity) {
+  const oid = Number(orderId);
+  const iid = Number(itemId);
+  const qty = Math.max(1, Math.floor(Number(quantity)));
+
+  if (!oid || !iid) {
+    return { ok: false, status: 400, error: 'Invalid order or line item' };
+  }
+  if (!Number.isFinite(Number(quantity)) || qty < 1) {
+    return { ok: false, status: 400, error: 'Quantity must be at least 1' };
+  }
+
+  const [[order]] = await conn.query(
+    `SELECT id, order_number, status, customer_name, customer_email, shipping_cost, subtotal, tax_amount, total,
+            stripe_payment_intent_id
+     FROM orders WHERE id = ?`,
+    [oid]
+  );
+  if (!order) {
+    return { ok: false, status: 404, error: 'Order not found' };
+  }
+
+  const [[item]] = await conn.query(
+    `SELECT id, order_id, product_id, product_name, unit_price, quantity, line_total
+     FROM order_items WHERE id = ? AND order_id = ?`,
+    [iid, oid]
+  );
+  if (!item) {
+    return { ok: false, status: 404, error: 'Line item not found on this order' };
+  }
+
+  if (qty === Number(item.quantity)) {
+    return { ok: false, status: 400, error: 'Quantity is already set to that value' };
+  }
+
+  const unitPrice = Number(item.unit_price);
+  const lineTotal = Number((unitPrice * qty).toFixed(2));
+
+  const [siblingItems] = await conn.query(
+    `SELECT id, line_total FROM order_items WHERE order_id = ?`,
+    [oid]
+  );
+  let subtotal = 0;
+  for (const row of siblingItems) {
+    subtotal += Number(row.id) === iid ? lineTotal : Number(row.line_total) || 0;
+  }
+  const newTotals = computeOrderTotals(subtotal, order.shipping_cost);
+  const priorTotal = Number(order.total);
+  const delta = Number((newTotals.total - priorTotal).toFixed(2));
+  const paid = orderIsPaid(order);
+
+  return {
+    ok: true,
+    oid,
+    iid,
+    order,
+    item,
+    quantity: qty,
+    unitPrice,
+    lineTotal,
+    priorTotal,
+    paid,
+    delta,
+    newTotals,
+  };
+}
+
+export async function previewOrderLineItemQuantityChange({ orderId, itemId, quantity }) {
+  const conn = await pool.getConnection();
+  try {
+    const built = await buildLineItemQuantityChange(conn, orderId, itemId, quantity);
+    if (!built.ok) return built;
+
+    const { priorTotal, paid, delta, newTotals, item } = built;
+    const refundAmount = paid && delta < -0.01 ? Math.abs(delta) : 0;
+
+    return {
+      ok: true,
+      requiresRefundConfirmation: refundAmount >= 0.01,
+      preview: {
+        itemId: built.iid,
+        quantity: built.quantity,
+        priorTotal,
+        newTotal: newTotals.total,
+        newSubtotal: newTotals.subtotal,
+        newTaxAmount: newTotals.taxAmount,
+        delta,
+        refundAmount,
+        paid,
+        previousQuantity: Number(item.quantity),
+        productName: item.product_name,
+      },
+    };
+  } finally {
+    conn.release();
+  }
+}
+
+export async function changeOrderLineItemQuantity({ orderId, itemId, quantity }) {
+  const conn = await pool.getConnection();
+  try {
+    const built = await buildLineItemQuantityChange(conn, orderId, itemId, quantity);
+    if (!built.ok) return built;
+
+    const {
+      oid,
+      iid,
+      order,
+      item,
+      quantity: qty,
+      lineTotal,
+      priorTotal,
+      paid,
+      delta,
+      newTotals,
+    } = built;
+
+    await conn.beginTransaction();
+    await snapshotOrderAdjustmentOriginals(conn, oid, iid, item, order);
+
+    await conn.query(
+      `UPDATE order_items SET quantity = ?, line_total = ? WHERE id = ?`,
+      [qty, lineTotal.toFixed(2), iid]
+    );
+
+    await conn.query(
+      `UPDATE orders SET subtotal = ?, tax_amount = ?, total = ? WHERE id = ?`,
+      [
+        newTotals.subtotal.toFixed(2),
+        newTotals.taxAmount.toFixed(2),
+        newTotals.total.toFixed(2),
+        oid,
+      ]
+    );
+    await conn.commit();
+
+    const adjustment = await applyLineItemTotalAdjustment({
+      order,
+      oid,
+      iid,
+      priorTotal,
+      newTotal: newTotals.total,
+      delta,
+      paid,
+      productLabel: item.product_name,
+      refundReason: 'line_item_quantity_change',
+      paymentNote: `Additional amount due after your order ${order.order_number} was updated (quantity change on line item).`,
+    });
+
+    const earlyExit = adjustment._earlyExit;
+    if (earlyExit) {
+      delete adjustment._earlyExit;
+      return {
+        ...earlyExit,
+        previousQuantity: Number(item.quantity),
+        newQuantity: qty,
+        productName: item.product_name,
+      };
+    }
+
+    return {
+      ok: true,
+      order: await loadUpdatedOrder(oid),
+      items: await loadOrderItems(oid),
+      adjustment,
+      previousQuantity: Number(item.quantity),
+      newQuantity: qty,
+      productName: item.product_name,
+    };
+  } catch (e) {
+    try {
+      await conn.rollback();
+    } catch {
+      /* ignore */
+    }
+    console.error('[order-line-item] quantity change failed:', e);
+    return { ok: false, status: 500, error: e.message || 'Failed to update line item quantity' };
+  } finally {
+    conn.release();
+  }
+}
+
 export async function previewOrderLineItemProductChange({ orderId, itemId, productId }) {
   const conn = await pool.getConnection();
   try {
@@ -310,146 +643,27 @@ export async function changeOrderLineItemProduct({ orderId, itemId, productId })
 
     const newTotal = totals.total;
 
-    const adjustment = {
-      itemId: iid,
+    const adjustment = await applyLineItemTotalAdjustment({
+      order,
+      oid,
+      iid,
       priorTotal,
       newTotal,
       delta,
       paid,
-      type: 'none',
-    };
+      productLabel: productName,
+      refundReason: 'line_item_product_change',
+      paymentNote: `Additional amount due after your order ${order.order_number} was updated (product change on line item).`,
+    });
 
-    if (paid && Math.abs(delta) >= 0.01) {
-      if (delta < 0) {
-        const refundAmount = Math.abs(delta);
-        adjustment.type = 'refund';
-        adjustment.refundAmount = refundAmount;
-
-        if (!order.stripe_payment_intent_id) {
-          await setItemRefundMeta(iid, { amount: refundAmount, status: 'failed' });
-          const itemsWithRefund = await loadOrderItems(oid);
-          return {
-            ok: true,
-            order: await loadUpdatedOrder(oid),
-            items: itemsWithRefund,
-            adjustment: {
-              ...adjustment,
-              refundIssued: false,
-              refundStatus: 'failed',
-              warning:
-                'Order totals were updated, but no Stripe payment is on file — issue the refund manually.',
-            },
-            previousProductName: item.product_name,
-            newProductName: productName,
-          };
-        }
-
-        const stripe = getStripe();
-        if (!stripe) {
-          await setItemRefundMeta(iid, { amount: refundAmount, status: 'failed' });
-          const itemsWithRefund = await loadOrderItems(oid);
-          return {
-            ok: true,
-            order: await loadUpdatedOrder(oid),
-            items: itemsWithRefund,
-            adjustment: {
-              ...adjustment,
-              refundIssued: false,
-              refundStatus: 'failed',
-              warning:
-                'Order totals were updated, but Stripe is not configured — issue the refund manually.',
-            },
-            previousProductName: item.product_name,
-            newProductName: productName,
-          };
-        }
-
-        await setItemRefundMeta(iid, { amount: refundAmount, status: 'pending' });
-
-        try {
-          const refund = await stripe.refunds.create({
-            payment_intent: order.stripe_payment_intent_id,
-            amount: Math.round(refundAmount * 100),
-            metadata: {
-              order_id: String(oid),
-              order_number: order.order_number,
-              order_item_id: String(iid),
-              reason: 'line_item_product_change',
-            },
-          });
-
-          await setItemRefundMeta(iid, {
-            amount: refundAmount,
-            status: 'issued',
-            refundId: refund.id,
-          });
-
-          await pool.query('UPDATE orders SET status = ? WHERE id = ?', ['refunded', oid]);
-
-          let emailSent = false;
-          let emailError = null;
-          try {
-            await sendOrderLineItemRefundEmail({
-              to: order.customer_email,
-              customerName: order.customer_name,
-              orderNumber: order.order_number,
-              refundAmount,
-              priorTotal,
-              newTotal,
-              productName,
-            });
-            emailSent = true;
-          } catch (e) {
-            emailError = e.message || 'Failed to send refund email';
-            console.error('[order-line-item] refund email failed:', emailError);
-          }
-
-          adjustment.refundIssued = true;
-          adjustment.refundStatus = 'issued';
-          adjustment.refundId = refund.id;
-          adjustment.emailSent = emailSent;
-          adjustment.emailError = emailError;
-        } catch (e) {
-          console.error('[order-line-item] Stripe refund failed:', e);
-          await setItemRefundMeta(iid, { amount: refundAmount, status: 'failed' });
-          adjustment.refundIssued = false;
-          adjustment.refundStatus = 'failed';
-          adjustment.warning = e.message || 'Stripe refund failed';
-        }
-      } else if (delta >= MIN_PAYMENT_LINK_USD) {
-        await clearItemRefundMeta(iid);
-        const note = `Additional amount due after your order ${order.order_number} was updated (product change on line item).`;
-        const paymentResult = await createCustomPayment({
-          orderId: oid,
-          amount: delta,
-          adminNote: note,
-          sendEmail: true,
-          paymentPurpose: 'order_line_adjustment',
-        });
-
-        if (!paymentResult.ok) {
-          adjustment.type = 'payment_due';
-          adjustment.amountDue = delta;
-          adjustment.paymentCreated = false;
-          adjustment.warning = paymentResult.error || 'Failed to create payment link';
-        } else {
-          adjustment.type = 'payment_due';
-          adjustment.amountDue = delta;
-          adjustment.paymentCreated = true;
-          adjustment.paymentNumber = paymentResult.paymentNumber;
-          adjustment.checkoutUrl = paymentResult.checkoutUrl;
-          adjustment.emailSent = paymentResult.emailSent;
-          adjustment.emailError = paymentResult.emailError ?? null;
-        }
-      } else {
-        await clearItemRefundMeta(iid);
-        adjustment.type = 'payment_due';
-        adjustment.amountDue = delta;
-        adjustment.paymentCreated = false;
-        adjustment.warning = `Balance due is ${delta.toFixed(2)} — below the $${MIN_PAYMENT_LINK_USD.toFixed(2)} minimum for a Stripe payment link. Collect manually or adjust the order again.`;
-      }
-    } else {
-      await clearItemRefundMeta(iid);
+    const earlyExit = adjustment._earlyExit;
+    if (earlyExit) {
+      delete adjustment._earlyExit;
+      return {
+        ...earlyExit,
+        previousProductName: item.product_name,
+        newProductName: productName,
+      };
     }
 
     const finalItems = await loadOrderItems(oid);

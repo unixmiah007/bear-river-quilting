@@ -5,8 +5,7 @@ import { useAdminSession } from '../hooks/useAdminSession.js';
 import ProductImage from '../components/ProductImage.jsx';
 import CartIcon from '../components/CartIcon.jsx';
 import FavoriteProductButton from '../components/FavoriteProductButton.jsx';
-import ProductShareDialog from '../components/ProductShareDialog.jsx';
-import ShareIcon from '../components/ShareIcon.jsx';
+import ProductShareButton from '../components/ProductShareButton.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { CUSTOMER_SIZE_OPTIONS, resolveProductPrice } from '../lib/productSizes.js';
 import PageLoading from '../components/PageLoading.jsx';
@@ -68,7 +67,6 @@ export default function ProductDetail() {
 
   const [activeIdx, setActiveIdx] = useState(0);
   const [selectedSize, setSelectedSize] = useState('');
-  const [shareOpen, setShareOpen] = useState(false);
   const [sizeMissing, setSizeMissing] = useState(false);
   const purchaseFormRef = useRef(null);
 
@@ -258,13 +256,6 @@ export default function ProductDetail() {
           </form>
         </div>
       </section>
-      {shareOpen ? (
-        <ProductShareDialog
-          product={product}
-          imageSrc={mainSrc}
-          onClose={() => setShareOpen(false)}
-        />
-      ) : null}
     </>
   );
 }

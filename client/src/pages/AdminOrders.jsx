@@ -113,10 +113,13 @@ function isInteractiveRowTarget(target) {
 
 function formatLineItemChangeMessage(result) {
   const parts = [];
-  if (result.previousProductName && result.newProductName) {
+  if (result.previousQuantity != null && result.newQuantity != null) {
+    const label = result.productName ? ` for ${result.productName}` : '';
+    parts.push(`Quantity${label} updated from ${result.previousQuantity} to ${result.newQuantity}.`);
+  } else if (result.previousProductName && result.newProductName) {
     parts.push(`Line item updated to ${result.newProductName}.`);
   } else {
-    parts.push('Line item product updated.');
+    parts.push('Line item updated.');
   }
 
   const adj = result.adjustment;
@@ -269,7 +272,14 @@ export default function AdminOrders() {
   const [addProductSize, setAddProductSize] = useState('small');
   const [addQuantity, setAddQuantity] = useState('1');
   const [addBusy, setAddBusy] = useState(false);
-  const [addPaymentConfirm, setAddPaymentConfirm] = useState(null);
+  const [addPreview, setAddPreview] = useState(null);
+  const [addPreviewBusy, setAddPreviewBusy] = useState(false);
+  const [paymentLinkBusy, setPaymentLinkBusy] = useState(false);
+  const [removeItemTarget, setRemoveItemTarget] = useState(null);
+  const [removeItemBusy, setRemoveItemBusy] = useState(false);
+  const [deleteOrderTarget, setDeleteOrderTarget] = useState(null);
+  const [deleteOrderBusy, setDeleteOrderBusy] = useState(false);
+  const [orderBalanceDue, setOrderBalanceDue] = useState(null);
 
   const filteredOrders = useMemo(() => {
     const term = searchQuery.trim().toLowerCase();
@@ -385,7 +395,8 @@ export default function AdminOrders() {
     setStatusMsg(null);
     setItemProductMsg(null);
     setRefundConfirm(null);
-    setAddPaymentConfirm(null);
+    setRemoveItemTarget(null);
+    setDeleteOrderTarget(null);
     try {
       const data = await adminApi.orderById(id);
       setDetails(data);
@@ -394,10 +405,41 @@ export default function AdminOrders() {
         carrier: data.order.tracking_carrier || 'usps',
         trackingNumber: data.order.tracking_number || '',
       });
+      adminApi
+        .orderOutstandingBalance(id)
+        .then((balance) => setOrderBalanceDue(balance))
+        .catch(() => setOrderBalanceDue(null));
     } catch (e) {
       setError(e.body?.error || e.message);
     }
   }
+
+  useEffect(() => {
+    if (!details?.order?.id || !addProductId) {
+      setAddPreview(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setAddPreviewBusy(true);
+    adminApi
+      .previewAddOrderLineItem(details.order.id, {
+        productId: Number(addProductId),
+        quantity: Math.max(1, Math.floor(Number(addQuantity) || 1)),
+        productSize: addProductSize,
+      })
+      .then((result) => {
+        if (!cancelled) setAddPreview(result.preview ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setAddPreview(null);
+      })
+      .finally(() => {
+        if (!cancelled) setAddPreviewBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [details?.order?.id, addProductId, addQuantity, addProductSize]);
 
   async function handleStatusUpdate(e) {
     e.preventDefault();
@@ -469,6 +511,17 @@ export default function AdminOrders() {
     }
   }
 
+  async function applyLineItemChangeResult(result) {
+    const msg = formatLineItemChangeMessage(result);
+    const orderId = details.order.id;
+    await loadDetails(orderId);
+    setItemProductMsg(msg);
+    if (result.adjustment?.refundStatus === 'issued') {
+      setStatusForm('refunded');
+    }
+    await refresh();
+  }
+
   async function changeLineItemProduct(itemId, productId) {
     if (!details?.order?.id) return;
     setItemProductBusy(itemId);
@@ -480,14 +533,26 @@ export default function AdminOrders() {
         itemId,
         productId
       );
-      const msg = formatLineItemChangeMessage(result);
-      const orderId = details.order.id;
-      await loadDetails(orderId);
-      setItemProductMsg(msg);
-      if (result.adjustment?.refundStatus === 'issued') {
-        setStatusForm('refunded');
-      }
-      await refresh();
+      await applyLineItemChangeResult(result);
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setItemProductBusy(null);
+    }
+  }
+
+  async function changeLineItemQuantity(itemId, quantity) {
+    if (!details?.order?.id) return;
+    setItemProductBusy(itemId);
+    setItemProductMsg(null);
+    setError(null);
+    try {
+      const result = await adminApi.updateOrderLineItemQuantity(
+        details.order.id,
+        itemId,
+        quantity
+      );
+      await applyLineItemChangeResult(result);
     } catch (err) {
       setError(err.body?.error || err.message);
     } finally {
@@ -507,6 +572,7 @@ export default function AdminOrders() {
       );
       if (previewResult.requiresRefundConfirmation && previewResult.preview) {
         setRefundConfirm({
+          changeType: 'product',
           itemId: item.id,
           productId: nextProductId,
           ...previewResult.preview,
@@ -521,15 +587,48 @@ export default function AdminOrders() {
     }
   }
 
+  async function requestLineItemQuantityChange(item, nextQuantity) {
+    if (!details?.order?.id) return;
+    const qty = Math.max(1, Math.floor(Number(nextQuantity) || 1));
+    if (qty === Number(item.quantity)) return;
+    setItemProductPreviewBusy(item.id);
+    setError(null);
+    try {
+      const previewResult = await adminApi.previewOrderLineItemQuantity(
+        details.order.id,
+        item.id,
+        qty
+      );
+      if (previewResult.requiresRefundConfirmation && previewResult.preview) {
+        setRefundConfirm({
+          changeType: 'quantity',
+          itemId: item.id,
+          quantity: qty,
+          ...previewResult.preview,
+        });
+        return;
+      }
+      await changeLineItemQuantity(item.id, qty);
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setItemProductPreviewBusy(null);
+    }
+  }
+
   function closeRefundConfirm() {
     setRefundConfirm(null);
   }
 
   async function confirmRefundAndChangeLineItem() {
     if (!refundConfirm) return;
-    const { itemId, productId } = refundConfirm;
+    const { changeType, itemId } = refundConfirm;
     setRefundConfirm(null);
-    await changeLineItemProduct(itemId, productId);
+    if (changeType === 'quantity') {
+      await changeLineItemQuantity(itemId, refundConfirm.quantity);
+    } else {
+      await changeLineItemProduct(itemId, refundConfirm.productId);
+    }
   }
 
   async function emailCustomerInvoice() {
@@ -576,12 +675,19 @@ export default function AdminOrders() {
     itemProductBusy != null ||
     itemProductPreviewBusy != null ||
     addBusy ||
+    paymentLinkBusy ||
+    removeItemBusy ||
     refundConfirm != null ||
-    addPaymentConfirm != null;
+    removeItemTarget != null ||
+    deleteOrderTarget != null;
 
-  async function addProductToOrder() {
+  const addPaymentDue =
+    addPreview?.paid && Number(addPreview.amountDue) >= 0.5 ? Number(addPreview.amountDue) : null;
+
+  async function addProductToOrder({ sendPaymentLink = false } = {}) {
     if (!details?.order?.id || !addProductId) return;
-    setAddBusy(true);
+    if (sendPaymentLink) setPaymentLinkBusy(true);
+    else setAddBusy(true);
     setItemProductMsg(null);
     setError(null);
     try {
@@ -589,55 +695,82 @@ export default function AdminOrders() {
         productId: Number(addProductId),
         quantity: Math.max(1, Math.floor(Number(addQuantity) || 1)),
         productSize: addProductSize,
+        sendPaymentLink,
       });
       const orderId = details.order.id;
       await loadDetails(orderId);
       setItemProductMsg(formatAddLineItemMessage(result));
-      setAddProductId('');
-      setAddQuantity('1');
+      if (!sendPaymentLink) {
+        setAddProductId('');
+        setAddQuantity('1');
+      }
       await refresh();
     } catch (err) {
       setError(err.body?.error || err.message);
     } finally {
       setAddBusy(false);
-      setAddPaymentConfirm(null);
+      setPaymentLinkBusy(false);
     }
   }
 
-  async function requestAddProductToOrder() {
-    if (!details?.order?.id || !addProductId) {
-      setError('Choose a product to add.');
-      return;
-    }
-    setAddBusy(true);
+  async function sendOutstandingPaymentLink(amount) {
+    if (!details?.order?.id) return;
+    setPaymentLinkBusy(true);
+    setItemProductMsg(null);
     setError(null);
     try {
-      const previewResult = await adminApi.previewAddOrderLineItem(details.order.id, {
-        productId: Number(addProductId),
-        quantity: Math.max(1, Math.floor(Number(addQuantity) || 1)),
-        productSize: addProductSize,
-      });
-      if (previewResult.requiresPaymentConfirmation && previewResult.preview) {
-        setAddPaymentConfirm(previewResult.preview);
-        setAddBusy(false);
-        return;
-      }
-      setAddBusy(false);
-      await addProductToOrder();
+      const result = await adminApi.sendOrderPaymentLink(details.order.id, { amount });
+      await loadDetails(details.order.id);
+      const parts = [
+        `Payment link for ${formatPrice(result.amountDue)} created.`,
+        result.emailSent ? 'Emailed to the customer.' : null,
+        result.emailError ? `Email issue: ${result.emailError}` : null,
+      ].filter(Boolean);
+      setItemProductMsg(parts.join(' '));
+      await refresh();
     } catch (err) {
       setError(err.body?.error || err.message);
-      setAddBusy(false);
+    } finally {
+      setPaymentLinkBusy(false);
     }
   }
 
-  function closeAddPaymentConfirm() {
-    if (addBusy) return;
-    setAddPaymentConfirm(null);
+  async function confirmRemoveLineItem() {
+    if (!removeItemTarget || !details?.order?.id) return;
+    setRemoveItemBusy(true);
+    setError(null);
+    try {
+      const result = await adminApi.removeOrderLineItem(details.order.id, removeItemTarget.id);
+      setRemoveItemTarget(null);
+      await loadDetails(details.order.id);
+      const msg = result.removedProductName
+        ? `Removed ${result.removedProductName} from the order. Totals updated.`
+        : 'Line item removed.';
+      setItemProductMsg(result.warning ? `${msg} ${result.warning}` : msg);
+      await refresh();
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setRemoveItemBusy(false);
+    }
   }
 
-  async function confirmAddProductWithPaymentLink() {
-    setAddPaymentConfirm(null);
-    await addProductToOrder();
+  async function confirmDeleteOrder() {
+    if (!deleteOrderTarget) return;
+    setDeleteOrderBusy(true);
+    setError(null);
+    try {
+      await adminApi.deleteOrder(deleteOrderTarget.id);
+      setDeleteOrderTarget(null);
+      setDetails(null);
+      setSelected(null);
+      setItemProductMsg(null);
+      await refresh();
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setDeleteOrderBusy(false);
+    }
   }
 
   return (
@@ -835,6 +968,19 @@ export default function AdminOrders() {
               >
                 {invoiceEmailBusy ? 'Sending…' : 'E-mail Customer Invoice'}
               </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() =>
+                  setDeleteOrderTarget({
+                    id: details.order.id,
+                    orderNumber: details.order.order_number,
+                  })
+                }
+                disabled={deleteOrderBusy || itemsSectionBusy}
+              >
+                Delete order
+              </button>
             </div>
           </div>
           {invoiceEmailMsg ? (
@@ -979,9 +1125,9 @@ export default function AdminOrders() {
           </form>
 
           <p className="muted admin-order-items-hint" style={{ margin: '1rem 0 0.5rem' }}>
-            Change line items or add products below. Totals update automatically. For paid orders, a
-            lower total triggers a refund; a higher total (including new products) emails a Stripe
-            payment link for the difference.
+            Change products or quantities, remove line items, or add products below. Lowering the
+            total on a paid order may trigger a refund; raising it can use <strong>Send payment
+            link</strong> for the balance due.
           </p>
           {itemProductMsg ? (
             <p className="page-body" style={{ color: '#065f46', margin: '0 0 0.75rem' }}>
@@ -1001,6 +1147,7 @@ export default function AdminOrders() {
                   <th>Qty</th>
                   <th>Unit</th>
                   <th>Line</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -1047,7 +1194,7 @@ export default function AdminOrders() {
                           className="muted"
                           style={{ display: 'block', fontSize: '0.82rem', marginTop: '0.25rem' }}
                         >
-                          Calculating refund…
+                          Updating…
                         </span>
                       ) : null}
                       {lineItemWasChanged(it) ? (
@@ -1069,9 +1216,41 @@ export default function AdminOrders() {
                         processing={itemProductBusy === it.id}
                       />
                     </td>
-                    <td>{it.quantity}</td>
+                    <td>
+                      <input
+                        type="number"
+                        className="admin-order-item-qty-input"
+                        min={1}
+                        step={1}
+                        defaultValue={it.quantity}
+                        key={`qty-${it.id}-${it.quantity}`}
+                        disabled={itemsSectionBusy}
+                        aria-label={`Quantity for ${it.product_name}`}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') e.currentTarget.blur();
+                        }}
+                        onBlur={(e) => {
+                          const next = Math.max(1, Math.floor(Number(e.target.value) || 1));
+                          if (next !== Number(it.quantity)) {
+                            requestLineItemQuantityChange(it, next);
+                          }
+                        }}
+                      />
+                    </td>
                     <td>{formatPrice(it.unit_price)}</td>
                     <td>{formatPrice(it.line_total)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-danger btn--compact"
+                        disabled={itemsSectionBusy}
+                        onClick={() =>
+                          setRemoveItemTarget({ id: it.id, name: it.product_name })
+                        }
+                      >
+                        Remove
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1133,28 +1312,61 @@ export default function AdminOrders() {
                   onChange={(e) => setAddQuantity(e.target.value)}
                 />
               </div>
-              <div className="field" style={{ alignSelf: 'flex-end' }}>
+              <div className="field admin-order-add-item__actions" style={{ alignSelf: 'flex-end' }}>
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={itemsSectionBusy || !addProductId}
-                  onClick={requestAddProductToOrder}
+                  disabled={itemsSectionBusy || !addProductId || addPreviewBusy}
+                  onClick={() => addProductToOrder({ sendPaymentLink: false })}
                 >
                   {addBusy ? 'Adding…' : 'Add to order'}
                 </button>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={
+                    itemsSectionBusy || !addProductId || addPreviewBusy || addPaymentDue == null
+                  }
+                  title={
+                    addPaymentDue == null
+                      ? 'Select a product on a paid order with at least $0.50 balance due'
+                      : undefined
+                  }
+                  onClick={() => addProductToOrder({ sendPaymentLink: true })}
+                >
+                  {paymentLinkBusy
+                    ? 'Sending…'
+                    : addPaymentDue != null
+                      ? `Send payment link (${formatPrice(addPaymentDue)})`
+                      : 'Send payment link'}
+                </button>
               </div>
             </div>
-            {addLineEstimate ? (
+            {addPreviewBusy ? (
+              <p className="muted admin-order-add-item__estimate" style={{ margin: '0.35rem 0 0' }}>
+                Calculating new total…
+              </p>
+            ) : addPreview ? (
+              <div className="admin-order-add-preview" style={{ marginTop: '0.5rem' }}>
+                <p className="admin-order-add-preview__totals" style={{ margin: '0 0 0.25rem' }}>
+                  Current total: {formatPrice(addPreview.priorTotal)} → New total:{' '}
+                  <strong>{formatPrice(addPreview.newTotal)}</strong>
+                </p>
+                {addPreview.paid && Number(addPreview.amountDue) >= 0.01 ? (
+                  <p className="admin-order-add-preview__due" style={{ margin: 0 }}>
+                    Balance due if added: <strong>{formatPrice(addPreview.amountDue)}</strong>
+                  </p>
+                ) : addLineEstimate ? (
+                  <p className="muted" style={{ margin: 0, fontSize: '0.88rem' }}>
+                    Line: {formatPrice(addLineEstimate.unit)} × {addLineEstimate.qty} ={' '}
+                    {formatPrice(addLineEstimate.line)}
+                  </p>
+                ) : null}
+              </div>
+            ) : addLineEstimate ? (
               <p className="muted admin-order-add-item__estimate" style={{ margin: '0.35rem 0 0' }}>
                 Line estimate: {formatPrice(addLineEstimate.unit)} × {addLineEstimate.qty} ={' '}
                 <strong>{formatPrice(addLineEstimate.line)}</strong>
-                {details.order.stripe_payment_intent_id ? (
-                  <span>
-                    {' '}
-                    — on paid orders, tax is recalculated and a payment link is emailed for any
-                    balance due.
-                  </span>
-                ) : null}
               </p>
             ) : null}
           </section>
@@ -1174,6 +1386,25 @@ export default function AdminOrders() {
           <div className="price" style={{ textAlign: 'right' }}>
             {formatPrice(details.order.total)}
           </div>
+
+          {orderBalanceDue?.paid && Number(orderBalanceDue.amountDue) >= 0.5 && !addProductId ? (
+            <div className="admin-order-balance-due" style={{ marginTop: '0.75rem' }}>
+              <p className="muted" style={{ margin: '0 0 0.5rem' }}>
+                Outstanding balance on this order:{' '}
+                <strong>{formatPrice(orderBalanceDue.amountDue)}</strong>
+              </p>
+              <button
+                type="button"
+                className="btn"
+                disabled={paymentLinkBusy || itemsSectionBusy}
+                onClick={() => sendOutstandingPaymentLink(orderBalanceDue.amountDue)}
+              >
+                {paymentLinkBusy
+                  ? 'Sending…'
+                  : `Send payment link (${formatPrice(orderBalanceDue.amountDue)})`}
+              </button>
+            </div>
+          ) : null}
 
           {messagingFeedback?.error ? (
             <p className="page-body" style={{ color: '#b91c1c', marginTop: '1.25rem' }}>
@@ -1201,53 +1432,85 @@ export default function AdminOrders() {
         </div>
       ) : null}
 
-      {addPaymentConfirm ? (
+      {removeItemTarget ? (
         <div
           className="confirm-dialog-backdrop"
           role="presentation"
-          onClick={closeAddPaymentConfirm}
+          onClick={() => !removeItemBusy && setRemoveItemTarget(null)}
         >
           <div
             className="confirm-dialog"
             role="alertdialog"
             aria-modal="true"
-            aria-labelledby="order-add-payment-confirm-title"
-            aria-describedby="order-add-payment-confirm-desc"
+            aria-labelledby="remove-line-item-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 id="order-add-payment-confirm-title" className="confirm-dialog__title">
-              Send payment link?
+            <h3 id="remove-line-item-title" className="confirm-dialog__title">
+              Remove line item?
             </h3>
-            <div id="order-add-payment-confirm-desc" className="confirm-dialog__body">
-              <p style={{ marginTop: 0 }}>
-                Adding this product increases the order total. A Stripe payment link will be emailed
-                to the customer for the additional amount.
-              </p>
-              <p style={{ margin: '0.75rem 0 0' }}>
-                <strong>{addPaymentConfirm.productName}</strong>
-                {addPaymentConfirm.quantity > 1 ? ` × ${addPaymentConfirm.quantity}` : null}
-                {' — '}
-                {formatPrice(addPaymentConfirm.lineTotal)}
-              </p>
-              <p style={{ margin: '0.5rem 0 0' }}>
-                <strong>Payment due:</strong> {formatPrice(addPaymentConfirm.amountDue)}
-              </p>
-              <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
-                Order total: {formatPrice(addPaymentConfirm.priorTotal)} →{' '}
-                {formatPrice(addPaymentConfirm.newTotal)}
-              </p>
-            </div>
+            <p className="muted confirm-dialog__body">
+              <strong>{removeItemTarget.name}</strong> will be removed from this order. Totals will
+              be recalculated. On paid orders you may need to issue a refund manually if the total
+              drops.
+            </p>
             <div className="confirm-dialog__actions">
-              <button type="button" className="btn" onClick={closeAddPaymentConfirm} disabled={addBusy}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setRemoveItemTarget(null)}
+                disabled={removeItemBusy}
+              >
                 Cancel
               </button>
               <button
                 type="button"
-                className="btn btn-primary"
-                onClick={confirmAddProductWithPaymentLink}
-                disabled={addBusy}
+                className="btn btn-danger"
+                onClick={confirmRemoveLineItem}
+                disabled={removeItemBusy}
               >
-                {addBusy ? 'Adding…' : `Add & email ${formatPrice(addPaymentConfirm.amountDue)} link`}
+                {removeItemBusy ? 'Removing…' : 'Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteOrderTarget ? (
+        <div
+          className="confirm-dialog-backdrop"
+          role="presentation"
+          onClick={() => !deleteOrderBusy && setDeleteOrderTarget(null)}
+        >
+          <div
+            className="confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-order-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="delete-order-title" className="confirm-dialog__title">
+              Delete order?
+            </h3>
+            <p className="muted confirm-dialog__body">
+              Order <strong>{deleteOrderTarget.orderNumber}</strong> and all line items will be
+              deleted permanently. This cannot be undone.
+            </p>
+            <div className="confirm-dialog__actions">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setDeleteOrderTarget(null)}
+                disabled={deleteOrderBusy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={confirmDeleteOrder}
+                disabled={deleteOrderBusy}
+              >
+                {deleteOrderBusy ? 'Deleting…' : 'Delete order'}
               </button>
             </div>
           </div>
@@ -1273,8 +1536,9 @@ export default function AdminOrders() {
             </h3>
             <div id="order-refund-confirm-desc" className="confirm-dialog__body">
               <p style={{ marginTop: 0 }}>
-                Changing this line item lowers the order total. A refund will be sent to the
-                customer&apos;s original payment method and they will be emailed.
+                {refundConfirm.changeType === 'quantity'
+                  ? 'Lowering the quantity reduces the order total. A refund will be sent to the customer’s original payment method and they will be emailed.'
+                  : 'Changing this line item lowers the order total. A refund will be sent to the customer’s original payment method and they will be emailed.'}
               </p>
               <p style={{ margin: '0.75rem 0 0' }}>
                 <strong>Refund amount:</strong>{' '}
@@ -1284,7 +1548,16 @@ export default function AdminOrders() {
                 Order total: {formatPrice(refundConfirm.priorTotal)} →{' '}
                 {formatPrice(refundConfirm.newTotal)}
               </p>
-              {refundConfirm.previousProductName && refundConfirm.newProductName ? (
+              {refundConfirm.changeType === 'quantity' &&
+              refundConfirm.previousQuantity != null ? (
+                <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
+                  {refundConfirm.productName ? `${refundConfirm.productName}: ` : ''}
+                  Qty {refundConfirm.previousQuantity} → {refundConfirm.quantity}
+                </p>
+              ) : null}
+              {refundConfirm.changeType !== 'quantity' &&
+              refundConfirm.previousProductName &&
+              refundConfirm.newProductName ? (
                 <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
                   {refundConfirm.previousProductName} → {refundConfirm.newProductName}
                 </p>

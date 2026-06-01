@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import FavoriteProductButton from './FavoriteProductButton.jsx';
+import ProductShareButton from './ProductShareButton.jsx';
 import ProductImage from './ProductImage.jsx';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
 import { stripRichHtml } from '../lib/richText.js';
@@ -10,9 +11,17 @@ function formatPrice(n) {
   );
 }
 
-export default function ProductCard({ product, onAddToCart, badge, showFavorite = false, showCustomize = false }) {
+export default function ProductCard({
+  product,
+  onAddToCart,
+  badge,
+  showFavorite = false,
+  showCustomize = false,
+  showShare = false,
+}) {
   const detailPath = `/products/${product.id}`;
   const customizePath = `/customize?product=${encodeURIComponent(product.id)}`;
+  const tripleActions = showShare && showCustomize;
 
   return (
     <article
@@ -40,10 +49,13 @@ export default function ProductCard({ product, onAddToCart, badge, showFavorite 
         ) : null}
         <div className="price">{formatPrice(product.price)}</div>
       </Link>
-      <div className="row card-actions">
+      <div
+        className={`row card-actions${tripleActions ? ' card-actions--triple' : ''}`}
+      >
         <button type="button" className="btn btn-primary" onClick={() => onAddToCart(product)}>
           Add to cart
         </button>
+        {showShare ? <ProductShareButton product={product} compact={tripleActions} /> : null}
         {showCustomize ? (
           <Link className="btn" to={customizePath}>
             Customize
