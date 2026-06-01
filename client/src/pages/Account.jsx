@@ -11,6 +11,7 @@ import { buildTrackingUrl, labelForCarrier } from '../lib/shippingCarriers.js';
 import { labelForOrderStatus } from '../lib/orderStatuses.js';
 import AccountVisitHistory from '../components/AccountVisitHistory.jsx';
 import AccountCustomQuiltLookup from '../components/AccountCustomQuiltLookup.jsx';
+import AccountOrderItems, { orderListShowsAdjustment } from '../components/AccountOrderItems.jsx';
 import PageLoading from '../components/PageLoading.jsx';
 
 function formatPrice(n) {
@@ -295,7 +296,11 @@ export default function Account() {
 
       {mode === 'list' && !detail ? (
         <section className="card">
-          <h2 style={{ marginTop: 0 }}>Your orders</h2>
+          <h2 style={{ marginTop: 0 }}>Order history</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Newest orders first. If we updated an order after checkout, you will see the current total
+            and any refunds on the order details page.
+          </p>
           {list.length === 0 ? (
             <p className="muted">No orders found for that email yet.</p>
           ) : (
@@ -318,8 +323,25 @@ export default function Account() {
                       <td>
                         <strong>{o.order_number}</strong>
                       </td>
-                      <td>{statusLabel(o.status)}</td>
-                      <td>{formatPrice(o.total)}</td>
+                      <td>
+                        {statusLabel(o.status)}
+                        {orderListShowsAdjustment(o) ? (
+                          <span className="account-order-list-badge">Updated</span>
+                        ) : null}
+                      </td>
+                      <td>
+                        {orderListShowsAdjustment(o) ? (
+                          <>
+                            <span className="muted" style={{ textDecoration: 'line-through' }}>
+                              {formatPrice(o.original_total)}
+                            </span>
+                            <br />
+                            <strong>{formatPrice(o.total)}</strong>
+                          </>
+                        ) : (
+                          formatPrice(o.total)
+                        )}
+                      </td>
                       <td className="muted">{new Date(o.created_at).toLocaleString()}</td>
                       <td className="muted">····{o.card_last4}</td>
                       <td>
@@ -419,34 +441,7 @@ export default function Account() {
           </p>
 
           <h3 style={{ marginTop: '1.25rem', marginBottom: '0.35rem' }}>Items</h3>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Qty</th>
-                  <th>Unit</th>
-                  <th>Line</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(detail.items || []).map((it) => (
-                  <tr key={it.id}>
-                    <td>
-                      <Link to={`/products/${it.product_id}`}>{it.product_name}</Link>
-                    </td>
-                    <td>{it.quantity}</td>
-                    <td>{formatPrice(it.unit_price)}</td>
-                    <td>{formatPrice(it.line_total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="muted" style={{ marginTop: '1rem' }}>
-            Subtotal {formatPrice(order.subtotal)} · Tax {formatPrice(order.tax_amount)} · Shipping{' '}
-            {formatPrice(order.shipping_cost)} · <strong>Total {formatPrice(order.total)}</strong>
-          </p>
+          <AccountOrderItems order={order} items={detail.items || []} />
 
           <OrderCorrespondencePanel email={email} orderNumber={order.order_number} />
         </section>

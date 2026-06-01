@@ -8,6 +8,7 @@ import { OrderStatusIcon, TrackingEmailIcon } from '../components/admin/AdminSec
 import PageLoading from '../components/PageLoading.jsx';
 import { labelForCarrier, SHIPPING_CARRIER_OPTIONS } from '../lib/shippingCarriers.js';
 import { ORDER_STATUS_OPTIONS, normalizeOrderStatusForForm, labelForOrderStatus } from '../lib/orderStatuses.js';
+import { formatProductPriceRange } from '../lib/productSizes.js';
 
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
 const SORTABLE_COLUMNS = ['order', 'customer', 'status', 'total', 'created'];
@@ -65,6 +66,15 @@ function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
     Number(n)
   );
+}
+
+function productOptionLabel(product) {
+  const priceLabel =
+    product.unit_price != null && product.unit_price !== ''
+      ? formatPrice(product.unit_price)
+      : formatProductPriceRange(product, formatPrice);
+  const title = product.sku ? `${product.sku} — ${product.name}` : product.name;
+  return `${title} (${priceLabel})`;
 }
 
 function orderSearchText(order) {
@@ -882,13 +892,17 @@ export default function AdminOrders() {
                         {(catalogProducts.some((p) => Number(p.id) === Number(it.product_id))
                           ? catalogProducts
                           : [
-                              { id: it.product_id, sku: '', name: it.product_name },
+                              {
+                                id: it.product_id,
+                                sku: '',
+                                name: it.product_name,
+                                unit_price: it.unit_price,
+                              },
                               ...catalogProducts,
                             ]
                         ).map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.sku ? `${p.sku} — ` : ''}
-                            {p.name}
+                            {productOptionLabel(p)}
                           </option>
                         ))}
                       </select>

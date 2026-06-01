@@ -100,7 +100,7 @@ import {
   changeOrderLineItemProduct,
   previewOrderLineItemProductChange,
 } from './lib/orderLineItemProduct.js';
-import { ensureOrderItemRefundColumns } from './lib/ensureOrderItemRefundColumns.js';
+import { ensureOrderAdjustmentColumns } from './lib/ensureOrderAdjustmentColumns.js';
 import { lookupCustomerCustomQuiltRequests } from './lib/customQuiltCustomerLookup.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -648,6 +648,7 @@ app.post('/api/customer/orders', async (req, res) => {
                 shipping_method, shipping_cost,
                 billing_name, billing_address1, billing_address2, billing_city, billing_state, billing_postal_code, billing_country,
                 card_last4, subtotal, tax_amount, total, created_at,
+                original_subtotal, original_tax_amount, original_total, order_adjusted_at,
                 tracking_carrier, tracking_number, tracking_notified_at
          FROM orders WHERE order_number = ? AND LOWER(TRIM(customer_email)) = ?`,
         [orderNumber, email]
@@ -659,15 +660,17 @@ app.post('/api/customer/orders', async (req, res) => {
         });
       }
       const [items] = await pool.query(
-        `SELECT id, product_id, product_name, unit_price, quantity, line_total
+        `SELECT id, product_id, product_name, unit_price, quantity, line_total,
+                line_refund_amount, line_refund_status, line_refund_at,
+                original_product_id, original_product_name, original_unit_price, original_line_total
          FROM order_items WHERE order_id = ? ORDER BY id ASC`,
         [order.id]
       );
       return res.json({ mode: 'detail', order, items });
     }
     const [orders] = await pool.query(
-      `SELECT id, order_number, status, customer_name, total, created_at, card_last4, shipping_method,
-              tracking_carrier, tracking_number
+      `SELECT id, order_number, status, customer_name, total, original_total, order_adjusted_at,
+              created_at, card_last4, shipping_method, tracking_carrier, tracking_number
        FROM orders WHERE LOWER(TRIM(customer_email)) = ?
        ORDER BY created_at DESC`,
       [email]
@@ -2314,9 +2317,9 @@ async function startServer() {
     console.error('[ensureOrderMessagesTable]', e?.message || e);
   }
   try {
-    await ensureOrderItemRefundColumns(pool);
+    await ensureOrderAdjustmentColumns(pool);
   } catch (e) {
-    console.error('[ensureOrderItemRefundColumns]', e?.message || e);
+    console.error('[ensureOrderAdjustmentColumns]', e?.message || e);
   }
   app.listen(PORT, async () => {
     const stripeOk = !!process.env.STRIPE_SECRET_KEY;

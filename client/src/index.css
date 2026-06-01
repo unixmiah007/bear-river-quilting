@@ -5439,3 +5439,126 @@ tr:last-child td {
     margin: 0.15in;
   }
 }
+
+.account-order-list-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: 4px;
+  background: #fef3c7;
+  color: #92400e;
+  vertical-align: middle;
+}
+
+.account-order-adjustment {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #f8fafc;
+}
+
+.account-order-adjustment__title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.account-order-adjustment__when {
+  margin: 0.25rem 0 0.65rem;
+  font-size: 0.85rem;
+}
+
+.account-order-adjustment__totals {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.account-order-adjustment__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+  font-size: 0.9rem;
+}
+
+.account-order-adjustment__label {
+  color: var(--muted, #6b7280);
+}
+
+.account-order-item-tag {
+  display: inline-block;
+  margin-right: 0.35rem;
+  padding: 0.08rem 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 3px;
+  background: #e0e7ff;
+  color: #3730a3;
+  vertical-align: middle;
+}
+
+.account-order-item-tag--original {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.account-order-item-current {
+  margin-bottom: 0.15rem;
+}
+
+.account-order-item-original {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border);
+  font-size: 0.88rem;
+}
+
+.account-order-item-original__name {
+  display: block;
+  margin-top: 0.2rem;
+}
+
+.account-order-item-original__amounts {
+  display: block;
+  font-size: 0.82rem;
+  margin-top: 0.15rem;
+}
+
+.account-order-item-refund {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.account-order-item-refund__when {
+  font-weight: 400;
+  color: var(--muted, #6b7280);
+}
+
+.account-order-item-refund--issued {
+  color: #065f46;
+}
+
+.account-order-item-refund--pending {
+  color: #92400e;
+}
+
+.account-order-item-refund--failed {
+  color: #b91c1c;
+}
+
+.account-order-items-table td:first-child {
+  min-width: 14rem;
+}
+
+.account-order-totals-compare {
+  font-size: 0.9rem;
+  line-height: 1.45;
+}

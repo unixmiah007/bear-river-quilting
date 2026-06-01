@@ -57,7 +57,34 @@ function computeOrderTotals(subtotal, shippingCost) {
 }
 
 const ORDER_ITEM_COLUMNS = `id, product_id, product_name, unit_price, quantity, line_total,
-  line_refund_amount, line_refund_status, stripe_refund_id, line_refund_at`;
+  line_refund_amount, line_refund_status, stripe_refund_id, line_refund_at,
+  original_product_id, original_product_name, original_unit_price, original_line_total`;
+
+async function snapshotOrderAdjustmentOriginals(conn, orderId, itemId, item, order) {
+  await conn.query(
+    `UPDATE order_items SET
+       original_product_id = product_id,
+       original_product_name = product_name,
+       original_unit_price = unit_price,
+       original_line_total = line_total
+     WHERE id = ? AND original_product_id IS NULL`,
+    [itemId]
+  );
+  await conn.query(
+    `UPDATE orders SET
+       original_subtotal = ?,
+       original_tax_amount = ?,
+       original_total = ?,
+       order_adjusted_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND original_total IS NULL`,
+    [
+      Number(order.subtotal).toFixed(2),
+      Number(order.tax_amount).toFixed(2),
+      Number(order.total).toFixed(2),
+      orderId,
+    ]
+  );
+}
 
 async function loadOrderItems(orderId) {
   const [items] = await pool.query(
@@ -239,6 +266,8 @@ export async function changeOrderLineItemProduct({ orderId, itemId, productId })
 
     await conn.beginTransaction();
 
+    await snapshotOrderAdjustmentOriginals(conn, oid, iid, item, order);
+
     await conn.query(
       `UPDATE order_items SET product_id = ?, product_name = ?, unit_price = ?, line_total = ?
        WHERE id = ?`,
@@ -267,6 +296,7 @@ export async function changeOrderLineItemProduct({ orderId, itemId, productId })
               shipping_method, shipping_cost,
               billing_name, billing_address1, billing_address2, billing_city, billing_state, billing_postal_code, billing_country,
               card_last4, subtotal, tax_amount, total, created_at,
+              original_subtotal, original_tax_amount, original_total, order_adjusted_at,
               tracking_carrier, tracking_number, tracking_notified_at, invoice_emailed_at,
               label_from_name, label_from_address1, label_from_address2,
               label_from_city, label_from_state, label_from_postal_code, label_from_country, label_from_phone,
