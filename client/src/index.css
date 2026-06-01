@@ -3439,6 +3439,117 @@ h2 {
   background: #991b1b;
 }
 
+.admin-comm-unread-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: 0.35rem;
+  border-radius: 999px;
+  background: #b91c1c;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.admin-comm-unread-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+.admin-comm-unread-badge--inline {
+  margin-left: 0;
+  margin-right: 0.4rem;
+}
+
+.admin-comm-unread-count {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.admin-communications-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 1rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.admin-communications-table tbody tr.admin-communications-row {
+  cursor: pointer;
+}
+
+.admin-communications-table tbody tr.admin-communications-row:hover {
+  background: #f9fafb;
+}
+
+.admin-communications-table tbody tr.admin-communications-row--unread {
+  background: #fffbeb;
+}
+
+.admin-communications-table tbody tr.admin-communications-row--unread:hover {
+  background: #fef3c7;
+}
+
+.admin-communications-table tbody tr.admin-communications-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.admin-communications-row__link {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.4rem;
+  text-decoration: none;
+  color: inherit;
+  font-weight: 500;
+}
+
+.admin-communications-row__link:hover {
+  text-decoration: underline;
+  color: var(--accent);
+}
+
+.admin-communications-row__link strong {
+  font-weight: 600;
+}
+
+.admin-communications-row__preview {
+  display: block;
+  max-width: 28rem;
+  line-height: 1.4;
+}
+
+.admin-communications-row__snippet {
+  font-size: 0.88rem;
+}
+
+.admin-communications-table__when {
+  white-space: nowrap;
+  font-size: 0.88rem;
+}
+
+.admin-communications-table__count-col {
+  white-space: nowrap;
+  text-align: right;
+}
+
 .admin-top .btn {
   background: #ffffff;
   color: #111111;
@@ -5230,6 +5341,16 @@ tr:last-child td {
 
 .admin-order-message-list__item:hover {
   background: #f9fafb;
+}
+
+.admin-order-message-list__item--unread {
+  background: #fffbeb;
+  border-left: 3px solid #b91c1c;
+  padding-left: calc(1rem - 3px);
+}
+
+.admin-order-message-list__item--unread:hover {
+  background: #fef3c7;
 }
 
 .admin-order-message-list__item:disabled {

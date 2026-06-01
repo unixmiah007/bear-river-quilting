@@ -57,6 +57,9 @@ export default function OrderMessagingPanel({
     try {
       const msg = await adminApi.orderMessage(orderId, messageId);
       setViewing(msg);
+      if (msg?.direction === 'customer_to_staff') {
+        await loadMessages();
+      }
     } catch (e) {
       onFeedback?.({ error: e.body?.error || e.message });
     } finally {
@@ -93,7 +96,11 @@ export default function OrderMessagingPanel({
   }
 
   return (
-    <section className="admin-order-messaging" aria-labelledby="admin-order-messaging-heading">
+    <section
+      id="admin-order-messaging"
+      className="admin-order-messaging"
+      aria-labelledby="admin-order-messaging-heading"
+    >
       <AdminSectionTitle
         id="admin-order-messaging-heading"
         icon={CustomerMessagingIcon}
@@ -148,11 +155,16 @@ export default function OrderMessagingPanel({
               <li key={m.id}>
                 <button
                   type="button"
-                  className="admin-order-message-list__item"
+                  className={`admin-order-message-list__item${m.is_unread ? ' admin-order-message-list__item--unread' : ''}`}
                   onClick={() => openMessage(m.id)}
                   disabled={viewBusy}
                 >
                   <span className="admin-order-message-list__subject">
+                    {m.is_unread ? (
+                      <span className="admin-comm-unread-badge admin-comm-unread-badge--inline">
+                        New
+                      </span>
+                    ) : null}
                     {senderLabel(m.direction)}: {m.subject}
                   </span>
                   <span className="admin-order-message-list__meta muted">

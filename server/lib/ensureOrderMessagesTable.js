@@ -38,4 +38,9 @@ export async function ensureOrderMessagesTable(conn) {
       `ALTER TABLE order_messages ADD COLUMN from_email VARCHAR(255) NULL AFTER direction`
     );
   }
+  if (!(await columnExists(conn, 'order_messages', 'admin_read_at'))) {
+    await conn.query(
+      `ALTER TABLE order_messages ADD COLUMN admin_read_at TIMESTAMP NULL DEFAULT NULL AFTER created_at`
+    );
+  }
 }

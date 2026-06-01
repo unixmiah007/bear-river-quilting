@@ -258,6 +258,7 @@ export default function AdminOrders() {
   const [statusBusy, setStatusBusy] = useState(false);
   const [statusMsg, setStatusMsg] = useState(null);
   const orderDetailRef = useRef(null);
+  const pendingMessagesFocusRef = useRef(false);
   const [pageSize, setPageSize] = useState(15);
   const [page, setPage] = useState(1);
   const [sortKey, setSortKey] = useState('created');
@@ -354,11 +355,13 @@ export default function AdminOrders() {
     const raw = searchParams.get('order');
     if (raw == null || String(raw).trim() === '') return undefined;
     const orderId = Number(raw);
+    pendingMessagesFocusRef.current = searchParams.get('focus') === 'messages';
     if (!Number.isFinite(orderId) || orderId <= 0) {
       setSearchParams(
         (sp) => {
           const n = new URLSearchParams(sp);
           n.delete('order');
+          n.delete('focus');
           return n;
         },
         { replace: true }
@@ -370,6 +373,7 @@ export default function AdminOrders() {
       (sp) => {
         const n = new URLSearchParams(sp);
         n.delete('order');
+        n.delete('focus');
         return n;
       },
       { replace: true }
@@ -381,6 +385,17 @@ export default function AdminOrders() {
 
   useEffect(() => {
     if (!details) return undefined;
+    if (pendingMessagesFocusRef.current) {
+      pendingMessagesFocusRef.current = false;
+      const frame = requestAnimationFrame(() => {
+        document.getElementById('admin-order-messaging')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+        adminApi.markOrderMessagesRead(details.order.id).catch(() => {});
+      });
+      return () => cancelAnimationFrame(frame);
+    }
     const frame = requestAnimationFrame(() => {
       orderDetailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });

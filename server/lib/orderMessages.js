@@ -48,6 +48,7 @@ export async function listOrderMessages(orderId, { ascending = false } = {}) {
   const sort = ascending ? 'ASC' : 'DESC';
   const [rows] = await pool.query(
     `SELECT id, order_id, direction, from_email, subject, to_email, email_sent, sent_at, created_at,
+            admin_read_at,
             LEFT(body_text, 200) AS body_preview
      FROM order_messages
      WHERE order_id = ?
@@ -57,6 +58,8 @@ export async function listOrderMessages(orderId, { ascending = false } = {}) {
   return rows.map((r) => ({
     ...r,
     body_preview: previewText(r.body_preview, 120),
+    is_unread:
+      r.direction === MESSAGE_DIRECTION.CUSTOMER && (r.admin_read_at == null || r.admin_read_at === ''),
   }));
 }
 
@@ -64,12 +67,35 @@ export async function getOrderMessage(orderId, messageId) {
   const oid = Number(orderId);
   const mid = Number(messageId);
   const [[row]] = await pool.query(
-    `SELECT id, order_id, direction, from_email, subject, body_text, body_html, to_email, email_sent, sent_at, created_at
+    `SELECT id, order_id, direction, from_email, subject, body_text, body_html, to_email, email_sent, sent_at, created_at, admin_read_at
      FROM order_messages
      WHERE id = ? AND order_id = ?`,
     [mid, oid]
   );
+  if (
+    row &&
+    row.direction === MESSAGE_DIRECTION.CUSTOMER &&
+    (row.admin_read_at == null || row.admin_read_at === '')
+  ) {
+    await pool.query(
+      'UPDATE order_messages SET admin_read_at = CURRENT_TIMESTAMP WHERE id = ? AND admin_read_at IS NULL',
+      [mid]
+    );
+    row.admin_read_at = new Date();
+  }
   return row ?? null;
+}
+
+export async function markOrderMessagesReadByAdmin(orderId) {
+  const id = Number(orderId);
+  if (!id) return { updated: 0 };
+  const [result] = await pool.query(
+    `UPDATE order_messages
+     SET admin_read_at = CURRENT_TIMESTAMP
+     WHERE order_id = ? AND direction = ? AND admin_read_at IS NULL`,
+    [id, MESSAGE_DIRECTION.CUSTOMER]
+  );
+  return { updated: result.affectedRows ?? 0 };
 }
 
 export async function sendOrderCustomerMessage(orderId, { subject, body }) {

@@ -77,7 +77,9 @@ import {
   sendOrderCustomerMessage,
   sendCustomerOrderReply,
   verifyCustomerOrderAccess,
+  markOrderMessagesReadByAdmin,
 } from './lib/orderMessages.js';
+import { listOrderCommunicationThreads } from './lib/orderCommunications.js';
 import { SHIPPING_CARRIERS } from './lib/shippingCarriers.js';
 import {
   createStripeCheckoutSession,
@@ -1908,6 +1910,36 @@ app.post('/api/admin/custom-payments', authMiddleware, async (req, res) => {
   } catch (e) {
     console.error('[admin/custom-payments]', e);
     res.status(500).json({ error: 'Failed to create payment link' });
+  }
+});
+
+app.get('/api/admin/communications', authMiddleware, async (_req, res) => {
+  try {
+    const threads = await listOrderCommunicationThreads();
+    res.json(threads);
+  } catch (e) {
+    console.error('[admin/communications]', e);
+    if (e.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        error: 'order_messages table is missing.',
+        hint: 'Restart the API to create it automatically.',
+      });
+    }
+    res.status(500).json({ error: 'Failed to load order communications.' });
+  }
+});
+
+app.post('/api/admin/orders/:id/messages/mark-read', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid order id' });
+    const [[order]] = await pool.query('SELECT id FROM orders WHERE id = ?', [id]);
+    if (!order) return res.status(404).json({ error: 'Order not found' });
+    const result = await markOrderMessagesReadByAdmin(id);
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    console.error('[admin/orders/messages/mark-read]', e);
+    res.status(500).json({ error: 'Failed to mark messages as read.' });
   }
 });
 

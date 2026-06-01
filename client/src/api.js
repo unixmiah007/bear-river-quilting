@@ -233,6 +233,12 @@ export const adminApi = {
     const q = params.toString();
     return api(`/api/admin/nav-badge-counts${q ? `?${q}` : ''}`);
   },
+  communications: () => apiJsonArray('/api/admin/communications'),
+  markOrderMessagesRead: (orderId) =>
+    api(`/api/admin/orders/${encodeURIComponent(orderId)}/messages/mark-read`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
   orders: () => apiJsonArray('/api/admin/orders'),
   orderById: (id) => api(`/api/admin/orders/${id}`),
   downloadOrderInvoicePdf: async (orderId, orderNumber) => {

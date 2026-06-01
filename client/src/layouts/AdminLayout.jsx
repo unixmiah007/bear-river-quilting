@@ -17,7 +17,11 @@ async function signOut() {
 
 export default function AdminLayout() {
   const [state, setState] = useState({ loading: true, ok: false });
-  const [navBadges, setNavBadges] = useState({ orders: 0, customizeRequests: 0 });
+  const [navBadges, setNavBadges] = useState({
+    orders: 0,
+    customizeRequests: 0,
+    communications: 0,
+  });
   const location = useLocation();
 
   const refreshNavBadges = useCallback(async () => {
@@ -29,6 +33,7 @@ export default function AdminLayout() {
       setNavBadges({
         orders: Number(counts.orders) || 0,
         customizeRequests: Number(counts.customizeRequests) || 0,
+        communications: Number(counts.communications) || 0,
       });
     } catch {
       /* ignore — badges are non-critical */
@@ -112,6 +117,12 @@ export default function AdminLayout() {
               badge={formatAdminNavBadge(navBadges.customizeRequests)}
             >
               Customize
+            </AdminLayoutNavLink>
+            <AdminLayoutNavLink
+              to="/admin/communication"
+              badge={formatAdminNavBadge(navBadges.communications)}
+            >
+              Communication
             </AdminLayoutNavLink>
             <NavLink
               className={({ isActive }) => `pill${isActive ? ' active' : ''}`}

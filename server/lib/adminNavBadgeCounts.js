@@ -1,4 +1,5 @@
 import pool from '../db.js';
+import { countOrdersWithUnreadMessages } from './orderCommunications.js';
 
 function parseSinceParam(raw) {
   if (raw == null || String(raw).trim() === '') return null;
@@ -19,10 +20,11 @@ export async function getAdminNavBadgeCounts({ ordersSince, customizeSince } = {
   const ordersFrom = parseSinceParam(ordersSince);
   const customizeFrom = parseSinceParam(customizeSince);
 
-  const [orders, customizeRequests] = await Promise.all([
+  const [orders, customizeRequests, communications] = await Promise.all([
     countSince('orders', ordersFrom),
     countSince('custom_quilt_requests', customizeFrom),
+    countOrdersWithUnreadMessages(),
   ]);
 
-  return { orders, customizeRequests };
+  return { orders, customizeRequests, communications };
 }
