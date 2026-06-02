@@ -241,6 +241,7 @@ async function applyLineItemTotalAdjustment({
   productLabel,
   refundReason,
   paymentNote,
+  skipAutoRefund = false,
 }) {
   const adjustment = {
     itemId: iid,
@@ -261,35 +262,34 @@ async function applyLineItemTotalAdjustment({
     adjustment.type = 'refund';
     adjustment.refundAmount = refundAmount;
 
-    async function failEarly(warning) {
-      return {
-        _earlyExit: {
-          ok: true,
-          order: await loadUpdatedOrder(oid),
-          items: await loadOrderItems(oid),
-          adjustment: {
-            ...adjustment,
-            refundIssued: false,
-            refundStatus: 'failed',
-            warning,
-          },
-        },
-      };
-    }
-
     if (!order.stripe_payment_intent_id) {
-      await setItemRefundMeta(iid, { amount: refundAmount, status: 'failed' });
-      return failEarly(
-        'Order totals were updated, but no Stripe payment is on file — issue the refund manually.'
-      );
+      await setItemRefundMeta(iid, { amount: refundAmount, status: 'pending' });
+      adjustment.refundIssued = false;
+      adjustment.refundStatus = 'pending';
+      adjustment.manualRequired = true;
+      adjustment.warning =
+        'Order totals were updated. Issue the refund manually in Stripe, then mark it processed in order history.';
+      return adjustment;
     }
 
     const stripe = getStripe();
     if (!stripe) {
-      await setItemRefundMeta(iid, { amount: refundAmount, status: 'failed' });
-      return failEarly(
-        'Order totals were updated, but Stripe is not configured — issue the refund manually.'
-      );
+      await setItemRefundMeta(iid, { amount: refundAmount, status: 'pending' });
+      adjustment.refundIssued = false;
+      adjustment.refundStatus = 'pending';
+      adjustment.manualRequired = true;
+      adjustment.warning =
+        'Order totals were updated. Stripe is not configured — issue the refund manually, then mark it processed in order history.';
+      return adjustment;
+    }
+
+    if (skipAutoRefund) {
+      await setItemRefundMeta(iid, { amount: refundAmount, status: 'pending' });
+      adjustment.refundIssued = false;
+      adjustment.refundStatus = 'pending';
+      adjustment.manualRequired = true;
+      adjustment.warning = `Refund of $${refundAmount.toFixed(2)} is due. Issue it in Stripe, then mark it processed in order history.`;
+      return adjustment;
     }
 
     await setItemRefundMeta(iid, { amount: refundAmount, status: 'pending' });
@@ -339,10 +339,11 @@ async function applyLineItemTotalAdjustment({
       adjustment.emailError = emailError;
     } catch (e) {
       console.error('[order-line-item] Stripe refund failed:', e);
-      await setItemRefundMeta(iid, { amount: refundAmount, status: 'failed' });
+      await setItemRefundMeta(iid, { amount: refundAmount, status: 'pending' });
       adjustment.refundIssued = false;
-      adjustment.refundStatus = 'failed';
-      adjustment.warning = e.message || 'Stripe refund failed';
+      adjustment.refundStatus = 'pending';
+      adjustment.manualRequired = true;
+      adjustment.warning = `Automatic refund failed (${e.message || 'Stripe error'}). Issue $${refundAmount.toFixed(2)} manually in Stripe, then mark it processed in order history.`;
     }
     return adjustment;
   }
@@ -479,7 +480,7 @@ export async function previewOrderLineItemQuantityChange({ orderId, itemId, quan
   }
 }
 
-export async function changeOrderLineItemQuantity({ orderId, itemId, quantity }) {
+export async function changeOrderLineItemQuantity({ orderId, itemId, quantity, skipAutoRefund = false }) {
   const conn = await pool.getConnection();
   try {
     const built = await buildLineItemQuantityChange(conn, orderId, itemId, quantity);
@@ -528,6 +529,7 @@ export async function changeOrderLineItemQuantity({ orderId, itemId, quantity })
       productLabel: item.product_name,
       refundReason: 'line_item_quantity_change',
       paymentNote: `Additional amount due after your order ${order.order_number} was updated (quantity change on line item).`,
+      skipAutoRefund,
     });
 
     const earlyExit = adjustment._earlyExit;
@@ -594,7 +596,7 @@ export async function previewOrderLineItemProductChange({ orderId, itemId, produ
   }
 }
 
-export async function changeOrderLineItemProduct({ orderId, itemId, productId }) {
+export async function changeOrderLineItemProduct({ orderId, itemId, productId, skipAutoRefund = false }) {
   const conn = await pool.getConnection();
   try {
     const built = await buildLineItemProductChange(conn, orderId, itemId, productId);
@@ -654,6 +656,7 @@ export async function changeOrderLineItemProduct({ orderId, itemId, productId })
       productLabel: productName,
       refundReason: 'line_item_product_change',
       paymentNote: `Additional amount due after your order ${order.order_number} was updated (product change on line item).`,
+      skipAutoRefund,
     });
 
     const earlyExit = adjustment._earlyExit;
@@ -687,4 +690,76 @@ export async function changeOrderLineItemProduct({ orderId, itemId, productId })
   } finally {
     conn.release();
   }
+}
+
+export async function recordManualLineItemRefund({ orderId, itemId, stripeRefundId = null }) {
+  const oid = Number(orderId);
+  const iid = Number(itemId);
+  if (!oid || !iid) {
+    return { ok: false, status: 400, error: 'Invalid order or line item' };
+  }
+
+  const [[order]] = await pool.query(
+    `SELECT id, order_number, customer_name, customer_email, total, original_total
+     FROM orders WHERE id = ?`,
+    [oid]
+  );
+  if (!order) {
+    return { ok: false, status: 404, error: 'Order not found' };
+  }
+
+  const [[item]] = await pool.query(
+    `SELECT id, product_name, line_refund_amount, line_refund_status
+     FROM order_items WHERE id = ? AND order_id = ?`,
+    [iid, oid]
+  );
+  if (!item) {
+    return { ok: false, status: 404, error: 'Line item not found' };
+  }
+
+  const amount = Number(item.line_refund_amount);
+  const status = String(item.line_refund_status ?? '').toLowerCase();
+  if (!amount || amount < 0.01) {
+    return { ok: false, status: 400, error: 'No refund amount is recorded for this line item' };
+  }
+  if (status === 'issued') {
+    return { ok: false, status: 400, error: 'Refund is already marked as issued' };
+  }
+
+  const stripeId = String(stripeRefundId ?? '').trim() || null;
+  if (stripeId) {
+    const stripe = getStripe();
+    if (stripe) {
+      try {
+        await stripe.refunds.retrieve(stripeId);
+      } catch (e) {
+        return { ok: false, status: 400, error: e.message || 'Stripe refund id could not be verified' };
+      }
+    }
+  }
+
+  await setItemRefundMeta(iid, { amount, status: 'issued', refundId: stripeId });
+  await pool.query('UPDATE orders SET status = ? WHERE id = ?', ['refunded', oid]);
+
+  try {
+    await sendOrderLineItemRefundEmail({
+      to: order.customer_email,
+      customerName: order.customer_name,
+      orderNumber: order.order_number,
+      refundAmount: amount,
+      priorTotal: Number(order.original_total ?? order.total),
+      newTotal: Number(order.total),
+      productName: item.product_name,
+    });
+  } catch (e) {
+    console.error('[order-line-item] manual refund email failed:', e);
+  }
+
+  return {
+    ok: true,
+    order: await loadUpdatedOrder(oid),
+    items: await loadOrderItems(oid),
+    refundAmount: amount,
+    stripeRefundId: stripeId,
+  };
 }

@@ -61,6 +61,10 @@ import {
 } from './lib/shippingLabel.js';
 import { getDefaultShipFrom } from './lib/defaultShipFrom.js';
 import { buildOrderInvoicePdf, invoicePdfFilename } from './lib/orderInvoicePdf.js';
+import {
+  buildMonthlySalesReportPdf,
+  monthlySalesReportFilename,
+} from './lib/monthlySalesReportPdf.js';
 import { emailCustomerOrderInvoice, loadOrderInvoiceContext } from './lib/orderInvoiceEmail.js';
 import { sendProductShareEmail } from './lib/productShareEmail.js';
 import { ensureProductEmailBlastsTable } from './lib/ensureProductEmailBlastsTable.js';
@@ -105,14 +109,17 @@ import {
   changeOrderLineItemQuantity,
   previewOrderLineItemProductChange,
   previewOrderLineItemQuantityChange,
+  recordManualLineItemRefund,
 } from './lib/orderLineItemProduct.js';
 import { addOrderLineItem, previewAddOrderLineItem } from './lib/addOrderLineItem.js';
-import { removeOrderLineItem, deleteAdminOrder } from './lib/removeOrderLineItem.js';
+import { removeOrderLineItem, previewRemoveOrderLineItem, deleteAdminOrder } from './lib/removeOrderLineItem.js';
 import {
   computeOrderOutstandingBalance,
   sendOrderBalancePaymentLink,
 } from './lib/sendOrderBalancePaymentLink.js';
 import { ensureOrderAdjustmentColumns } from './lib/ensureOrderAdjustmentColumns.js';
+import { ensureOrderRefundsTable } from './lib/ensureOrderRefundsTable.js';
+import { listOrderRefunds, recordManualOrderRefund } from './lib/orderRefunds.js';
 import { getAdminNavBadgeCounts } from './lib/adminNavBadgeCounts.js';
 import { getOrderStats } from './lib/orderStats.js';
 import { lookupCustomerCustomQuiltRequests } from './lib/customQuiltCustomerLookup.js';
@@ -1991,6 +1998,143 @@ app.get('/api/admin/orders/stats', authMiddleware, async (req, res) => {
   }
 });
 
+app.get('/api/admin/orders/sales-report.pdf', authMiddleware, async (req, res) => {
+  try {
+    const rawMonth = String(req.query.month ?? '').trim();
+    const monthValue = /^\d{4}-\d{2}$/.test(rawMonth)
+      ? rawMonth
+      : new Date().toISOString().slice(0, 7);
+    const [year, month] = monthValue.split('-').map(Number);
+    const from = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
+    const to = new Date(Date.UTC(year, month, 1, 0, 0, 0));
+
+    const [monthOrders] = await pool.query(
+      `SELECT id, order_number, status, customer_name, subtotal, tax_amount, shipping_cost, total, created_at
+       FROM orders
+       WHERE created_at >= ? AND created_at < ?
+       ORDER BY created_at ASC`,
+      [from, to]
+    );
+
+    const [monthTotalRows] = await pool.query(
+      `SELECT COUNT(*) AS orderCount,
+              COALESCE(SUM(subtotal), 0) AS subtotal,
+              COALESCE(SUM(tax_amount), 0) AS tax,
+              COALESCE(SUM(shipping_cost), 0) AS shipping,
+              COALESCE(SUM(total), 0) AS total
+       FROM orders
+       WHERE created_at >= ? AND created_at < ?`,
+      [from, to]
+    );
+
+    const [breakdownRows] = await pool.query(
+      `SELECT DATE_FORMAT(created_at, '%Y-%m') AS monthValue,
+              COUNT(*) AS orderCount,
+              COALESCE(SUM(total), 0) AS total
+       FROM orders
+       GROUP BY monthValue
+       ORDER BY monthValue ASC`
+    );
+
+    const [statusRows] = await pool.query(
+      `SELECT status, COUNT(*) AS orderCount, COALESCE(SUM(total), 0) AS total
+       FROM orders
+       WHERE created_at >= ? AND created_at < ?
+       GROUP BY status
+       ORDER BY status ASC`,
+      [from, to]
+    );
+
+    const [lineRefundRows] = await pool.query(
+      `SELECT o.id AS orderId, o.order_number AS orderNumber, oi.line_refund_amount AS amount,
+              oi.line_refund_status AS status, oi.stripe_refund_id AS reference,
+              COALESCE(oi.line_refund_at, o.created_at) AS createdAt
+       FROM order_items oi
+       INNER JOIN orders o ON o.id = oi.order_id
+       WHERE o.created_at >= ? AND o.created_at < ?
+         AND oi.line_refund_amount IS NOT NULL
+       ORDER BY createdAt ASC`,
+      [from, to]
+    );
+
+    const [orderRefundRows] = await pool.query(
+      `SELECT o.id AS orderId, o.order_number AS orderNumber, r.amount, r.status,
+              r.stripe_refund_id AS reference,
+              COALESCE(r.processed_at, r.created_at) AS createdAt
+       FROM order_refunds r
+       INNER JOIN orders o ON o.id = r.order_id
+       WHERE o.created_at >= ? AND o.created_at < ?
+       ORDER BY createdAt ASC`,
+      [from, to]
+    );
+
+    const monthlyBreakdown = breakdownRows.map((row) => {
+      const [y, m] = String(row.monthValue).split('-').map(Number);
+      const label = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-US', {
+        month: 'long',
+        year: 'numeric',
+      });
+      return {
+        monthValue: row.monthValue,
+        monthLabel: label,
+        orderCount: Number(row.orderCount) || 0,
+        total: Number(row.total) || 0,
+      };
+    });
+
+    const monthLabel = new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+    });
+
+    const statusBreakdown = statusRows.map((row) => ({
+      status: row.status || 'unknown',
+      orderCount: Number(row.orderCount) || 0,
+      total: Number(row.total) || 0,
+    }));
+
+    const refunds = [
+      ...lineRefundRows.map((row) => ({
+        type: 'Line-item',
+        status: row.status || 'pending',
+        amount: Number(row.amount) || 0,
+        createdAt: row.createdAt,
+        reference: row.reference || `${row.orderNumber} (line item)`,
+      })),
+      ...orderRefundRows.map((row) => ({
+        type: 'Order-level',
+        status: row.status || 'pending',
+        amount: Number(row.amount) || 0,
+        createdAt: row.createdAt,
+        reference: row.reference || `${row.orderNumber} (order refund)`,
+      })),
+    ];
+
+    const pdf = await buildMonthlySalesReportPdf({
+      monthLabel,
+      generatedAt: new Date().toISOString(),
+      monthTotals: monthTotalRows[0] ?? {
+        orderCount: 0,
+        subtotal: 0,
+        tax: 0,
+        shipping: 0,
+        total: 0,
+      },
+      monthOrders,
+      monthlyBreakdown,
+      statusBreakdown,
+      refunds,
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${monthlySalesReportFilename(monthValue)}"`);
+    res.send(pdf);
+  } catch (e) {
+    console.error('[sales-report] PDF failed:', e);
+    res.status(500).json({ error: 'Failed to generate monthly sales report' });
+  }
+});
+
 app.get('/api/admin/orders/:id/invoice.pdf', authMiddleware, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -2066,7 +2210,13 @@ app.get('/api/admin/orders/:id', authMiddleware, async (req, res) => {
     } catch (e) {
       if (e.code !== 'ER_NO_SUCH_TABLE') throw e;
     }
-    res.json({ order, items, customPayments });
+    let orderRefunds = [];
+    try {
+      orderRefunds = await listOrderRefunds(id);
+    } catch (e) {
+      if (e.code !== 'ER_NO_SUCH_TABLE') throw e;
+    }
+    res.json({ order, items, customPayments, orderRefunds });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to load order details' });
@@ -2221,6 +2371,7 @@ app.put('/api/admin/orders/:orderId/items/:itemId/quantity', authMiddleware, asy
       orderId: req.params.orderId,
       itemId: req.params.itemId,
       quantity: req.body?.quantity,
+      skipAutoRefund: req.body?.skipAutoRefund === true,
     });
     if (!result.ok) {
       return res.status(result.status ?? 400).json({ error: result.error });
@@ -2238,6 +2389,7 @@ app.put('/api/admin/orders/:orderId/items/:itemId/product', authMiddleware, asyn
       orderId: req.params.orderId,
       itemId: req.params.itemId,
       productId: req.body?.productId,
+      skipAutoRefund: req.body?.skipAutoRefund === true,
     });
     if (!result.ok) {
       return res.status(result.status ?? 400).json({ error: result.error });
@@ -2286,11 +2438,32 @@ app.post('/api/admin/orders/:orderId/items', authMiddleware, async (req, res) =>
   }
 });
 
+app.post(
+  '/api/admin/orders/:orderId/items/:itemId/remove-preview',
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const result = await previewRemoveOrderLineItem({
+        orderId: req.params.orderId,
+        itemId: req.params.itemId,
+      });
+      if (!result.ok) {
+        return res.status(result.status ?? 400).json({ error: result.error });
+      }
+      res.json(result);
+    } catch (e) {
+      console.error('[admin] remove line item preview failed:', e);
+      res.status(500).json({ error: e.message || 'Failed to preview line item removal' });
+    }
+  }
+);
+
 app.delete('/api/admin/orders/:orderId/items/:itemId', authMiddleware, async (req, res) => {
   try {
     const result = await removeOrderLineItem({
       orderId: req.params.orderId,
       itemId: req.params.itemId,
+      skipAutoRefund: req.body?.skipAutoRefund === true,
     });
     if (!result.ok) {
       return res.status(result.status ?? 400).json({ error: result.error });
@@ -2299,6 +2472,66 @@ app.delete('/api/admin/orders/:orderId/items/:itemId', authMiddleware, async (re
   } catch (e) {
     console.error('[admin] remove line item failed:', e);
     res.status(500).json({ error: e.message || 'Failed to remove line item' });
+  }
+});
+
+app.post(
+  '/api/admin/orders/:orderId/items/:itemId/record-refund',
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const result = await recordManualLineItemRefund({
+        orderId: req.params.orderId,
+        itemId: req.params.itemId,
+        stripeRefundId: req.body?.stripeRefundId,
+      });
+      if (!result.ok) {
+        return res.status(result.status ?? 400).json({ error: result.error });
+      }
+      res.json(result);
+    } catch (e) {
+      console.error('[admin] record line item refund failed:', e);
+      res.status(500).json({ error: e.message || 'Failed to record refund' });
+    }
+  }
+);
+
+app.post('/api/admin/orders/:orderId/refunds/:refundId/record', authMiddleware, async (req, res) => {
+  try {
+    const result = await recordManualOrderRefund({
+      refundRowId: req.params.refundId,
+      stripeRefundId: req.body?.stripeRefundId,
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    const orderId = result.orderId;
+    const [[order]] = await pool.query(
+      `SELECT id, order_number, status, customer_name, customer_email, customer_phone,
+              shipping_address1, shipping_address2, shipping_city, shipping_state, shipping_postal_code, shipping_country,
+              shipping_method, shipping_cost,
+              billing_name, billing_address1, billing_address2, billing_city, billing_state, billing_postal_code, billing_country,
+              card_last4, subtotal, tax_amount, total, created_at,
+              original_subtotal, original_tax_amount, original_total, order_adjusted_at,
+              tracking_carrier, tracking_number, tracking_notified_at, invoice_emailed_at,
+              label_from_name, label_from_address1, label_from_address2,
+              label_from_city, label_from_state, label_from_postal_code, label_from_country, label_from_phone,
+              stripe_payment_intent_id
+       FROM orders WHERE id = ?`,
+      [orderId]
+    );
+    const [items] = await pool.query(
+      `SELECT id, product_id, product_name, unit_price, quantity, line_total,
+              line_refund_amount, line_refund_status, stripe_refund_id, line_refund_at,
+              original_product_id, original_product_name, original_unit_price, original_line_total
+       FROM order_items WHERE order_id = ? ORDER BY id ASC`,
+      [orderId]
+    );
+    const orderRefunds = await listOrderRefunds(orderId);
+    res.json({ ok: true, order, items, orderRefunds });
+  } catch (e) {
+    console.error('[admin] record order refund failed:', e);
+    res.status(500).json({ error: e.message || 'Failed to record refund' });
   }
 });
 
@@ -2595,6 +2828,11 @@ async function startServer() {
     await ensureOrderAdjustmentColumns(pool);
   } catch (e) {
     console.error('[ensureOrderAdjustmentColumns]', e?.message || e);
+  }
+  try {
+    await ensureOrderRefundsTable(pool);
+  } catch (e) {
+    console.error('[ensureOrderRefundsTable]', e?.message || e);
   }
   try {
     await ensureProductEmailBlastsTable(pool);

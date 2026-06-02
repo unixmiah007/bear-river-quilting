@@ -135,6 +135,11 @@ function formatLineItemChangeMessage(result) {
       );
       if (adj.emailSent) parts.push('Customer notified by email.');
       else if (adj.emailError) parts.push(`Refund email failed: ${adj.emailError}`);
+    } else if (adj.refundStatus === 'pending' || adj.manualRequired) {
+      parts.push(
+        `Refund of ${formatPrice(adj.refundAmount)} is due (${formatPrice(adj.priorTotal)} → ${formatPrice(adj.newTotal)}). Issue it in Stripe, then mark it processed in order history.`
+      );
+      if (adj.warning) parts.push(adj.warning);
     } else if (adj.warning) {
       parts.push(adj.warning);
     }
@@ -205,19 +210,14 @@ function OrderLineItemRefundNote({ item, processing }) {
 
   if (amount == null || !status) return null;
 
-  if (status === 'pending') {
+  if (status === 'pending' || status === 'failed') {
     return (
       <span className="admin-order-item-refund admin-order-item-refund--pending">
-        Refund to issue: <strong>{formatPrice(amount)}</strong>
-      </span>
-    );
-  }
-
-  if (status === 'failed') {
-    return (
-      <span className="admin-order-item-refund admin-order-item-refund--failed">
-        Refund to issue: <strong>{formatPrice(amount)}</strong>
-        <span className="admin-order-item-refund__detail"> — not processed; issue manually in Stripe</span>
+        Refund due: <strong>{formatPrice(amount)}</strong>
+        <span className="admin-order-item-refund__detail">
+          {' '}
+          — issue in Stripe, then mark processed in order history
+        </span>
       </span>
     );
   }
@@ -281,6 +281,7 @@ export default function AdminOrders() {
   const [deleteOrderTarget, setDeleteOrderTarget] = useState(null);
   const [deleteOrderBusy, setDeleteOrderBusy] = useState(false);
   const [orderBalanceDue, setOrderBalanceDue] = useState(null);
+  const [recordRefundBusy, setRecordRefundBusy] = useState(null);
 
   const filteredOrders = useMemo(() => {
     const term = searchQuery.trim().toLowerCase();
@@ -537,7 +538,7 @@ export default function AdminOrders() {
     await refresh();
   }
 
-  async function changeLineItemProduct(itemId, productId) {
+  async function changeLineItemProduct(itemId, productId, skipAutoRefund = false) {
     if (!details?.order?.id) return;
     setItemProductBusy(itemId);
     setItemProductMsg(null);
@@ -546,7 +547,8 @@ export default function AdminOrders() {
       const result = await adminApi.updateOrderLineItemProduct(
         details.order.id,
         itemId,
-        productId
+        productId,
+        { skipAutoRefund }
       );
       await applyLineItemChangeResult(result);
     } catch (err) {
@@ -556,7 +558,7 @@ export default function AdminOrders() {
     }
   }
 
-  async function changeLineItemQuantity(itemId, quantity) {
+  async function changeLineItemQuantity(itemId, quantity, skipAutoRefund = false) {
     if (!details?.order?.id) return;
     setItemProductBusy(itemId);
     setItemProductMsg(null);
@@ -565,7 +567,8 @@ export default function AdminOrders() {
       const result = await adminApi.updateOrderLineItemQuantity(
         details.order.id,
         itemId,
-        quantity
+        quantity,
+        { skipAutoRefund }
       );
       await applyLineItemChangeResult(result);
     } catch (err) {
@@ -635,14 +638,72 @@ export default function AdminOrders() {
     setRefundConfirm(null);
   }
 
-  async function confirmRefundAndChangeLineItem() {
+  async function confirmRefundAndChangeLineItem({ skipAutoRefund = false } = {}) {
     if (!refundConfirm) return;
-    const { changeType, itemId } = refundConfirm;
+    const pending = { ...refundConfirm };
     setRefundConfirm(null);
-    if (changeType === 'quantity') {
-      await changeLineItemQuantity(itemId, refundConfirm.quantity);
+    if (pending.changeType === 'remove') {
+      await confirmRemoveLineItem(skipAutoRefund, {
+        id: pending.itemId,
+        name: pending.productName,
+      });
+      return;
+    }
+    if (pending.changeType === 'quantity') {
+      await changeLineItemQuantity(pending.itemId, pending.quantity, skipAutoRefund);
     } else {
-      await changeLineItemProduct(itemId, refundConfirm.productId);
+      await changeLineItemProduct(pending.itemId, pending.productId, skipAutoRefund);
+    }
+  }
+
+  async function recordLineItemRefund(itemId, body) {
+    if (!details?.order?.id) return;
+    setRecordRefundBusy(`item-${itemId}`);
+    setError(null);
+    try {
+      const result = await adminApi.recordOrderLineItemRefund(details.order.id, itemId, body);
+      setDetails((prev) =>
+        prev
+          ? {
+              ...prev,
+              order: result.order,
+              items: result.items,
+            }
+          : prev
+      );
+      setStatusForm('refunded');
+      setItemProductMsg(`Refund of ${formatPrice(result.refundAmount)} marked as processed.`);
+      await refresh();
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setRecordRefundBusy(null);
+    }
+  }
+
+  async function recordOrderRefund(refundId, body) {
+    if (!details?.order?.id) return;
+    setRecordRefundBusy(`refund-${refundId}`);
+    setError(null);
+    try {
+      const result = await adminApi.recordOrderRefund(details.order.id, refundId, body);
+      setDetails((prev) =>
+        prev
+          ? {
+              ...prev,
+              order: result.order,
+              items: result.items,
+              orderRefunds: result.orderRefunds,
+            }
+          : prev
+      );
+      setStatusForm('refunded');
+      setItemProductMsg('Refund marked as processed.');
+      await refresh();
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setRecordRefundBusy(null);
     }
   }
 
@@ -750,18 +811,48 @@ export default function AdminOrders() {
     }
   }
 
-  async function confirmRemoveLineItem() {
-    if (!removeItemTarget || !details?.order?.id) return;
+  async function requestRemoveLineItem(item) {
+    if (!details?.order?.id) return;
+    setItemProductPreviewBusy(item.id);
+    setError(null);
+    try {
+      const previewResult = await adminApi.previewRemoveOrderLineItem(details.order.id, item.id);
+      if (previewResult.requiresRefundConfirmation && previewResult.preview) {
+        setRefundConfirm({
+          changeType: 'remove',
+          itemId: item.id,
+          productName: item.product_name,
+          ...previewResult.preview,
+        });
+        return;
+      }
+      setRemoveItemTarget({ id: item.id, name: item.product_name });
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setItemProductPreviewBusy(null);
+    }
+  }
+
+  async function confirmRemoveLineItem(skipAutoRefund = false, targetOverride = null) {
+    const target = targetOverride ?? removeItemTarget;
+    if (!target?.id || !details?.order?.id) return;
     setRemoveItemBusy(true);
     setError(null);
     try {
-      const result = await adminApi.removeOrderLineItem(details.order.id, removeItemTarget.id);
+      const result = await adminApi.removeOrderLineItem(details.order.id, target.id, {
+        skipAutoRefund,
+      });
       setRemoveItemTarget(null);
       await loadDetails(details.order.id);
       const msg = result.removedProductName
         ? `Removed ${result.removedProductName} from the order. Totals updated.`
         : 'Line item removed.';
-      setItemProductMsg(result.warning ? `${msg} ${result.warning}` : msg);
+      const adjMsg = result.adjustment ? formatLineItemChangeMessage({ adjustment: result.adjustment }) : null;
+      setItemProductMsg([msg, adjMsg, result.warning].filter(Boolean).join(' '));
+      if (result.adjustment?.refundStatus === 'issued') {
+        setStatusForm('refunded');
+      }
       await refresh();
     } catch (err) {
       setError(err.body?.error || err.message);
@@ -1153,6 +1244,10 @@ export default function AdminOrders() {
             order={details.order}
             items={details.items}
             customPayments={details.customPayments}
+            orderRefunds={details.orderRefunds}
+            recordRefundBusy={recordRefundBusy}
+            onRecordLineItemRefund={recordLineItemRefund}
+            onRecordOrderRefund={recordOrderRefund}
           />
           <div className="table-wrap">
             <table className="admin-order-items-table">
@@ -1259,9 +1354,7 @@ export default function AdminOrders() {
                         type="button"
                         className="btn btn-danger btn--compact"
                         disabled={itemsSectionBusy}
-                        onClick={() =>
-                          setRemoveItemTarget({ id: it.id, name: it.product_name })
-                        }
+                        onClick={() => requestRemoveLineItem(it)}
                       >
                         Remove
                       </button>
@@ -1547,13 +1640,15 @@ export default function AdminOrders() {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 id="order-refund-confirm-title" className="confirm-dialog__title">
-              Issue refund?
+              {refundConfirm.changeType === 'remove' ? 'Remove item and issue refund?' : 'Issue refund?'}
             </h3>
             <div id="order-refund-confirm-desc" className="confirm-dialog__body">
               <p style={{ marginTop: 0 }}>
-                {refundConfirm.changeType === 'quantity'
-                  ? 'Lowering the quantity reduces the order total. A refund will be sent to the customer’s original payment method and they will be emailed.'
-                  : 'Changing this line item lowers the order total. A refund will be sent to the customer’s original payment method and they will be emailed.'}
+                {refundConfirm.changeType === 'remove'
+                  ? 'Removing this line item lowers the order total on a paid order. Choose how to handle the refund.'
+                  : refundConfirm.changeType === 'quantity'
+                    ? 'Lowering the quantity reduces the order total on a paid order. Choose how to handle the refund.'
+                    : 'Changing this line item lowers the order total on a paid order. Choose how to handle the refund.'}
               </p>
               <p style={{ margin: '0.75rem 0 0' }}>
                 <strong>Refund amount:</strong>{' '}
@@ -1584,13 +1679,23 @@ export default function AdminOrders() {
               </button>
               <button
                 type="button"
-                className="btn btn-danger"
-                onClick={confirmRefundAndChangeLineItem}
-                disabled={itemProductBusy != null}
+                className="btn"
+                onClick={() => confirmRefundAndChangeLineItem({ skipAutoRefund: true })}
+                disabled={itemProductBusy != null || removeItemBusy}
               >
-                {itemProductBusy != null
+                {removeItemBusy || itemProductBusy != null
                   ? 'Processing…'
-                  : `Refund ${formatPrice(refundConfirm.refundAmount)}`}
+                  : 'Apply — refund manually in Stripe'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => confirmRefundAndChangeLineItem({ skipAutoRefund: false })}
+                disabled={itemProductBusy != null || removeItemBusy}
+              >
+                {removeItemBusy || itemProductBusy != null
+                  ? 'Processing…'
+                  : `Refund ${formatPrice(refundConfirm.refundAmount)} in Stripe`}
               </button>
             </div>
           </div>

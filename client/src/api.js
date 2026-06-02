@@ -243,6 +243,35 @@ export const adminApi = {
     }),
   orders: () => apiJsonArray('/api/admin/orders'),
   orderById: (id) => api(`/api/admin/orders/${id}`),
+  downloadMonthlySalesReportPdf: async (monthValue) => {
+    const monthParam = String(monthValue ?? '').trim();
+    const q = monthParam ? `?month=${encodeURIComponent(monthParam)}` : '';
+    const res = await fetch(`/api/admin/orders/sales-report.pdf${q}`, {
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+      const err = new Error(data?.error || res.statusText || 'Failed to download sales report');
+      err.status = res.status;
+      err.body = data;
+      throw err;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sales-report-${monthParam || 'current-month'}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
   downloadOrderInvoicePdf: async (orderId, orderNumber) => {
     const res = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/invoice.pdf`, {
       credentials: 'include',
@@ -283,12 +312,12 @@ export const adminApi = {
         body: JSON.stringify({ productId }),
       }
     ),
-  updateOrderLineItemProduct: (orderId, itemId, productId) =>
+  updateOrderLineItemProduct: (orderId, itemId, productId, options = {}) =>
     api(
       `/api/admin/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}/product`,
       {
         method: 'PUT',
-        body: JSON.stringify({ productId }),
+        body: JSON.stringify({ productId, ...options }),
       }
     ),
   previewOrderLineItemQuantity: (orderId, itemId, quantity) =>
@@ -299,12 +328,12 @@ export const adminApi = {
         body: JSON.stringify({ quantity }),
       }
     ),
-  updateOrderLineItemQuantity: (orderId, itemId, quantity) =>
+  updateOrderLineItemQuantity: (orderId, itemId, quantity, options = {}) =>
     api(
       `/api/admin/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}/quantity`,
       {
         method: 'PUT',
-        body: JSON.stringify({ quantity }),
+        body: JSON.stringify({ quantity, ...options }),
       }
     ),
   previewAddOrderLineItem: (orderId, body) =>
@@ -317,10 +346,25 @@ export const adminApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  removeOrderLineItem: (orderId, itemId) =>
+  removeOrderLineItem: (orderId, itemId, options = {}) =>
     api(
       `/api/admin/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}`,
-      { method: 'DELETE', body: JSON.stringify({}) }
+      { method: 'DELETE', body: JSON.stringify(options) }
+    ),
+  previewRemoveOrderLineItem: (orderId, itemId) =>
+    api(
+      `/api/admin/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}/remove-preview`,
+      { method: 'POST', body: JSON.stringify({}) }
+    ),
+  recordOrderLineItemRefund: (orderId, itemId, body = {}) =>
+    api(
+      `/api/admin/orders/${encodeURIComponent(orderId)}/items/${encodeURIComponent(itemId)}/record-refund`,
+      { method: 'POST', body: JSON.stringify(body) }
+    ),
+  recordOrderRefund: (orderId, refundId, body = {}) =>
+    api(
+      `/api/admin/orders/${encodeURIComponent(orderId)}/refunds/${encodeURIComponent(refundId)}/record`,
+      { method: 'POST', body: JSON.stringify(body) }
     ),
   orderOutstandingBalance: (orderId) =>
     api(`/api/admin/orders/${encodeURIComponent(orderId)}/outstanding-balance`),

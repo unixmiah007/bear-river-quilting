@@ -74,6 +74,20 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [reportBusy, setReportBusy] = useState(false);
+
+  async function downloadMonthlySalesReport() {
+    setReportBusy(true);
+    setError(null);
+    try {
+      const monthValue = new Date().toISOString().slice(0, 7);
+      await adminApi.downloadMonthlySalesReportPdf(monthValue);
+    } catch (e) {
+      setError(e.body?.error || e.message);
+    } finally {
+      setReportBusy(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -118,6 +132,14 @@ export default function AdminDashboard() {
           >
             Launch stripe payment portal (Transaction history)
           </a>
+          <button
+            type="button"
+            className="admin-dashboard__report-link"
+            onClick={downloadMonthlySalesReport}
+            disabled={reportBusy}
+          >
+            {reportBusy ? 'Generating monthly sales report…' : 'Download monthly sales report'}
+          </button>
         </div>
         <div className="admin-dashboard__toggle" role="group" aria-label="Time grouping">
           {GRANULARITY_OPTIONS.map((opt) => (

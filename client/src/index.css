@@ -3743,6 +3743,24 @@ h2 {
   font-weight: 500;
 }
 
+.admin-dashboard__report-link {
+  margin-top: 0.5rem;
+  margin-left: 0.75rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.admin-dashboard__report-link:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
 .admin-dashboard__toggle {
   display: inline-flex;
   flex-wrap: wrap;
@@ -4695,6 +4713,31 @@ tr:last-child td {
 
 .admin-order-history__payment-link {
   font-size: 0.82rem;
+}
+
+.admin-order-history__refunds {
+  margin-top: 1rem;
+}
+
+.admin-order-refund-process {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.admin-order-refund-process__label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.admin-order-refund-process__label input {
+  min-width: 10rem;
+  font-size: 0.85rem;
 }
 
 .admin-order-item-original {
