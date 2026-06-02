@@ -176,6 +176,9 @@ export default function AdminProducts() {
   const [createBusy, setCreateBusy] = useState(false);
   const [createProgress, setCreateProgress] = useState(null);
   const [visibilityBusy, setVisibilityBusy] = useState(false);
+  const [productFormExpanded, setProductFormExpanded] = useState(false);
+  const [mediaGalleryExpanded, setMediaGalleryExpanded] = useState(false);
+  const [importCsvExpanded, setImportCsvExpanded] = useState(false);
 
   const filteredRows = useMemo(() => {
     const term = searchQuery.trim().toLowerCase();
@@ -297,6 +300,13 @@ export default function AdminProducts() {
     if (loading || editingId) return;
     loadNextSku();
   }, [loading, editingId, loadNextSku]);
+
+  useEffect(() => {
+    if (editingId) {
+      setProductFormExpanded(true);
+      setMediaGalleryExpanded(true);
+    }
+  }, [editingId]);
 
   useEffect(() => {
     if (!editingId) {
@@ -651,16 +661,35 @@ export default function AdminProducts() {
         id="admin-product-edit"
         className="admin-product-edit-section"
         aria-labelledby="admin-product-edit-heading"
+        style={{ marginBottom: '2rem' }}
       >
-      <AdminSectionTitle
-        as="h2"
-        id="admin-product-edit-heading"
-        icon={ProductEditIcon}
-        className="admin-section-title--h2"
-        style={{ marginTop: 0 }}
-      >
-        {editingId ? 'Edit product' : 'New product'}
-      </AdminSectionTitle>
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+        <AdminSectionTitle
+          as="h2"
+          id="admin-product-edit-heading"
+          icon={ProductEditIcon}
+          className="admin-section-title--h2"
+          style={{ marginTop: 0, marginBottom: 0 }}
+        >
+          {editingId ? 'Edit product' : 'New product'}
+        </AdminSectionTitle>
+        <button
+          type="button"
+          className="btn"
+          aria-expanded={productFormExpanded}
+          aria-controls="admin-product-form-panel"
+          onClick={() => setProductFormExpanded((v) => !v)}
+        >
+          {productFormExpanded ? 'Collapse' : 'Expand'}
+        </button>
+      </div>
+      {!productFormExpanded ? (
+        <p className="muted" style={{ marginTop: '0.6rem', marginBottom: 0 }}>
+          Expand to {editingId ? 'edit this product' : 'create a new product'}.
+        </p>
+      ) : null}
+      {productFormExpanded ? (
+      <div id="admin-product-form-panel">
       <form className="form admin-product-form" onSubmit={editingId ? onUpdate : onCreate}>
         <fieldset className="admin-product-form__fields" disabled={createBusy}>
         <div className="field">
@@ -904,149 +933,191 @@ export default function AdminProducts() {
       </form>
 
       <section className="card admin-gallery-section" style={{ marginTop: '1.5rem', marginBottom: '2rem' }}>
-        <AdminSectionTitle
-          as="h3"
-          icon={ProductImagesIcon}
-          className="admin-section-title--h3"
-          style={{ marginTop: 0 }}
-        >
-          Product images
-        </AdminSectionTitle>
-        {editingId ? (
-          <>
-            <p className="muted" style={{ marginTop: 0 }}>
-              Uploaded images appear on the public product page as a gallery. The first image in the
-              list is used as the thumbnail in product listings. You can upload directly, or pick
-              from the media gallery below (files are copied into this product&apos;s folder).
-            </p>
-            <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
-              <label className="btn" style={{ cursor: uploadBusy ? 'wait' : 'pointer' }}>
-                {uploadBusy ? 'Uploading…' : 'Browse images'}
-                <input
-                  type="file"
-                  accept={IMAGE_UPLOAD_ACCEPT}
-                  multiple
-                  disabled={uploadBusy}
-                  onChange={onGalleryFiles}
-                  style={{ display: 'none' }}
-                />
-              </label>
-            </div>
-            {galleryImages.length === 0 ? (
-              <p className="muted">
-                No images yet. Choose one or more files (JPEG, PNG, WebP, GIF, or iPhone HEIC — saved as
-                PNG).
-              </p>
-            ) : (
-              <div className="admin-gallery-strip">
-                {galleryImages.map((img) => (
-                  <div key={img.id} className="admin-gallery-thumb">
-                    <img src={img.url} alt="" />
-                    <button
-                      type="button"
-                      className="btn btn-danger"
-                      onClick={() => removeGalleryImage(img.id)}
-                      disabled={uploadBusy}
-                      aria-label="Remove image"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        ) : (
-          <p className="muted" style={{ marginTop: 0 }}>
-            Save a new product once (or click Edit on an existing row), then upload images or add them
-            from the media gallery below.
-          </p>
-        )}
-        <ProductMediaLibrary
-          productId={editingId}
-          disabled={uploadBusy}
-          onImagesAdded={(images) => {
-            gallerySyncGeneration.current += 1;
-            setGalleryImages(Array.isArray(images) ? images : []);
-            refresh();
-          }}
-          onError={(msg) => {
-            if (msg) setError(msg);
-          }}
-        />
-      </section>
-      </section>
-
-      <section className="card" style={{ marginBottom: '1.5rem' }}>
-        <AdminSectionTitle
-          as="h2"
-          icon={CsvImportIcon}
-          className="admin-section-title--h2"
-          style={{ marginTop: 0 }}
-        >
-          Import from CSV
-        </AdminSectionTitle>
-        <p className="muted" style={{ marginTop: 0 }}>
-          Download all products as CSV, edit in a spreadsheet, then upload. Required column on import:{' '}
-          <strong>name</strong> (or <strong>title</strong>). Use <strong>id</strong> or <strong>sku</strong>{' '}
-          to update existing rows; omit <strong>id</strong> for new products. Columns: id, sku, name,
-          description, price, stock_quantity, product_size (standard, small, large, x-large, xx-large,
-          xxx-large), image_url, is_published (1/0), is_featured (1/0).
-        </p>
-        <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
-          <label className="btn" style={{ cursor: importBusy ? 'wait' : 'pointer' }}>
-            {importBusy ? 'Importing…' : 'Choose CSV file'}
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              disabled={importBusy || exportCsvBusy}
-              onChange={onCsvFile}
-              style={{ display: 'none' }}
-            />
-          </label>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={downloadProductsCsv}
-            disabled={importBusy || exportCsvBusy || rows.length === 0}
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+          <AdminSectionTitle
+            as="h3"
+            icon={ProductImagesIcon}
+            className="admin-section-title--h3"
+            style={{ marginTop: 0, marginBottom: 0 }}
           >
-            {exportCsvBusy ? 'Preparing…' : 'Download CSV'}
-          </button>
+            Product images
+          </AdminSectionTitle>
           <button
             type="button"
             className="btn"
-            onClick={downloadCsvTemplate}
-            disabled={importBusy || exportCsvBusy}
+            aria-expanded={mediaGalleryExpanded}
+            aria-controls="admin-media-gallery-panel"
+            onClick={() => setMediaGalleryExpanded((v) => !v)}
           >
-            Download template
+            {mediaGalleryExpanded ? 'Collapse' : 'Expand'}
           </button>
         </div>
-        {importResult ? (
-          <div style={{ marginTop: '1rem' }}>
-            <p>
-              <strong>{importResult.created}</strong> created,{' '}
-              <strong>{importResult.updated}</strong> updated.
-            </p>
-            {importResult.errors?.length > 0 ? (
-              <div className="table-wrap" style={{ marginTop: '0.5rem' }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Line</th>
-                      <th>SKU</th>
-                      <th>Message</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {importResult.errors.map((err, i) => (
-                      <tr key={i}>
-                        <td>{err.line}</td>
-                        <td>{err.sku ?? '—'}</td>
-                        <td>{err.message}</td>
-                      </tr>
+        {!mediaGalleryExpanded ? (
+          <p className="muted" style={{ marginTop: '0.6rem', marginBottom: 0 }}>
+            Expand to upload product images and manage the media gallery.
+          </p>
+        ) : null}
+        {mediaGalleryExpanded ? (
+          <div id="admin-media-gallery-panel">
+            {editingId ? (
+              <>
+                <p className="muted" style={{ marginTop: 0 }}>
+                  Uploaded images appear on the public product page as a gallery. The first image in the
+                  list is used as the thumbnail in product listings. You can upload directly, or pick
+                  from the media gallery below (files are copied into this product&apos;s folder).
+                </p>
+                <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                  <label className="btn" style={{ cursor: uploadBusy ? 'wait' : 'pointer' }}>
+                    {uploadBusy ? 'Uploading…' : 'Browse images'}
+                    <input
+                      type="file"
+                      accept={IMAGE_UPLOAD_ACCEPT}
+                      multiple
+                      disabled={uploadBusy}
+                      onChange={onGalleryFiles}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                </div>
+                {galleryImages.length === 0 ? (
+                  <p className="muted">
+                    No images yet. Choose one or more files (JPEG, PNG, WebP, GIF, or iPhone HEIC — saved as
+                    PNG).
+                  </p>
+                ) : (
+                  <div className="admin-gallery-strip">
+                    {galleryImages.map((img) => (
+                      <div key={img.id} className="admin-gallery-thumb">
+                        <img src={img.url} alt="" />
+                        <button
+                          type="button"
+                          className="btn btn-danger"
+                          onClick={() => removeGalleryImage(img.id)}
+                          disabled={uploadBusy}
+                          aria-label="Remove image"
+                        >
+                          ×
+                        </button>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="muted" style={{ marginTop: 0 }}>
+                Save a new product once (or click Edit on an existing row), then upload images or add them
+                from the media gallery below.
+              </p>
+            )}
+            <ProductMediaLibrary
+              productId={editingId}
+              disabled={uploadBusy}
+              onImagesAdded={(images) => {
+                gallerySyncGeneration.current += 1;
+                setGalleryImages(Array.isArray(images) ? images : []);
+                refresh();
+              }}
+              onError={(msg) => {
+                if (msg) setError(msg);
+              }}
+            />
+          </div>
+        ) : null}
+      </section>
+      </div>
+      ) : null}
+      </section>
+
+      <section className="card" style={{ marginBottom: '1.5rem' }}>
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+          <AdminSectionTitle
+            as="h2"
+            icon={CsvImportIcon}
+            className="admin-section-title--h2"
+            style={{ marginTop: 0, marginBottom: 0 }}
+          >
+            Import from CSV
+          </AdminSectionTitle>
+          <button
+            type="button"
+            className="btn"
+            aria-expanded={importCsvExpanded}
+            aria-controls="admin-import-csv-panel"
+            onClick={() => setImportCsvExpanded((v) => !v)}
+          >
+            {importCsvExpanded ? 'Collapse' : 'Expand'}
+          </button>
+        </div>
+        {!importCsvExpanded ? (
+          <p className="muted" style={{ marginTop: '0.6rem', marginBottom: 0 }}>
+            Expand to import products from CSV or download templates/exports.
+          </p>
+        ) : null}
+        {importCsvExpanded ? (
+          <div id="admin-import-csv-panel">
+            <p className="muted" style={{ marginTop: 0 }}>
+              Download all products as CSV, edit in a spreadsheet, then upload. Required column on import:{' '}
+              <strong>name</strong> (or <strong>title</strong>). Use <strong>id</strong> or <strong>sku</strong>{' '}
+              to update existing rows; omit <strong>id</strong> for new products. Columns: id, sku, name,
+              description, price, stock_quantity, product_size (standard, small, large, x-large, xx-large,
+              xxx-large), image_url, is_published (1/0), is_featured (1/0).
+            </p>
+            <div className="row" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
+              <label className="btn" style={{ cursor: importBusy ? 'wait' : 'pointer' }}>
+                {importBusy ? 'Importing…' : 'Choose CSV file'}
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  disabled={importBusy || exportCsvBusy}
+                  onChange={onCsvFile}
+                  style={{ display: 'none' }}
+                />
+              </label>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={downloadProductsCsv}
+                disabled={importBusy || exportCsvBusy || rows.length === 0}
+              >
+                {exportCsvBusy ? 'Preparing…' : 'Download CSV'}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={downloadCsvTemplate}
+                disabled={importBusy || exportCsvBusy}
+              >
+                Download template
+              </button>
+            </div>
+            {importResult ? (
+              <div style={{ marginTop: '1rem' }}>
+                <p>
+                  <strong>{importResult.created}</strong> created,{' '}
+                  <strong>{importResult.updated}</strong> updated.
+                </p>
+                {importResult.errors?.length > 0 ? (
+                  <div className="table-wrap" style={{ marginTop: '0.5rem' }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Line</th>
+                          <th>SKU</th>
+                          <th>Message</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importResult.errors.map((err, i) => (
+                          <tr key={i}>
+                            <td>{err.line}</td>
+                            <td>{err.sku ?? '—'}</td>
+                            <td>{err.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
