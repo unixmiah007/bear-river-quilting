@@ -21,6 +21,7 @@ function formatBlastTime(value) {
 }
 
 export default function AdminProductEmailBlast({ products, editingId }) {
+  const [expanded, setExpanded] = useState(false);
   const [productId, setProductId] = useState('');
   const [recipients, setRecipients] = useState('');
   const [message, setMessage] = useState('');
@@ -104,15 +105,33 @@ export default function AdminProductEmailBlast({ products, editingId }) {
 
   return (
     <section className="admin-product-email-blast card" aria-labelledby="admin-email-blast-heading">
-      <AdminSectionTitle
-        as="h2"
-        id="admin-email-blast-heading"
-        icon={EmailBlastIcon}
-        className="admin-section-title--h2"
-        style={{ marginTop: 0 }}
-      >
-        Email blast
-      </AdminSectionTitle>
+      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+        <AdminSectionTitle
+          as="h2"
+          id="admin-email-blast-heading"
+          icon={EmailBlastIcon}
+          className="admin-section-title--h2"
+          style={{ marginTop: 0, marginBottom: 0 }}
+        >
+          Email blast
+        </AdminSectionTitle>
+        <button
+          type="button"
+          className="btn"
+          aria-expanded={expanded}
+          aria-controls="admin-email-blast-panel"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? 'Collapse' : 'Expand'}
+        </button>
+      </div>
+      {!expanded ? (
+        <p className="muted admin-product-email-blast__intro" style={{ marginTop: '0.6rem', marginBottom: 0 }}>
+          Expand to send a product email blast and view recent blast history.
+        </p>
+      ) : null}
+      {expanded ? (
+        <div id="admin-email-blast-panel">
       <p className="muted admin-product-email-blast__intro">
         Email a product link with thumbnail and details to a list of recipients. Paste one email
         address per line (commas and semicolons also work). Each message links to the product page
@@ -252,6 +271,8 @@ export default function AdminProductEmailBlast({ products, editingId }) {
               ))}
             </ul>
           )}
+        </div>
+      ) : null}
         </div>
       ) : null}
     </section>
