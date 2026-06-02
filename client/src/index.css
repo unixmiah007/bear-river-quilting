@@ -4035,6 +4035,41 @@ h2 {
   line-height: 1.1;
 }
 
+.admin-products-table table {
+  width: 100%;
+  min-width: 1080px;
+}
+
+.admin-products-table th,
+.admin-products-table td {
+  padding: 0.45rem 0.5rem;
+  font-size: 0.86rem;
+  vertical-align: middle;
+}
+
+.admin-products-table th:nth-child(8),
+.admin-products-table td:nth-child(8),
+.admin-products-table th:nth-child(9),
+.admin-products-table td:nth-child(9) {
+  white-space: nowrap;
+}
+
+.admin-products-table td:nth-child(9) .btn {
+  padding: 0.42rem 0.62rem;
+}
+
+.admin-products-table td:nth-child(9) .row {
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+}
+
+.admin-products-table td:nth-child(9) .btn {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.76rem;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
 .admin-comm-unread-dot {
   display: inline-block;
   width: 0.5rem;

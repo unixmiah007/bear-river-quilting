@@ -42,7 +42,7 @@ const emptyForm = {
 
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
 
-const SORTABLE_COLUMNS = ['sku', 'name', 'size', 'price', 'stock', 'published', 'created_at'];
+const SORTABLE_COLUMNS = ['sku', 'name', 'size', 'price', 'stock', 'published', 'updated_at'];
 
 function getSortValue(product, key) {
   switch (key) {
@@ -58,8 +58,8 @@ function getSortValue(product, key) {
       return Number(product.stock_quantity) || 0;
     case 'published':
       return product.is_published ? 1 : 0;
-    case 'created_at':
-      return product.created_at ? new Date(product.created_at).getTime() : 0;
+    case 'updated_at':
+      return product.updated_at ? new Date(product.updated_at).getTime() : 0;
     default:
       return '';
   }
@@ -166,8 +166,8 @@ export default function AdminProducts() {
   const editSectionRef = useRef(null);
   const [pageSize, setPageSize] = useState(15);
   const [page, setPage] = useState(1);
-  const [sortKey, setSortKey] = useState('name');
-  const [sortDir, setSortDir] = useState('asc');
+  const [sortKey, setSortKey] = useState('updated_at');
+  const [sortDir, setSortDir] = useState('desc');
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -1173,8 +1173,8 @@ export default function AdminProducts() {
                 onSort={handleSort}
               />
               <SortableTh
-                label="Created At"
-                column="created_at"
+                label="Updated At"
+                column="updated_at"
                 sortKey={sortKey}
                 sortDir={sortDir}
                 onSort={handleSort}
@@ -1250,7 +1250,7 @@ export default function AdminProducts() {
                     </div>
                   </td>
                   <td className="muted" style={{ whiteSpace: 'nowrap' }}>
-                    {formatCreatedAt(p.created_at)}
+                    {formatCreatedAt(p.updated_at)}
                   </td>
                   <td>
                     <div className="row" style={{ justifyContent: 'flex-end' }}>
