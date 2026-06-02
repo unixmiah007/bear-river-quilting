@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom';
 
-export default function AdminLayoutNavLink({ to, children, badge }) {
+export default function AdminLayoutNavLink({ to, children, badge, onClick }) {
   return (
     <NavLink
       className={({ isActive }) => `pill admin-layout-nav-link${isActive ? ' active' : ''}`}
       to={to}
+      onClick={onClick}
     >
       <span className="admin-layout-nav-link__label">{children}</span>
       {badge ? (

@@ -114,6 +114,7 @@ import {
 } from './lib/sendOrderBalancePaymentLink.js';
 import { ensureOrderAdjustmentColumns } from './lib/ensureOrderAdjustmentColumns.js';
 import { getAdminNavBadgeCounts } from './lib/adminNavBadgeCounts.js';
+import { getOrderStats } from './lib/orderStats.js';
 import { lookupCustomerCustomQuiltRequests } from './lib/customQuiltCustomerLookup.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1969,6 +1970,24 @@ app.get('/api/admin/orders', authMiddleware, async (_req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to list orders' });
+  }
+});
+
+app.get('/api/admin/orders/stats', authMiddleware, async (req, res) => {
+  try {
+    const result = await getOrderStats(pool, {
+      granularity: req.query.granularity,
+      from: req.query.from,
+      to: req.query.to,
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    const { ok: _ok, status: _status, error: _error, ...stats } = result;
+    res.json(stats);
+  } catch (e) {
+    console.error('[admin/orders/stats]', e);
+    res.status(500).json({ error: 'Failed to load order stats' });
   }
 });
 

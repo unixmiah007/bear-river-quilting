@@ -18,6 +18,7 @@ const TypesOfQuilting = lazy(() => import('./pages/TypesOfQuilting.jsx'));
 const Customize = lazy(() => import('./pages/Customize.jsx'));
 const CustomizeSuccess = lazy(() => import('./pages/CustomizeSuccess.jsx'));
 const AdminLogin = lazy(() => import('./pages/AdminLogin.jsx'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
 const AdminPages = lazy(() => import('./pages/AdminPages.jsx'));
 const AdminProducts = lazy(() => import('./pages/AdminProducts.jsx'));
 const AdminCategories = lazy(() => import('./pages/AdminCategories.jsx'));
@@ -149,7 +150,15 @@ export default function App() {
         }
       />
       <Route element={<AdminLayout />}>
-        <Route path="/admin" element={<Navigate to="/admin/pages" replace />} />
+        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+        <Route
+          path="/admin/dashboard"
+          element={
+            <SuspenseRoute>
+              <AdminDashboard />
+            </SuspenseRoute>
+          }
+        />
         <Route
           path="/admin/pages"
           element={

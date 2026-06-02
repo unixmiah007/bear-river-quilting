@@ -233,6 +233,8 @@ export const adminApi = {
     const q = params.toString();
     return api(`/api/admin/nav-badge-counts${q ? `?${q}` : ''}`);
   },
+  orderStats: (granularity = 'day') =>
+    api(`/api/admin/orders/stats?granularity=${encodeURIComponent(granularity)}`),
   communications: () => apiJsonArray('/api/admin/communications'),
   markOrderMessagesRead: (orderId) =>
     api(`/api/admin/orders/${encodeURIComponent(orderId)}/messages/mark-read`, {

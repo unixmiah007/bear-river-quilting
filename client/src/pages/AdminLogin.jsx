@@ -1,17 +1,39 @@
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { authApi } from '../api.js';
+
+function resolveAdminRedirect(fromState) {
+  if (!fromState?.pathname) return '/admin/dashboard';
+  const path = `${fromState.pathname}${fromState.search || ''}`;
+  if (path === '/admin/login' || path === '/admin' || path === '/admin/') {
+    return '/admin/dashboard';
+  }
+  return path;
+}
 
 export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [session, setSession] = useState({ loading: true, authenticated: false });
   const navigate = useNavigate();
   const location = useLocation();
-  const fromState = location.state?.from;
-  const from = fromState
-    ? `${fromState.pathname || '/admin'}${fromState.search || ''}`
-    : '/admin/pages';
+  const from = resolveAdminRedirect(location.state?.from);
+
+  useEffect(() => {
+    let cancelled = false;
+    authApi
+      .me()
+      .then((r) => {
+        if (!cancelled) setSession({ loading: false, authenticated: !!r?.authenticated });
+      })
+      .catch(() => {
+        if (!cancelled) setSession({ loading: false, authenticated: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function onSubmit(e) {
     e.preventDefault();
@@ -25,6 +47,14 @@ export default function AdminLogin() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (session.loading) {
+    return null;
+  }
+
+  if (session.authenticated) {
+    return <Navigate to="/admin/dashboard" replace />;
   }
 
   return (

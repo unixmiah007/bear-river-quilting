@@ -119,7 +119,7 @@ export default function Home() {
             <p className="page-body">
               Explore curated quilt collections built for comfort, character, and clean bedroom
               styling. Each page has a unique look and product mix that you can edit in{' '}
-              <Link to="/admin/login">Admin</Link>.
+              <Link to="/admin/dashboard">Admin</Link>.
             </p>
             <div className="row">
               <Link className="btn btn-primary" to="/p/heritage-quilts">

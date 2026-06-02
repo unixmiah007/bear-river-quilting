@@ -13,7 +13,7 @@ export function AdminSessionBanner() {
         Signed in as site admin
       </span>
       <span className="admin-session-banner__actions">
-        <Link className="btn btn-primary admin-session-banner__btn" to="/admin/pages">
+        <Link className="btn btn-primary admin-session-banner__btn" to="/admin/dashboard">
           Admin dashboard
         </Link>
         <button type="button" className="btn admin-session-banner__btn" onClick={() => signOut()}>

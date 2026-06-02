@@ -9,7 +9,7 @@ export default function AdminNavLink({ onNavigate }) {
 
   return (
     <NavLink
-      to="/admin/pages"
+      to={isAdmin ? '/admin/dashboard' : '/admin/login'}
       onClick={onNavigate}
       className={() =>
         `nav-link-admin${active ? ' nav-link-admin--active' : ''}${isAdmin ? ' nav-link-admin--signed-in' : ''}`
