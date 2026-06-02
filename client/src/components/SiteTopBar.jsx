@@ -3,6 +3,7 @@ import {
   SUPPORT_PHONE_DISPLAY,
   SUPPORT_PHONE_TEL,
 } from '../lib/siteContact.js';
+import SocialShareIcons from './SocialShareIcons.jsx';
 
 function MailIcon() {
   return (
@@ -33,9 +34,9 @@ function PhoneIcon() {
 
 export default function SiteTopBar() {
   return (
-    <div className="site-top-bar" role="region" aria-label="Contact and hours">
+    <div className="site-top-bar" role="region" aria-label="Contact and social share">
       <div className="site-top-bar__inner">
-        <p className="site-top-bar__hours">Hours of operation: M-F 7am-7pm EST</p>
+        <SocialShareIcons className="site-top-bar__social" />
         <div className="site-top-bar__contact">
           <a className="site-top-bar__link" href={`mailto:${SUPPORT_EMAIL}`}>
             <MailIcon />
