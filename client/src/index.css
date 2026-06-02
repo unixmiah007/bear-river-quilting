@@ -3539,6 +3539,39 @@ h2 {
   gap: 0.65rem;
 }
 
+.admin-refresh-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid #f59e0b;
+  background: linear-gradient(90deg, #fff7ed 0%, #fffbeb 100%);
+}
+
+.admin-refresh-link {
+  border: none;
+  background: transparent;
+  color: #c2410c;
+  font-weight: 700;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.admin-refresh-control__label {
+  font-size: 0.75rem;
+  color: #92400e;
+}
+
+.admin-refresh-control__select {
+  font-size: 0.75rem;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  padding: 0.15rem 0.45rem;
+  background: #ffffff;
+  color: #7c2d12;
+}
+
 .admin-top__desktop {
   display: flex;
   align-items: center;
@@ -3698,6 +3731,10 @@ h2 {
   }
 
   .admin-top__session {
+    display: none;
+  }
+
+  .admin-refresh-control {
     display: none;
   }
 }

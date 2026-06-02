@@ -10,6 +10,18 @@ import {
   setAdminLastVisited,
 } from '../lib/adminNavVisit.js';
 
+const REFRESH_OPTIONS = [
+  { value: '5s', label: 'Every 5 seconds', ms: 5_000 },
+  { value: '10s', label: 'Every 10 seconds', ms: 10_000 },
+  { value: '20s', label: 'Every 20 seconds', ms: 20_000 },
+  { value: '1m', label: 'Every 1 minute', ms: 60_000 },
+  { value: '5m', label: 'Every 5 minutes', ms: 5 * 60_000 },
+  { value: '10m', label: 'Every 10 minutes', ms: 10 * 60_000 },
+  { value: '15m', label: 'Every 15 minutes', ms: 15 * 60_000 },
+  { value: '20m', label: 'Every 20 minutes', ms: 20 * 60_000 },
+  { value: '30m', label: 'Every 30 minutes', ms: 30 * 60_000 },
+];
+
 async function signOut() {
   await authApi.logout();
   window.location.href = '/admin/login';
@@ -83,6 +95,7 @@ function AdminNav({ badges, className = 'admin-nav', onNavigate }) {
 export default function AdminLayout() {
   const [state, setState] = useState({ loading: true, ok: false });
   const [menuOpen, setMenuOpen] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState('off');
   const [navBadges, setNavBadges] = useState({
     orders: 0,
     customizeRequests: 0,
@@ -156,6 +169,34 @@ export default function AdminLayout() {
     return () => window.clearInterval(timer);
   }, [state.ok, location.pathname, refreshNavBadges]);
 
+  useEffect(() => {
+    const stored = String(window.localStorage.getItem('adminAutoRefreshInterval') || 'off');
+    if (REFRESH_OPTIONS.some((opt) => opt.value === stored)) {
+      setRefreshInterval(stored);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (refreshInterval === 'off' || !state.ok) return undefined;
+    const selected = REFRESH_OPTIONS.find((opt) => opt.value === refreshInterval);
+    if (!selected) return undefined;
+    const timer = window.setInterval(() => {
+      window.location.reload();
+    }, selected.ms);
+    return () => window.clearInterval(timer);
+  }, [refreshInterval, state.ok]);
+
+  function onRefreshIntervalChange(value) {
+    const next = String(value || 'off');
+    if (next !== 'off' && !REFRESH_OPTIONS.some((opt) => opt.value === next)) return;
+    setRefreshInterval(next);
+    if (next !== 'off') {
+      window.localStorage.setItem('adminAutoRefreshInterval', next);
+    } else {
+      window.localStorage.removeItem('adminAutoRefreshInterval');
+    }
+  }
+
   if (state.loading) {
     return (
       <div className="admin-shell">
@@ -180,6 +221,32 @@ export default function AdminLayout() {
               <span className="admin-session-dot" aria-hidden="true" />
               Admin signed in
             </span>
+            <div className="admin-refresh-control">
+              <button
+                type="button"
+                className="admin-refresh-link"
+                onClick={() => window.location.reload()}
+              >
+                Refresh page
+              </button>
+              <label htmlFor="admin-refresh-interval" className="admin-refresh-control__label">
+                Auto
+              </label>
+              <select
+                id="admin-refresh-interval"
+                className="admin-refresh-control__select"
+                value={refreshInterval}
+                onChange={(e) => onRefreshIntervalChange(e.target.value)}
+                aria-label="Auto refresh interval"
+              >
+                <option value="off">Off</option>
+                {REFRESH_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <button
               type="button"
               className={`admin-menu-toggle${menuOpen ? ' is-open' : ''}`}
