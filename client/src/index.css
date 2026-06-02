@@ -2116,6 +2116,7 @@ h2 {
 /* Homepage — promote /customize */
 .customize-promo {
   margin-top: 2.25rem;
+  margin-bottom: 1.25rem;
 }
 
 .customize-promo__inner {
@@ -2292,43 +2293,93 @@ h2 {
   text-transform: uppercase;
 }
 
-.customize-promo__swatches {
+.customize-promo__featured {
   position: absolute;
   left: 1rem;
   bottom: 1rem;
-  display: flex;
-  gap: 0.35rem;
+  right: 1rem;
   z-index: 2;
+  padding: 0.7rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(17, 17, 17, 0.58);
+  color: #ffffff;
+  backdrop-filter: blur(3px);
 }
 
-.customize-promo__swatch {
-  width: 3.25rem;
-  height: 3.25rem;
+.customize-promo__featured-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.customize-promo__featured-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.customize-promo__featured-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  color: #ffffff;
+  text-decoration: none;
+  padding: 0.2rem 0.1rem;
+  border-radius: 8px;
+}
+
+.customize-promo__featured-item:hover {
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.customize-promo__featured-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.customize-promo__featured-thumb {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 6px;
   object-fit: cover;
-  border-radius: 10px;
-  border: 2px solid #ffffff;
-  box-shadow: 0 8px 20px rgba(17, 17, 17, 0.18);
-  transition: transform 0.25s ease;
+  object-position: center;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
 }
 
-.customize-promo__swatch--1 {
-  transform: rotate(-6deg) translateY(4px);
+.customize-promo__featured-name {
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 15rem;
 }
 
-.customize-promo__swatch--2 {
-  transform: rotate(2deg);
+.customize-promo__featured-price {
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-.customize-promo__swatch--3 {
-  transform: rotate(8deg) translateY(-2px);
-}
+@media (max-width: 640px) {
+  .customize-promo__featured {
+    left: 0.7rem;
+    right: 0.7rem;
+    bottom: 0.7rem;
+    padding: 0.6rem 0.65rem;
+  }
 
-.customize-promo__swatch--4 {
-  transform: rotate(-3deg) translateY(6px);
-}
-
-.customize-promo__visual:hover .customize-promo__swatch {
-  transform: translateY(-4px) rotate(0deg);
+  .customize-promo__featured-name {
+    max-width: 10.5rem;
+  }
 }
 
 .featured {

@@ -110,6 +110,8 @@ export default function Home() {
 
   return (
     <>
+      <CustomizePromoBanner />
+
       <section className="hero hero--quilt-bg">
         <HomeHeroBackdrop variant="home" />
         <div className="hero-grid hero__content">
@@ -184,8 +186,6 @@ export default function Home() {
           </div>
         </article>
       </section>
-
-      <CustomizePromoBanner />
 
       <section className="featured best-sellers">
         <div className="featured-head">

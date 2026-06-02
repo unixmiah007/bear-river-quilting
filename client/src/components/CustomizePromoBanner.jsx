@@ -1,10 +1,26 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { publicApi } from '../api.js';
 import { QUILT_STUDIO_IMAGE } from '../lib/quiltAssets.js';
-import { QUILT_DESIGN_PALETTE } from '../lib/quiltDesignPalette.js';
-
-const PREVIEW_DESIGNS = QUILT_DESIGN_PALETTE.slice(0, 4);
 
 export default function CustomizePromoBanner() {
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await publicApi.featuredProducts();
+        if (!cancelled) setFeaturedProducts(Array.isArray(rows) ? rows.slice(0, 3) : []);
+      } catch {
+        if (!cancelled) setFeaturedProducts([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <section className="customize-promo" aria-labelledby="customize-promo-heading">
       <div className="customize-promo__inner">
@@ -77,18 +93,42 @@ export default function CustomizePromoBanner() {
               decoding="async"
             />
             <span className="customize-promo__badge">New</span>
-          </div>
-          <div className="customize-promo__swatches" aria-hidden="true">
-            {PREVIEW_DESIGNS.map((design, index) => (
-              <img
-                key={design.id}
-                className={`customize-promo__swatch customize-promo__swatch--${index + 1}`}
-                src={design.image}
-                alt=""
-                loading="lazy"
-                decoding="async"
-              />
-            ))}
+            {featuredProducts.length > 0 ? (
+              <div className="customize-promo__featured" aria-label="Featured products">
+                <p className="customize-promo__featured-title">Featured products</p>
+                <ul className="customize-promo__featured-list">
+                  {featuredProducts.map((product) => (
+                    <li key={product.id}>
+                      <Link
+                        to={`/products/${encodeURIComponent(product.id)}`}
+                        className="customize-promo__featured-item"
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`View ${product.name}`}
+                      >
+                        <span className="customize-promo__featured-main">
+                          {product.image_url ? (
+                            <img
+                              className="customize-promo__featured-thumb"
+                              src={product.image_url}
+                              alt=""
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          ) : null}
+                          <span className="customize-promo__featured-name">{product.name}</span>
+                        </span>
+                        <span className="customize-promo__featured-price">
+                          {new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency: 'USD',
+                          }).format(Number(product.price) || 0)}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         </Link>
       </div>
