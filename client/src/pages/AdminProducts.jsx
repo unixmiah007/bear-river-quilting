@@ -450,6 +450,7 @@ export default function AdminProducts() {
     e.preventDefault();
     setError(null);
     try {
+      const productId = editingId;
       const pricePayload = sizePricesFormToPayload(form.size_prices);
       await adminApi.updateProduct(editingId, {
         ...form,
@@ -460,8 +461,7 @@ export default function AdminProducts() {
         is_featured: !!form.is_featured,
       });
       await saveProductCategories(editingId);
-      resetNewProductForm();
-      await refresh();
+      navigate(`/products/${encodeURIComponent(productId)}`);
     } catch (err) {
       setError(err.body?.error || err.message);
     }
