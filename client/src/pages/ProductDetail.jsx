@@ -18,6 +18,10 @@ function formatPrice(n) {
   );
 }
 
+function normalizeDiscountPercent(raw) {
+  return Math.max(0, Math.min(100, Math.floor(Number(raw) || 0)));
+}
+
 export default function ProductDetail() {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
@@ -108,6 +112,9 @@ export default function ProductDetail() {
   const displayPrice = product
     ? resolveProductPrice(product, sizeReady ? selectedSize : 'small')
     : 0;
+  const discountPercent = normalizeDiscountPercent(product?.discount_percent);
+  const discountedDisplayPrice =
+    discountPercent > 0 ? displayPrice * (1 - discountPercent / 100) : displayPrice;
 
   function handleAddToCart(e) {
     e.preventDefault();
@@ -186,6 +193,11 @@ export default function ProductDetail() {
         <div>
           <div className="product-detail-title-row">
             <h1>{product.name}</h1>
+            {discountPercent > 0 ? (
+              <span className="product-detail-discount-badge" aria-label={`${discountPercent}% off`}>
+                {discountPercent}% OFF
+              </span>
+            ) : null}
           </div>
           <div className="product-detail-secondary-actions">
             <FavoriteProductButton productId={product.id} productName={product.name} />
@@ -226,9 +238,16 @@ export default function ProductDetail() {
                 </p>
               ) : null}
             </div>
-            <div className="price" style={{ fontSize: '1.35rem', marginBottom: '1rem' }}>
-              {formatPrice(displayPrice)}
-            </div>
+            {discountPercent > 0 ? (
+              <div className="product-detail-price" style={{ marginBottom: '1rem' }}>
+                <span className="product-detail-price__now">{formatPrice(discountedDisplayPrice)}</span>
+                <span className="product-detail-price__original">{formatPrice(displayPrice)}</span>
+              </div>
+            ) : (
+              <div className="price" style={{ fontSize: '1.35rem', marginBottom: '1rem' }}>
+                {formatPrice(displayPrice)}
+              </div>
+            )}
             {product.description ? (
               <div
                 className="page-body cms-rich-content"

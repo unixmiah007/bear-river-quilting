@@ -22,6 +22,9 @@ export default function ProductCard({
   const detailPath = `/products/${product.id}`;
   const customizePath = `/customize?product=${encodeURIComponent(product.id)}`;
   const tripleActions = showShare && showCustomize;
+  const discountPercent = Math.max(0, Math.min(100, Math.floor(Number(product.discount_percent) || 0)));
+  const basePrice = Number(product.price) || 0;
+  const discountedPrice = basePrice * (1 - discountPercent / 100);
 
   return (
     <article
@@ -35,8 +38,13 @@ export default function ProductCard({
           className="featured-card__favorite"
         />
       ) : null}
-      <Link className="featured-card__body" to={detailPath}>
+      <Link className="featured-card__body" to={detailPath} style={{ position: 'relative' }}>
         <ProductImage src={product.image_url} alt={product.name} />
+        {discountPercent > 0 ? (
+          <span className="product-card-discount-badge" aria-label={`${discountPercent}% off`}>
+            {discountPercent}% OFF
+          </span>
+        ) : null}
         {badge}
         <h3>{product.name}</h3>
         {formatProductSizeLabel(product.product_size) ? (
@@ -47,7 +55,14 @@ export default function ProductCard({
         {product.description ? (
           <p className="muted product-card__description">{stripRichHtml(product.description)}</p>
         ) : null}
-        <div className="price">{formatPrice(product.price)}</div>
+        {discountPercent > 0 ? (
+          <div className="product-card-price">
+            <span className="product-card-price__now">{formatPrice(discountedPrice)}</span>
+            <span className="product-card-price__original">{formatPrice(basePrice)}</span>
+          </div>
+        ) : (
+          <div className="price">{formatPrice(product.price)}</div>
+        )}
       </Link>
       <div
         className={`row card-actions${tripleActions ? ' card-actions--triple' : ''}`}

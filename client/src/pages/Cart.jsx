@@ -13,7 +13,7 @@ function formatPrice(n) {
 
 export default function Cart() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { items, updateQty, removeItem, total } = useCart();
+  const { items, updateQty, removeItem, total, getDiscountedUnitPrice } = useCart();
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState(1);
@@ -45,6 +45,14 @@ export default function Cart() {
   const shippingCost = shippingCosts[form.shippingMethod] ?? 9.99;
   const taxAmount = Number((total * 0.0825).toFixed(2));
   const grandTotal = Number((total + shippingCost + taxAmount).toFixed(2));
+
+  function lineOriginalTotal(item) {
+    return Number(item.price) * item.quantity;
+  }
+
+  function hasDiscount(item) {
+    return Math.max(0, Math.min(100, Math.floor(Number(item.discount_percent) || 0)) ) > 0;
+  }
 
   useEffect(() => {
     if (searchParams.get('checkout') !== 'cancelled') return;
@@ -217,7 +225,18 @@ export default function Cart() {
                         <span className="muted">—</span>
                       )}
                     </td>
-                    <td className="cart-table-num">{formatPrice(it.price)}</td>
+                    <td className="cart-table-num">
+                      {hasDiscount(it) ? (
+                        <div className="cart-price-stack">
+                          <span className="cart-price-stack__now">
+                            {formatPrice(getDiscountedUnitPrice(it))}
+                          </span>
+                          <span className="cart-price-stack__original">{formatPrice(it.price)}</span>
+                        </div>
+                      ) : (
+                        formatPrice(it.price)
+                      )}
+                    </td>
                     <td>
                       <input
                         id={`qty-${it.key}`}
@@ -231,7 +250,18 @@ export default function Cart() {
                       />
                     </td>
                     <td className="cart-table-num cart-line-total">
-                      {formatPrice(Number(it.price) * it.quantity)}
+                      {hasDiscount(it) ? (
+                        <div className="cart-price-stack">
+                          <span className="cart-price-stack__now">
+                            {formatPrice(getDiscountedUnitPrice(it) * it.quantity)}
+                          </span>
+                          <span className="cart-price-stack__original">
+                            {formatPrice(lineOriginalTotal(it))}
+                          </span>
+                        </div>
+                      ) : (
+                        formatPrice(Number(it.price) * it.quantity)
+                      )}
                     </td>
                     <td>
                       <button

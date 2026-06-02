@@ -186,6 +186,22 @@ function parseProductSizeInput(body) {
   return { ok: true, value: v };
 }
 
+function parseDiscountPercentInput(body) {
+  const raw = body?.discount_percent ?? body?.discountPercent;
+  if (raw === undefined || raw === null || String(raw).trim() === '') {
+    return { ok: true, value: 0 };
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n)) {
+    return { ok: false, error: 'discount_percent must be a number between 0 and 100' };
+  }
+  const value = Math.floor(n);
+  if (value < 0 || value > 100) {
+    return { ok: false, error: 'discount_percent must be between 0 and 100' };
+  }
+  return { ok: true, value };
+}
+
 function slugify(input) {
   return String(input)
     .trim()
@@ -373,7 +389,7 @@ app.get('/api/products', async (req, res) => {
         return res.json([]);
       }
       const [rows] = await pool.query(
-        `SELECT p.id, p.name, p.description, p.price, p.size_prices, p.image_url, p.stock_quantity, p.product_size
+        `SELECT p.id, p.name, p.description, p.price, p.size_prices, p.image_url, p.stock_quantity, p.product_size, p.discount_percent
          FROM products p
          INNER JOIN product_category_products pcp ON pcp.product_id = p.id
          WHERE pcp.category_id = ? AND p.is_published = 1
@@ -383,7 +399,7 @@ app.get('/api/products', async (req, res) => {
       return res.json(hydrateProductRows(rows));
     }
     const [rows] = await pool.query(
-      `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size
+      `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size, discount_percent
        FROM products
        WHERE is_published = 1
        ORDER BY updated_at DESC, name ASC`
@@ -408,7 +424,7 @@ app.get('/api/products', async (req, res) => {
 app.get('/api/products/featured', async (_req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size
+      `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size, discount_percent
        FROM products
        WHERE is_published = 1 AND is_featured = 1
        ORDER BY updated_at DESC, name ASC
@@ -420,7 +436,7 @@ app.get('/api/products/featured', async (_req, res) => {
     if (isMissingProductColumnError(e)) {
       try {
         const [rows] = await pool.query(
-          `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size
+          `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size, discount_percent
            FROM products
            WHERE is_published = 1
            ORDER BY updated_at DESC, name ASC
@@ -440,7 +456,7 @@ app.get('/api/products/featured', async (_req, res) => {
 app.get('/api/products/best-sellers', async (_req, res) => {
   try {
     const [ranked] = await pool.query(
-      `SELECT p.id, p.name, p.description, p.price, p.size_prices, p.image_url, p.stock_quantity, p.product_size,
+      `SELECT p.id, p.name, p.description, p.price, p.size_prices, p.image_url, p.stock_quantity, p.product_size, p.discount_percent,
               agg.units_sold AS units_sold
        FROM products p
        INNER JOIN (
@@ -457,7 +473,7 @@ app.get('/api/products/best-sellers', async (_req, res) => {
       return res.json(hydrateProductRows(ranked));
     }
     const [fallback] = await pool.query(
-      `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size, NULL AS units_sold
+      `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size, discount_percent, NULL AS units_sold
        FROM products
        WHERE is_published = 1
        ORDER BY updated_at DESC, name ASC
@@ -469,7 +485,7 @@ app.get('/api/products/best-sellers', async (_req, res) => {
     if (e.code === 'ER_NO_SUCH_TABLE') {
       try {
         const [rows] = await pool.query(
-          `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size, NULL AS units_sold
+          `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size, discount_percent, NULL AS units_sold
            FROM products
            WHERE is_published = 1
            ORDER BY updated_at DESC, name ASC
@@ -495,7 +511,7 @@ app.get('/api/products/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid product id' });
     }
     const [[row]] = await pool.query(
-      `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size, updated_at
+      `SELECT id, name, description, price, size_prices, image_url, stock_quantity, product_size, discount_percent, updated_at
        FROM products
        WHERE id = ? AND is_published = 1`,
       [id]
@@ -1171,7 +1187,7 @@ app.post('/api/admin/products/import', authMiddleware, async (req, res) => {
 app.get('/api/admin/products', authMiddleware, async (_req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, sku, name, description, price, size_prices, stock_quantity, product_size, image_url, is_published, is_featured, created_at, updated_at FROM products ORDER BY name ASC'
+      'SELECT id, sku, name, description, price, size_prices, stock_quantity, product_size, image_url, is_published, is_featured, discount_percent, created_at, updated_at FROM products ORDER BY name ASC'
     );
     res.json(hydrateProductRows(rows));
   } catch (e) {
@@ -1203,7 +1219,7 @@ app.get('/api/admin/products/by-id/:id', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Invalid product id' });
     }
     const [[product]] = await pool.query(
-      `SELECT id, sku, name, description, price, size_prices, stock_quantity, product_size, image_url, is_published, is_featured, updated_at
+      `SELECT id, sku, name, description, price, size_prices, stock_quantity, product_size, image_url, is_published, is_featured, discount_percent, updated_at
        FROM products WHERE id = ?`,
       [id]
     );
@@ -1495,7 +1511,16 @@ app.post('/api/admin/products/:id/images/from-library', authMiddleware, async (r
 
 app.post('/api/admin/products', authMiddleware, async (req, res) => {
   try {
-    const { name, description, image_url, is_published, is_featured, sku, stock_quantity, product_size } =
+    const {
+      name,
+      description,
+      image_url,
+      is_published,
+      is_featured,
+      sku,
+      stock_quantity,
+      product_size,
+    } =
       req.body ?? {};
     if (!name) {
       return res.status(400).json({ error: 'name is required' });
@@ -1508,10 +1533,14 @@ app.post('/api/admin/products', authMiddleware, async (req, res) => {
     if (!sizeParsed.ok) {
       return res.status(400).json({ error: sizeParsed.error });
     }
+    const discountParsed = parseDiscountPercentInput(req.body);
+    if (!discountParsed.ok) {
+      return res.status(400).json({ error: discountParsed.error });
+    }
     const skuVal = sku != null && String(sku).trim() !== '' ? String(sku).trim().slice(0, 64) : null;
     const stock = Math.max(0, Math.min(9999999, Math.floor(Number(stock_quantity) || 0)));
     const [result] = await pool.query(
-      'INSERT INTO products (name, description, price, size_prices, image_url, is_published, is_featured, sku, stock_quantity, product_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO products (name, description, price, size_prices, image_url, is_published, is_featured, discount_percent, sku, stock_quantity, product_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         name,
         description ?? null,
@@ -1520,6 +1549,7 @@ app.post('/api/admin/products', authMiddleware, async (req, res) => {
         image_url ?? null,
         is_published ? 1 : 0,
         is_featured ? 1 : 0,
+        discountParsed.value,
         skuVal,
         stock,
         sizeParsed.value,
@@ -1600,7 +1630,16 @@ app.put('/api/admin/products/:id/categories', authMiddleware, async (req, res) =
 app.put('/api/admin/products/:id', authMiddleware, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { name, description, image_url, is_published, is_featured, sku, stock_quantity, product_size } =
+    const {
+      name,
+      description,
+      image_url,
+      is_published,
+      is_featured,
+      sku,
+      stock_quantity,
+      product_size,
+    } =
       req.body ?? {};
     if (!name) {
       return res.status(400).json({ error: 'name is required' });
@@ -1613,10 +1652,14 @@ app.put('/api/admin/products/:id', authMiddleware, async (req, res) => {
     if (!sizeParsed.ok) {
       return res.status(400).json({ error: sizeParsed.error });
     }
+    const discountParsed = parseDiscountPercentInput(req.body);
+    if (!discountParsed.ok) {
+      return res.status(400).json({ error: discountParsed.error });
+    }
     const skuVal = sku != null && String(sku).trim() !== '' ? String(sku).trim().slice(0, 64) : null;
     const stock = Math.max(0, Math.min(9999999, Math.floor(Number(stock_quantity) || 0)));
     const [result] = await pool.query(
-      'UPDATE products SET name = ?, description = ?, price = ?, size_prices = ?, image_url = ?, is_published = ?, is_featured = ?, sku = ?, stock_quantity = ?, product_size = ? WHERE id = ?',
+      'UPDATE products SET name = ?, description = ?, price = ?, size_prices = ?, image_url = ?, is_published = ?, is_featured = ?, discount_percent = ?, sku = ?, stock_quantity = ?, product_size = ? WHERE id = ?',
       [
         name,
         description ?? null,
@@ -1625,6 +1668,7 @@ app.put('/api/admin/products/:id', authMiddleware, async (req, res) => {
         image_url ?? null,
         is_published ? 1 : 0,
         is_featured ? 1 : 0,
+        discountParsed.value,
         skuVal,
         stock,
         sizeParsed.value,

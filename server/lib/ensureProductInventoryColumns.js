@@ -38,6 +38,11 @@ export async function ensureProductInventoryColumns(conn) {
       'ALTER TABLE products ADD COLUMN is_published TINYINT(1) NOT NULL DEFAULT 0'
     );
   }
+  if (!(await columnExists(conn, 'products', 'discount_percent'))) {
+    await conn.query(
+      'ALTER TABLE products ADD COLUMN discount_percent TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER is_featured'
+    );
+  }
   if (!(await indexExists(conn, 'products', 'uk_products_sku'))) {
     await conn.query('ALTER TABLE products ADD UNIQUE KEY uk_products_sku (sku)');
   }

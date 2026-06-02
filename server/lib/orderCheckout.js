@@ -15,6 +15,10 @@ function productNameWithSize(name, productSize) {
   return `${name} (${label})`;
 }
 
+function normalizeDiscountPercent(raw) {
+  return Math.max(0, Math.min(100, Math.floor(Number(raw) || 0)));
+}
+
 export function orderNumber() {
   return `Q${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 900 + 100)}`;
 }
@@ -54,7 +58,7 @@ export async function buildCheckoutFromBody(conn, body) {
   }
 
   const [products] = await conn.query(
-    `SELECT id, name, price, size_prices FROM products WHERE is_published = 1 AND id IN (${productIds
+    `SELECT id, name, price, size_prices, discount_percent FROM products WHERE is_published = 1 AND id IN (${productIds
       .map(() => '?')
       .join(',')})`,
     productIds
@@ -77,12 +81,15 @@ export async function buildCheckoutFromBody(conn, body) {
       };
     }
     const unitPrice = resolveProductPrice(product, productSize);
+    const discountPercent = normalizeDiscountPercent(product.discount_percent);
+    const discountedUnitPrice =
+      discountPercent > 0 ? Number((unitPrice * (1 - discountPercent / 100)).toFixed(2)) : unitPrice;
     normalizedItems.push({
       productId,
       productName: productNameWithSize(product.name, productSize),
-      unitPrice,
+      unitPrice: discountedUnitPrice,
       quantity,
-      lineTotal: unitPrice * quantity,
+      lineTotal: discountedUnitPrice * quantity,
     });
   }
   if (normalizedItems.length === 0) {

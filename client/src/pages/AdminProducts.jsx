@@ -37,6 +37,7 @@ const emptyForm = {
   image_url: '',
   is_published: true,
   is_featured: false,
+  discount_percent: '0',
 };
 
 const PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
@@ -124,6 +125,7 @@ function productSearchText(product) {
     sizeLabel,
     product.product_size,
     String(product.price ?? ''),
+    `${Number(product.discount_percent ?? 0)}%`,
     formatPrice(product.price),
     published,
     featured,
@@ -384,6 +386,7 @@ export default function AdminProducts() {
       image_url: p.image_url ?? '',
       is_published: !!p.is_published,
       is_featured: !!p.is_featured,
+      discount_percent: String(Number(p.discount_percent ?? 0)),
     });
   }, []);
 
@@ -754,6 +757,22 @@ export default function AdminProducts() {
             onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))}
             placeholder="External https://… or leave empty if you use uploads"
           />
+        </div>
+        <div className="field">
+          <label htmlFor="discount_percent">Discount percent (optional)</label>
+          <input
+            id="discount_percent"
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            value={form.discount_percent}
+            onChange={(e) => setForm((f) => ({ ...f, discount_percent: e.target.value }))}
+            placeholder="0"
+          />
+          <p className="muted" style={{ margin: '0.35rem 0 0', fontSize: '0.82rem' }}>
+            Set a value like 10 or 20 to show an “OFF” badge on storefront product cards.
+          </p>
         </div>
         <fieldset
           className="field admin-category-field admin-visibility-field"

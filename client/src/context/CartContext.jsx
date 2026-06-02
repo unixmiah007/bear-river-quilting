@@ -11,10 +11,12 @@ export function cartLineKey(productId, productSize) {
 function normalizeStoredItem(item) {
   const productId = item.productId;
   const product_size = item.product_size ?? null;
+  const discount_percent = Math.max(0, Math.min(100, Math.floor(Number(item.discount_percent) || 0)));
   return {
     ...item,
     productId,
     product_size,
+    discount_percent,
     key: item.key ?? cartLineKey(productId, product_size),
   };
 }
@@ -38,6 +40,16 @@ export function CartProvider({ children }) {
   }, [items]);
 
   const api = useMemo(() => {
+    function getDiscountedUnitPrice(item) {
+      const base = Number(item.price) || 0;
+      const discountPercent = Math.max(
+        0,
+        Math.min(100, Math.floor(Number(item.discount_percent) || 0))
+      );
+      if (discountPercent <= 0) return base;
+      return Number((base * (1 - discountPercent / 100)).toFixed(2));
+    }
+
     function addItem(product, quantity = 1) {
       const qty = Math.max(1, Math.min(99, Number(quantity) || 1));
       const product_size = product.product_size ?? null;
@@ -52,6 +64,10 @@ export function CartProvider({ children }) {
               productId: product.id,
               name: product.name,
               price: Number(product.price),
+              discount_percent: Math.max(
+                0,
+                Math.min(100, Math.floor(Number(product.discount_percent) || 0))
+              ),
               image_url: product.image_url ?? null,
               product_size,
               quantity: qty,
@@ -78,9 +94,9 @@ export function CartProvider({ children }) {
     }
 
     const itemCount = items.reduce((sum, x) => sum + x.quantity, 0);
-    const total = items.reduce((sum, x) => sum + Number(x.price) * x.quantity, 0);
+    const total = items.reduce((sum, x) => sum + getDiscountedUnitPrice(x) * x.quantity, 0);
 
-    return { items, addItem, updateQty, removeItem, clearCart, itemCount, total };
+    return { items, addItem, updateQty, removeItem, clearCart, itemCount, total, getDiscountedUnitPrice };
   }, [items]);
 
   return <CartContext.Provider value={api}>{children}</CartContext.Provider>;
