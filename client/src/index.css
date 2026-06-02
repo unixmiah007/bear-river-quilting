@@ -856,6 +856,15 @@ button {
   gap: 0.35rem 1rem;
 }
 
+.site-footer-utility-nav {
+  justify-content: center;
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 0.35rem 1.25rem;
+}
+
 .site-sticky-bar {
   margin-top: auto;
   flex-shrink: 0;

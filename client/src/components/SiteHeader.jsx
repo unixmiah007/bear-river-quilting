@@ -11,6 +11,7 @@ export function SiteNav({
   className,
   categories = [],
   showLegalLinks = false,
+  showUtilityLinks = true,
   onNavigate,
   'aria-label': ariaLabel,
 }) {
@@ -45,6 +46,21 @@ export function SiteNav({
           </NavLink>
         </>
       ) : null}
+      {showUtilityLinks ? (
+        <>
+          <CartNavLink onNavigate={onNavigate} />
+          <AccountNavLink onNavigate={onNavigate} />
+          <AdminNavLink onNavigate={onNavigate} />
+        </>
+      ) : null}
+    </nav>
+  );
+}
+
+/** Cart, account, and admin — footer bottom row only. */
+export function SiteFooterUtilityNav({ onNavigate }) {
+  return (
+    <nav className="nav site-footer-utility-nav" aria-label="Account and cart">
       <CartNavLink onNavigate={onNavigate} />
       <AccountNavLink onNavigate={onNavigate} />
       <AdminNavLink onNavigate={onNavigate} />

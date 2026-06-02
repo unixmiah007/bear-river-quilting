@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import SiteHeroBanner from '../components/SiteHeroBanner.jsx';
-import SiteHeader, { SiteFooterPageLinks, SiteNav } from '../components/SiteHeader.jsx';
+import SiteHeader, { SiteFooterPageLinks, SiteFooterUtilityNav, SiteNav } from '../components/SiteHeader.jsx';
 import SiteStickyBar from '../components/SiteStickyBar.jsx';
 import SiteTopBar from '../components/SiteTopBar.jsx';
 import { AdminSessionBanner } from '../components/AdminSessionIndicator.jsx';
@@ -71,8 +71,14 @@ export default function SiteLayout() {
           mainContent
         )}
         <footer className="site-footer">
-          <SiteNav className="nav site-footer-nav" showLegalLinks aria-label="Footer navigation" />
+          <SiteNav
+            className="nav site-footer-nav"
+            showLegalLinks
+            showUtilityLinks={false}
+            aria-label="Footer navigation"
+          />
           <SiteFooterPageLinks pages={pages} />
+          <SiteFooterUtilityNav />
         </footer>
       </div>
       <SiteStickyBar />
