@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import BrandLogo from './BrandLogo.jsx';
 import AcceptedPaymentMethods from './AcceptedPaymentMethods.jsx';
+import SocialShareIcons from './SocialShareIcons.jsx';
 import SslTrustBadge from './SslTrustBadge.jsx';
 import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL } from '../lib/siteContact.js';
 
@@ -27,9 +28,12 @@ export default function SiteStickyBar() {
               © {year} Bear River Quilting. All rights reserved.
             </p>
           </div>
-          <p className="site-sticky-bar__phone">
-            <a href={`tel:${SUPPORT_PHONE_TEL}`}>{SUPPORT_PHONE_DISPLAY}</a>
-          </p>
+          <div className="site-sticky-bar__contact-col">
+            <p className="site-sticky-bar__phone">
+              <a href={`tel:${SUPPORT_PHONE_TEL}`}>{SUPPORT_PHONE_DISPLAY}</a>
+            </p>
+            <SocialShareIcons className="site-sticky-bar__social" />
+          </div>
         </div>
         <div className="site-sticky-bar__hours">
           <p className="site-sticky-bar__hours-label">Customer care hours (Eastern Standard Time)</p>
