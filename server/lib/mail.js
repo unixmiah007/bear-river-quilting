@@ -56,21 +56,16 @@ export async function sendOrderConfirmationEmail({ to, orderNumber, customerName
     .trim()
     .toLowerCase();
   if (!toAddr || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toAddr)) {
-    console.error('[mail] Invalid customer email for confirmation:', to);
-    return;
+    throw new Error(`Invalid customer email for order confirmation: ${to}`);
   }
 
   if (!isSendGridConfigured()) {
-    console.warn('[mail] Skipping confirmation: SENDGRID_API_KEY is not set in server/.env');
-    return;
+    throw new Error('SendGrid is not configured — set SENDGRID_API_KEY in server/.env');
   }
 
   const from = resolveSendGridFromCustomer();
   if (!from) {
-    console.error(
-      '[mail] Skipping confirmation: set MAIL_FROM_ADDRESS or MAIL_FROM to a verified SendGrid sender (same as mail:test).'
-    );
-    return;
+    throw new Error('Set MAIL_FROM_ADDRESS or MAIL_FROM to a verified SendGrid sender');
   }
 
   const orderStatusUrl = buildCustomerOrderAccountUrl(toAddr, orderNumber);
