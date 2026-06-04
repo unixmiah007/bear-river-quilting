@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
 import { getLongArmServiceDetailByPath } from '../lib/longArmServiceDetailContent.js';
+import { longArmQuiltingRequestUrl } from '../lib/longArmServicePages.js';
 
 export default function LongArmServiceDetail() {
   const { pathname } = useLocation();
@@ -33,6 +34,7 @@ export default function LongArmServiceDetail() {
 
   const heroSrc = cardImageUrl || detail.heroImage;
   const heroAlt = detail.heroImageAlt || detail.title;
+  const requestUrl = longArmQuiltingRequestUrl(detail.slug);
 
   return (
     <article className="legal-page long-arm-service-detail">
@@ -41,7 +43,7 @@ export default function LongArmServiceDetail() {
         <h1>{detail.title}</h1>
         <p className="page-body long-arm-service-detail__intro">{detail.intro}</p>
         <div className="row" style={{ marginTop: '1.25rem' }}>
-          <Link className="btn btn-primary" to="/long-arm-quilting">
+          <Link className="btn btn-primary" to={requestUrl}>
             Request this service
           </Link>
           <Link className="btn" to="/long-arm-quilting">
@@ -84,7 +86,7 @@ export default function LongArmServiceDetail() {
         <section className="long-arm-service-detail__cta card">
           <h2>Get started</h2>
           <p className="page-body">{detail.cta}</p>
-          <Link className="btn btn-primary" to="/long-arm-quilting">
+          <Link className="btn btn-primary" to={requestUrl}>
             {detail.ctaButton}
           </Link>
         </section>

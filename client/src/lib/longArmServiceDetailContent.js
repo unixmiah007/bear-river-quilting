@@ -507,3 +507,9 @@ export function longArmServiceDetailPath(slug) {
   if (!slug) return null;
   return LONG_ARM_SERVICE_DETAIL_PATHS[slug] ?? null;
 }
+
+/** Opens the long-arm request wizard with a service pre-selected. */
+export function longArmQuiltingRequestUrl(serviceSlug) {
+  if (!serviceSlug) return '/long-arm-quilting';
+  return `/long-arm-quilting?service=${encodeURIComponent(serviceSlug)}`;
+}

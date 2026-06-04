@@ -233,6 +233,29 @@ export default function LongArmQuilting() {
   }, []);
 
   useEffect(() => {
+    const serviceSlug = searchParams.get('service')?.trim();
+    if (!serviceSlug || loading || services.length === 0) return;
+
+    const svc = services.find((s) => s.slug === serviceSlug);
+    if (!svc) return;
+
+    setError(null);
+    setSelectedServiceId(svc.id);
+    setQuiltSource('');
+    setSelectedBlanketId(null);
+    setWizardOpen(true);
+    setStep(1);
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('service');
+    setSearchParams(next, { replace: true });
+
+    requestAnimationFrame(() => {
+      document.querySelector('.long-arm-wizard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [loading, services, searchParams, setSearchParams]);
+
+  useEffect(() => {
     if (!wizardOpen) return undefined;
     let cancelled = false;
     publicApi
