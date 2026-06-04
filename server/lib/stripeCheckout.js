@@ -3,6 +3,7 @@ import pool from '../db.js';
 import { buildCheckoutFromBody, insertPendingOrder } from './orderCheckout.js';
 import { sendOrderConfirmationEmail, sendOrderStaffNotificationEmail } from './mail.js';
 import { fulfillCustomQuiltFromStripeSession } from './customQuiltStripeCheckout.js';
+import { fulfillLongArmFromStripeSession } from './longArmQuiltingStripeCheckout.js';
 import { fulfillCustomOrderPaymentFromStripeSession } from './customOrderPayment.js';
 import { clientOriginPath } from './clientOrigin.js';
 
@@ -205,8 +206,12 @@ export async function fulfillStripeCheckoutSession(sessionId) {
   }
 
   const customQuiltId = Number(session.metadata?.custom_quilt_request_id);
-  if (customQuiltId) {
+  if (customQuiltId && session.metadata?.checkout_type !== 'long_arm_quilting') {
     return fulfillCustomQuiltFromStripeSession(session);
+  }
+
+  if (session.metadata?.checkout_type === 'long_arm_quilting') {
+    return fulfillLongArmFromStripeSession(session);
   }
 
   const orderId = Number(session.metadata?.order_id);

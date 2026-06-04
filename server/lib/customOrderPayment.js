@@ -89,7 +89,12 @@ export async function sendCustomPaymentLinkEmail({
   }
 
   const isCustomQuilt = referenceType === 'custom_quilt';
-  const subjectNoun = isCustomQuilt ? 'custom quilt request' : 'order';
+  const isLongArm = referenceType === 'long_arm';
+  const subjectNoun = isLongArm
+    ? 'long-arm quilting request'
+    : isCustomQuilt
+      ? 'custom quilt request'
+      : 'order';
   const amountLine = formatUsd(amount);
   const noteBlock = adminNote ? `\n\nNote from our team:\n${adminNote}\n` : '';
 
@@ -152,6 +157,7 @@ async function createStripePaymentSession({
   paymentNumber,
   orderId,
   customQuiltRequestId,
+  longArmRequestId,
   adminNote,
   paymentPurpose,
 }) {
@@ -163,6 +169,7 @@ async function createStripePaymentSession({
   };
   if (orderId) metadata.order_id = String(orderId);
   if (customQuiltRequestId) metadata.custom_quilt_request_id = String(customQuiltRequestId);
+  if (longArmRequestId) metadata.long_arm_request_id = String(longArmRequestId);
   metadata.order_number = referenceNumber;
   if (paymentPurpose) metadata.payment_purpose = paymentPurpose;
 
@@ -175,9 +182,11 @@ async function createStripePaymentSession({
           currency: 'usd',
           product_data: {
             name:
-              referenceType === 'custom_quilt'
-                ? `Custom quilt ${referenceNumber} — payment`
-                : `Order ${referenceNumber} — payment`,
+              referenceType === 'long_arm'
+                ? `Long-arm quilting ${referenceNumber} — final payment`
+                : referenceType === 'custom_quilt'
+                  ? `Custom quilt ${referenceNumber} — payment`
+                  : `Order ${referenceNumber} — payment`,
             description: lineDescription,
           },
           unit_amount: amountCents,
@@ -186,13 +195,17 @@ async function createStripePaymentSession({
       },
     ],
     success_url:
-      referenceType === 'custom_quilt'
-        ? `${clientOriginPath('/customize/success')}?session_id={CHECKOUT_SESSION_ID}`
-        : `${clientOriginPath('/checkout/success')}?session_id={CHECKOUT_SESSION_ID}`,
+      referenceType === 'long_arm'
+        ? `${clientOriginPath('/long-arm-quilting/success')}?session_id={CHECKOUT_SESSION_ID}`
+        : referenceType === 'custom_quilt'
+          ? `${clientOriginPath('/customize/success')}?session_id={CHECKOUT_SESSION_ID}`
+          : `${clientOriginPath('/checkout/success')}?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url:
-      referenceType === 'custom_quilt'
-        ? clientOriginPath('/customize')
-        : `${clientOriginPath('/account')}?email=${encodeURIComponent(customerEmail)}`,
+      referenceType === 'long_arm'
+        ? clientOriginPath('/long-arm-quilting')
+        : referenceType === 'custom_quilt'
+          ? clientOriginPath('/customize')
+          : `${clientOriginPath('/account')}?email=${encodeURIComponent(customerEmail)}`,
     metadata,
   });
 }
@@ -204,6 +217,7 @@ export async function createCustomOrderPayment({ orderId, amount, adminNote, sen
 export async function createCustomPayment({
   orderId,
   customQuiltRequestId,
+  longArmRequestId,
   amount,
   adminNote,
   sendEmail = true,
@@ -216,8 +230,10 @@ export async function createCustomPayment({
 
   const hasOrder = orderId != null && Number(orderId) > 0;
   const hasCustomQuilt = customQuiltRequestId != null && Number(customQuiltRequestId) > 0;
-  if (hasOrder === hasCustomQuilt) {
-    return { ok: false, status: 400, error: 'Select exactly one shop order or custom quilt request' };
+  const hasLongArm = longArmRequestId != null && Number(longArmRequestId) > 0;
+  const refCount = [hasOrder, hasCustomQuilt, hasLongArm].filter(Boolean).length;
+  if (refCount !== 1) {
+    return { ok: false, status: 400, error: 'Select exactly one shop order, custom quilt request, or long-arm request' };
   }
 
   const amountNum = Number(amount);
@@ -232,6 +248,7 @@ export async function createCustomPayment({
   let sourceStatus;
   let resolvedOrderId = null;
   let resolvedCustomQuiltId = null;
+  let resolvedLongArmId = null;
 
   if (hasOrder) {
     const id = Number(orderId);
@@ -249,7 +266,7 @@ export async function createCustomPayment({
     customerEmail = order.customer_email;
     sourceStatus = order.status;
     resolvedOrderId = order.id;
-  } else {
+  } else if (hasCustomQuilt) {
     const id = Number(customQuiltRequestId);
     const [[request]] = await pool.query(
       `SELECT id, request_number, status, design_name, customer_name, customer_email, estimated_price
@@ -265,6 +282,25 @@ export async function createCustomPayment({
     customerEmail = request.customer_email;
     sourceStatus = request.status;
     resolvedCustomQuiltId = request.id;
+  } else {
+    const id = Number(longArmRequestId);
+    const [[request]] = await pool.query(
+      `SELECT id, request_number, status, customer_name, customer_email, deposit_amount, deposit_paid_at
+       FROM long_arm_quilting_requests WHERE id = ?`,
+      [id]
+    );
+    if (!request) {
+      return { ok: false, status: 404, error: 'Long-arm quilting request not found' };
+    }
+    if (!request.deposit_paid_at) {
+      return { ok: false, status: 400, error: 'Deposit has not been paid for this request yet' };
+    }
+    referenceType = 'long_arm';
+    referenceNumber = request.request_number;
+    customerName = request.customer_name;
+    customerEmail = request.customer_email;
+    sourceStatus = request.status;
+    resolvedLongArmId = request.id;
   }
 
   const paymentNumber = customPaymentNumber();
@@ -273,13 +309,14 @@ export async function createCustomPayment({
 
   const [insert] = await pool.query(
     `INSERT INTO order_custom_payments (
-       payment_number, order_id, custom_quilt_request_id, reference_type, order_number,
+       payment_number, order_id, custom_quilt_request_id, long_arm_request_id, reference_type, order_number,
        customer_email, amount, admin_note, status
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
     [
       paymentNumber,
       resolvedOrderId,
       resolvedCustomQuiltId,
+      resolvedLongArmId,
       referenceType,
       referenceNumber,
       customerEmail,
@@ -291,9 +328,11 @@ export async function createCustomPayment({
   const paymentId = insert.insertId;
   const lineDescription =
     note ||
-    (referenceType === 'custom_quilt'
-      ? `Payment for custom quilt request ${referenceNumber}`
-      : `Payment for Bear River Quilting order ${referenceNumber}`);
+    (referenceType === 'long_arm'
+      ? `Final payment for long-arm quilting request ${referenceNumber}`
+      : referenceType === 'custom_quilt'
+        ? `Payment for custom quilt request ${referenceNumber}`
+        : `Payment for Bear River Quilting order ${referenceNumber}`);
 
   try {
     const session = await createStripePaymentSession({
@@ -307,6 +346,7 @@ export async function createCustomPayment({
       paymentNumber,
       orderId: resolvedOrderId,
       customQuiltRequestId: resolvedCustomQuiltId,
+      longArmRequestId: resolvedLongArmId,
       adminNote: note,
       paymentPurpose,
     });
@@ -347,8 +387,10 @@ export async function createCustomPayment({
       referenceType,
       orderId: resolvedOrderId,
       customQuiltRequestId: resolvedCustomQuiltId,
+      longArmRequestId: resolvedLongArmId,
       orderNumber: referenceNumber,
-      requestNumber: referenceType === 'custom_quilt' ? referenceNumber : null,
+      requestNumber:
+        referenceType === 'custom_quilt' || referenceType === 'long_arm' ? referenceNumber : null,
       amount: amountNum,
       checkoutUrl: session.url,
       sessionId: session.id,
@@ -390,6 +432,14 @@ export async function fulfillCustomOrderPaymentFromStripeSession(session) {
         ...base,
         checkoutType: 'custom_quilt',
         requestId: payment.custom_quilt_request_id,
+        requestNumber: payment.order_number,
+      };
+    }
+    if (payment.long_arm_request_id) {
+      return {
+        ...base,
+        checkoutType: 'long_arm_quilting',
+        requestId: payment.long_arm_request_id,
         requestNumber: payment.order_number,
       };
     }
@@ -435,6 +485,33 @@ export async function fulfillCustomOrderPaymentFromStripeSession(session) {
       paymentNumber: payment.payment_number,
       customPaymentId: paymentId,
       referenceType: 'custom_quilt',
+    };
+  }
+
+  if (payment.long_arm_request_id) {
+    await pool.query(
+      `UPDATE long_arm_quilting_requests SET
+         final_payment_amount = ?,
+         status = 'completed'
+       WHERE id = ?`,
+      [Number(payment.amount).toFixed(2), payment.long_arm_request_id]
+    );
+
+    const [[laRequest]] = await pool.query(
+      'SELECT request_number, customer_email FROM long_arm_quilting_requests WHERE id = ?',
+      [payment.long_arm_request_id]
+    );
+
+    return {
+      ok: true,
+      checkoutType: 'long_arm_quilting',
+      requestId: payment.long_arm_request_id,
+      requestNumber: laRequest?.request_number ?? payment.order_number,
+      customerEmail: laRequest?.customer_email ?? payment.customer_email,
+      paymentNumber: payment.payment_number,
+      customPaymentId: paymentId,
+      referenceType: 'long_arm',
+      finalPayment: true,
     };
   }
 

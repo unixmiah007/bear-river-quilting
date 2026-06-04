@@ -60,4 +60,12 @@ export async function ensureOrderCustomPaymentsTable(pool) {
   if (orderCol?.nullable === 'NO') {
     await pool.query('ALTER TABLE order_custom_payments MODIFY order_id INT UNSIGNED NULL');
   }
+  if (!(await columnExists(pool, 'order_custom_payments', 'long_arm_request_id'))) {
+    await pool.query(
+      'ALTER TABLE order_custom_payments ADD COLUMN long_arm_request_id INT UNSIGNED NULL AFTER custom_quilt_request_id'
+    );
+    await pool.query(
+      'ALTER TABLE order_custom_payments ADD KEY idx_ocp_long_arm (long_arm_request_id)'
+    );
+  }
 }

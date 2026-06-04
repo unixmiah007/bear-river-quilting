@@ -88,6 +88,13 @@ function AdminNav({ badges, className = 'admin-nav', onNavigate }) {
       >
         Custom payment
       </NavLink>
+      <NavLink
+        className={({ isActive }) => `pill${isActive ? ' active' : ''}`}
+        to="/admin/service-requests"
+        onClick={closeMenu}
+      >
+        Service requests
+      </NavLink>
     </nav>
   );
 }

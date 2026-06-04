@@ -17,6 +17,8 @@ const ReturnPolicy = lazy(() => import('./pages/ReturnPolicy.jsx'));
 const TypesOfQuilting = lazy(() => import('./pages/TypesOfQuilting.jsx'));
 const Customize = lazy(() => import('./pages/Customize.jsx'));
 const CustomizeSuccess = lazy(() => import('./pages/CustomizeSuccess.jsx'));
+const LongArmQuilting = lazy(() => import('./pages/LongArmQuilting.jsx'));
+const LongArmQuiltingSuccess = lazy(() => import('./pages/LongArmQuiltingSuccess.jsx'));
 const AdminLogin = lazy(() => import('./pages/AdminLogin.jsx'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
 const AdminPages = lazy(() => import('./pages/AdminPages.jsx'));
@@ -27,6 +29,7 @@ const AdminOrders = lazy(() => import('./pages/AdminOrders.jsx'));
 const AdminCustomizeRequests = lazy(() => import('./pages/AdminCustomizeRequests.jsx'));
 const AdminCommunication = lazy(() => import('./pages/AdminCommunication.jsx'));
 const AdminCustomPayment = lazy(() => import('./pages/AdminCustomPayment.jsx'));
+const AdminServiceRequests = lazy(() => import('./pages/AdminServiceRequests.jsx'));
 
 function SuspenseRoute({ children }) {
   return <Suspense fallback={<RouteSuspenseFallback />}>{children}</Suspense>;
@@ -89,6 +92,22 @@ export default function App() {
           element={
             <SuspenseRoute>
               <CustomizeSuccess />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/long-arm-quilting"
+          element={
+            <SuspenseRoute>
+              <LongArmQuilting />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/long-arm-quilting/success"
+          element={
+            <SuspenseRoute>
+              <LongArmQuiltingSuccess />
             </SuspenseRoute>
           }
         />
@@ -212,6 +231,14 @@ export default function App() {
           element={
             <SuspenseRoute>
               <AdminCustomPayment />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/admin/service-requests"
+          element={
+            <SuspenseRoute>
+              <AdminServiceRequests />
             </SuspenseRoute>
           }
         />

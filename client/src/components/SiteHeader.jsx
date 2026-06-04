@@ -30,6 +30,9 @@ export function SiteNav({
         onNavigate={onNavigate}
         variant={className?.includes('nav--mobile') ? 'mobile' : 'desktop'}
       />
+      <NavLink to="/long-arm-quilting" {...linkProps}>
+        Long-Arm Quilting Services
+      </NavLink>
       {showLegalLinks ? (
         <>
           <NavLink to="/privacy-policy" {...linkProps}>
@@ -50,7 +53,6 @@ export function SiteNav({
         <>
           <CartNavLink onNavigate={onNavigate} />
           <AccountNavLink onNavigate={onNavigate} />
-          <AdminNavLink onNavigate={onNavigate} />
         </>
       ) : null}
     </nav>

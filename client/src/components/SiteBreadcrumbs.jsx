@@ -9,6 +9,8 @@ const STATIC_ROUTE_LABELS = {
   '/account': 'My account',
   '/customize': 'Customize',
   '/customize/success': 'Confirmation',
+  '/long-arm-quilting': 'Long-Arm Quilting Services',
+  '/long-arm-quilting/success': 'Confirmation',
   '/checkout/success': 'Order confirmation',
   '/privacy-policy': 'Privacy Policy',
   '/return-policy': 'Return Policy',
@@ -49,8 +51,11 @@ function buildBreadcrumbs(pathname, searchParams, params, labels) {
     return crumbs;
   }
 
-  if (pathname === '/customize/success') {
-    crumbs.push({ label: 'Customize', to: '/customize' });
+  if (pathname === '/customize/success' || pathname === '/long-arm-quilting/success') {
+    const parent = pathname.startsWith('/long-arm') ? '/long-arm-quilting' : '/customize';
+    const parentLabel =
+      pathname.startsWith('/long-arm') ? 'Long-Arm Quilting Services' : 'Customize';
+    crumbs.push({ label: parentLabel, to: parent });
     crumbs.push({ label: STATIC_ROUTE_LABELS[pathname], to: pathname });
     return crumbs;
   }

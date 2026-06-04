@@ -30,7 +30,9 @@ export function buildAdminOrderUrl(orderId) {
 }
 
 export function parseOrderNotifyRecipients() {
-  const raw = process.env.ORDER_NOTIFY_EMAILS?.trim();
+  const raw =
+    process.env.ORDERS_NOTIFY_EMAIL?.trim() ||
+    process.env.ORDER_NOTIFY_EMAILS?.trim();
   const src = raw || DEFAULT_ORDER_NOTIFY_EMAILS;
   const list = src
     .split(/[,;]+/)

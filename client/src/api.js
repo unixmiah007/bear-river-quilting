@@ -57,6 +57,12 @@ export const publicApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  listLongArmServices: () => apiJsonArray('/api/long-arm-quilting/services'),
+  createLongArmQuiltingStripeCheckoutSession: (body) =>
+    api('/api/checkout/long-arm-quilting-stripe-session', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   confirmStripeCheckout: (sessionId) =>
     api(`/api/checkout/confirm?session_id=${encodeURIComponent(sessionId)}`),
   customerOrdersLookup: (body) =>
@@ -425,6 +431,62 @@ export const adminApi = {
     }),
   sendCustomQuiltTracking: (id, body) =>
     api(`/api/admin/custom-quilt-requests/${encodeURIComponent(id)}/tracking`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  longArmServices: () => apiJsonArray('/api/admin/long-arm-quilting/services'),
+  createLongArmService: (body) =>
+    api('/api/admin/long-arm-quilting/services', { method: 'POST', body: JSON.stringify(body) }),
+  updateLongArmService: (id, body) =>
+    api(`/api/admin/long-arm-quilting/services/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteLongArmService: (id) =>
+    api(`/api/admin/long-arm-quilting/services/${id}`, { method: 'DELETE' }),
+  setLongArmServiceVisibility: (id, isPublished) =>
+    api(`/api/admin/long-arm-quilting/services/${encodeURIComponent(id)}/visibility`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_published: !!isPublished }),
+    }),
+  uploadLongArmServiceImage: async (id, file) => {
+    const { prepareUploadImageFiles } = await import('./lib/prepareUploadImages.js');
+    const prepared = await prepareUploadImageFiles([file]);
+    const fd = new FormData();
+    fd.append('image', prepared[0]);
+    const res = await fetch(`/api/admin/long-arm-quilting/services/${encodeURIComponent(id)}/image`, {
+      method: 'POST',
+      credentials: 'include',
+      body: fd,
+    });
+    const text = await res.text();
+    let data = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+    }
+    if (!res.ok) {
+      const err = new Error(data?.error || res.statusText || 'Upload failed');
+      err.status = res.status;
+      err.body = data;
+      throw err;
+    }
+    return data;
+  },
+  longArmRequests: () => apiJsonArray('/api/admin/long-arm-quilting/requests'),
+  setLongArmRequestAcknowledged: (id, acknowledged) =>
+    api(`/api/admin/long-arm-quilting/requests/${encodeURIComponent(id)}/acknowledged`, {
+      method: 'PUT',
+      body: JSON.stringify({ acknowledged }),
+    }),
+  updateLongArmRequestStatus: (id, status) =>
+    api(`/api/admin/long-arm-quilting/requests/${encodeURIComponent(id)}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
+  sendLongArmFinalPayment: (id, body) =>
+    api(`/api/admin/long-arm-quilting/requests/${encodeURIComponent(id)}/send-final-payment`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),

@@ -92,6 +92,22 @@ import {
   handleStripeWebhook,
 } from './lib/stripeCheckout.js';
 import { createCustomQuiltStripeCheckoutSession } from './lib/customQuiltStripeCheckout.js';
+import { createLongArmQuiltingStripeCheckoutSession } from './lib/longArmQuiltingStripeCheckout.js';
+import { ensureLongArmQuiltingTables } from './lib/ensureLongArmQuiltingTables.js';
+import {
+  listPublishedLongArmServices,
+  listAllLongArmServices,
+  createLongArmService,
+  updateLongArmService,
+  deleteLongArmService,
+  setLongArmServiceImage,
+  setLongArmServiceVisibility,
+} from './lib/longArmQuiltingService.js';
+import {
+  listLongArmRequestsForAdmin,
+  setLongArmRequestAcknowledged,
+  updateLongArmRequestStatus,
+} from './lib/longArmQuiltingRequest.js';
 import { ensureCustomizeWizardConfigTable } from './lib/ensureCustomizeWizardConfigTable.js';
 import {
   loadCustomizeWizardConfig,
@@ -129,6 +145,14 @@ const __dirnameRoot = path.dirname(__filename);
 const UPLOAD_ROOT = path.join(__dirnameRoot, 'uploads');
 
 fs.mkdirSync(path.join(UPLOAD_ROOT, 'products'), { recursive: true });
+fs.mkdirSync(path.join(UPLOAD_ROOT, 'long-arm-services'), { recursive: true });
+fs.mkdirSync(path.join(UPLOAD_ROOT, 'brand'), { recursive: true });
+
+const BRAND_LOGO_SRC = path.join(__dirnameRoot, '..', 'client', 'src', 'assets', 'bear-river-quilting-logo.png');
+const BRAND_LOGO_DEST = path.join(UPLOAD_ROOT, 'brand', 'bear-river-quilting-logo.png');
+if (fs.existsSync(BRAND_LOGO_SRC) && !fs.existsSync(BRAND_LOGO_DEST)) {
+  fs.copyFileSync(BRAND_LOGO_SRC, BRAND_LOGO_DEST);
+}
 fs.mkdirSync(ownDesignUploadRoot(UPLOAD_ROOT), { recursive: true });
 
 const app = express();
@@ -262,6 +286,22 @@ const customizeOwnDesignUpload = multer({
   storage: multer.diskStorage({
     destination(_req, _file, cb) {
       const dir = ownDesignUploadRoot(UPLOAD_ROOT);
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename(_req, file, cb) {
+      cb(null, imageUploadFilename(file));
+    },
+  }),
+  limits: { fileSize: IMAGE_UPLOAD_MAX_BYTES, files: 1 },
+  fileFilter: imageUploadFileFilter,
+});
+
+const longArmServiceImageUpload = multer({
+  storage: multer.diskStorage({
+    destination(req, _file, cb) {
+      const id = String(req.params.id);
+      const dir = path.join(UPLOAD_ROOT, 'long-arm-services', id);
       fs.mkdirSync(dir, { recursive: true });
       cb(null, dir);
     },
@@ -584,6 +624,28 @@ app.post('/api/checkout/custom-quilt-stripe-session', async (req, res) => {
   });
 });
 
+app.post('/api/checkout/long-arm-quilting-stripe-session', async (req, res) => {
+  const result = await createLongArmQuiltingStripeCheckoutSession(req.body);
+  if (!result.ok) {
+    return res.status(result.status ?? 500).json({ error: result.error });
+  }
+  res.json({
+    url: result.url,
+    sessionId: result.sessionId,
+    requestNumber: result.requestNumber,
+  });
+});
+
+app.get('/api/long-arm-quilting/services', async (_req, res) => {
+  try {
+    const services = await listPublishedLongArmServices();
+    res.json(services);
+  } catch (e) {
+    console.error('[long-arm/services]', e);
+    res.status(500).json({ error: 'Failed to load long-arm quilting services' });
+  }
+});
+
 app.get('/api/checkout/confirm', async (req, res) => {
   const sessionId = String(req.query.session_id ?? '').trim();
   if (!sessionId) {
@@ -601,6 +663,7 @@ app.get('/api/checkout/confirm', async (req, res) => {
     customerEmail: result.customerEmail,
     mail: result.mail,
     alreadyFulfilled: !!result.alreadyFulfilled,
+    finalPayment: !!result.finalPayment,
   });
 });
 
@@ -2713,6 +2776,169 @@ app.post('/api/admin/orders/:id/messages', authMiddleware, async (req, res) => {
 
 // --- Admin: test email ---
 
+// --- Admin: long-arm quilting ---
+
+app.get('/api/admin/long-arm-quilting/services', authMiddleware, async (_req, res) => {
+  try {
+    const services = await listAllLongArmServices();
+    res.json(services);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to list long-arm services' });
+  }
+});
+
+app.post('/api/admin/long-arm-quilting/services', authMiddleware, async (req, res) => {
+  try {
+    const result = await createLongArmService(req.body);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.status(201).json(result);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to create service' });
+  }
+});
+
+app.put('/api/admin/long-arm-quilting/services/:id', authMiddleware, async (req, res) => {
+  try {
+    const result = await updateLongArmService(req.params.id, req.body);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to update service' });
+  }
+});
+
+app.delete('/api/admin/long-arm-quilting/services/:id', authMiddleware, async (req, res) => {
+  try {
+    const result = await deleteLongArmService(req.params.id);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to delete service' });
+  }
+});
+
+app.patch('/api/admin/long-arm-quilting/services/:id/visibility', authMiddleware, async (req, res) => {
+  try {
+    const result = await setLongArmServiceVisibility(req.params.id, !!req.body?.is_published);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to update visibility' });
+  }
+});
+
+app.post(
+  '/api/admin/long-arm-quilting/services/:id/image',
+  authMiddleware,
+  (req, res, next) => {
+    longArmServiceImageUpload.single('image')(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message || 'Upload failed' });
+      next();
+    });
+  },
+  async (req, res) => {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'No image file received (use field name "image")' });
+    }
+    try {
+      const [normalized] = await normalizeUploadedImageFiles([file]);
+      const f = normalized ?? file;
+      const serviceId = req.params.id;
+      const url = `/uploads/long-arm-services/${serviceId}/${f.filename}`;
+      const result = await setLongArmServiceImage(serviceId, url);
+      if (!result.ok) {
+        return res.status(result.status ?? 400).json({ error: result.error });
+      }
+      res.status(201).json({ ok: true, image_url: url });
+    } catch (e) {
+      console.error('[long-arm/service-image]', e);
+      if (file?.path && fs.existsSync(file.path)) {
+        try {
+          fs.unlinkSync(file.path);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      res.status(400).json({ error: e.message || 'Could not process image' });
+    }
+  }
+);
+
+app.get('/api/admin/long-arm-quilting/requests', authMiddleware, async (_req, res) => {
+  try {
+    const requests = await listLongArmRequestsForAdmin();
+    res.json(requests);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to list service requests' });
+  }
+});
+
+app.put('/api/admin/long-arm-quilting/requests/:id/acknowledged', authMiddleware, async (req, res) => {
+  try {
+    const result = await setLongArmRequestAcknowledged(req.params.id, req.body?.acknowledged);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to update acknowledged flag' });
+  }
+});
+
+app.put('/api/admin/long-arm-quilting/requests/:id/status', authMiddleware, async (req, res) => {
+  try {
+    const result = await updateLongArmRequestStatus(req.params.id, req.body?.status);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+app.post('/api/admin/long-arm-quilting/requests/:id/send-final-payment', authMiddleware, async (req, res) => {
+  try {
+    const result = await createCustomPayment({
+      longArmRequestId: req.params.id,
+      amount: req.body?.amount,
+      adminNote: req.body?.adminNote ?? req.body?.note,
+      sendEmail: req.body?.sendEmail !== false,
+      paymentPurpose: 'long_arm_final_payment',
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    if (result.requestNumber) {
+      await pool.query('UPDATE long_arm_quilting_requests SET final_payment_amount = ? WHERE id = ?', [
+        Number(req.body?.amount).toFixed(2),
+        Number(req.params.id),
+      ]);
+    }
+    res.status(201).json(result);
+  } catch (e) {
+    console.error('[admin] long-arm final payment failed:', e);
+    res.status(500).json({ error: e.message || 'Failed to send final payment link' });
+  }
+});
+
 app.post('/api/admin/test-email', authMiddleware, async (req, res) => {
   const toEmail =
     String(req.body?.email ?? '').trim() ||
@@ -2841,6 +3067,11 @@ async function startServer() {
     await ensureOrderCustomPaymentsTable(pool);
   } catch (e) {
     console.error('[ensureOrderCustomPaymentsTable]', e?.message || e);
+  }
+  try {
+    await ensureLongArmQuiltingTables(pool);
+  } catch (e) {
+    console.error('[ensureLongArmQuiltingTables]', e?.message || e);
   }
   try {
     await ensureCustomizeWizardConfigTable(pool);

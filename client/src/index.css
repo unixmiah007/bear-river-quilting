@@ -6802,3 +6802,131 @@ tr:last-child td {
   display: block;
   margin-bottom: 0.25rem;
 }
+
+/* Long-arm quilting */
+.long-arm-page__header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.long-arm-services__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 1rem;
+}
+
+.long-arm-service-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.long-arm-service-card__image {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--border) 40%, transparent);
+}
+
+.long-arm-service-card__image--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+
+.long-arm-service-card__body {
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.long-arm-service-card__body h2 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin: 0 0 0.35rem;
+}
+
+.long-arm-service-card__rate {
+  margin: 0 0 0.5rem;
+}
+
+.long-arm-wizard__service-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.long-arm-wizard__service-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.long-arm-wizard__service-option--selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, #fff);
+}
+
+.long-arm-wizard__review ul {
+  margin: 0.35rem 0 1rem;
+  padding-left: 1.25rem;
+}
+
+.long-arm-wizard__quilt-source {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.long-arm-wizard__quilt-source-heading {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin: 0 0 0.35rem;
+}
+
+.long-arm-paid-banner {
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.15rem;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, #fff);
+  line-height: 1.5;
+}
+
+.long-arm-deposit-countdown {
+  margin-top: 0.75rem;
+  font-weight: 500;
+}
+
+.site-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.site-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(17, 17, 17, 0.45);
+  cursor: pointer;
+}
+
+.site-dialog__panel {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 28rem);
+  margin: 0;
+  padding: 1.25rem 1.35rem;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+}
