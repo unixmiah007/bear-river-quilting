@@ -530,4 +530,37 @@ export const adminApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  downloadLongArmRequestInvoicePdf: async (requestId, requestNumber) => {
+    const res = await fetch(
+      `/api/admin/long-arm-quilting/requests/${encodeURIComponent(requestId)}/invoice.pdf`,
+      { credentials: 'include' }
+    );
+    if (!res.ok) {
+      const text = await res.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+      const err = new Error(data?.error || res.statusText || 'Failed to download invoice');
+      err.status = res.status;
+      err.body = data;
+      throw err;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `invoice-${String(requestNumber ?? requestId).replace(/[^a-zA-Z0-9-_]+/g, '-')}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+  emailLongArmRequestInvoice: (id) =>
+    api(`/api/admin/long-arm-quilting/requests/${encodeURIComponent(id)}/invoice/email`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
 };

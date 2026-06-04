@@ -288,11 +288,17 @@ export async function fulfillLongArmRequestDeposit(requestId, { sessionId, payme
   };
 }
 
-export async function listLongArmRequestsForAdmin() {
-  const [rows] = await pool.query(
-    `SELECT * FROM long_arm_quilting_requests ORDER BY created_at DESC LIMIT 500`
-  );
+function mapBlanketPaletteFromRow(paletteRow) {
+  if (!paletteRow) return null;
+  return {
+    id: paletteRow.id,
+    title: paletteRow.title,
+    price: paletteRow.price != null ? Number(paletteRow.price) : null,
+    image_url: paletteRow.image_url,
+  };
+}
 
+async function loadServiceAndPaletteMapsForRows(rows) {
   const allIds = new Set();
   const paletteIds = new Set();
   for (const row of rows) {
@@ -322,20 +328,35 @@ export async function listLongArmRequestsForAdmin() {
     paletteMap = new Map(paletteRows.map((p) => [p.id, p]));
   }
 
-  return rows.map((row) => {
-    const ids = parseSelectedServiceIds(row.selected_service_ids);
-    const services = ids.map((id) => serviceMap.get(Number(id))).filter(Boolean);
-    const paletteRow = row.blanket_palette_id ? paletteMap.get(Number(row.blanket_palette_id)) : null;
-    const blanketPalette = paletteRow
-      ? {
-          id: paletteRow.id,
-          title: paletteRow.title,
-          price: paletteRow.price != null ? Number(paletteRow.price) : null,
-          image_url: paletteRow.image_url,
-        }
-      : null;
-    return mapRequestRow(row, services, blanketPalette);
-  });
+  return { serviceMap, paletteMap };
+}
+
+function mapAdminRequestFromRow(row, serviceMap, paletteMap) {
+  const ids = parseSelectedServiceIds(row.selected_service_ids);
+  const services = ids.map((id) => serviceMap.get(Number(id))).filter(Boolean);
+  const paletteRow = row.blanket_palette_id ? paletteMap.get(Number(row.blanket_palette_id)) : null;
+  return mapRequestRow(row, services, mapBlanketPaletteFromRow(paletteRow));
+}
+
+export async function getLongArmRequestForAdmin(id) {
+  const requestId = Number(id);
+  if (!Number.isFinite(requestId) || requestId <= 0) {
+    return { ok: false, status: 400, error: 'Invalid request id' };
+  }
+  const [[row]] = await pool.query('SELECT * FROM long_arm_quilting_requests WHERE id = ?', [requestId]);
+  if (!row) {
+    return { ok: false, status: 404, error: 'Request not found' };
+  }
+  const { serviceMap, paletteMap } = await loadServiceAndPaletteMapsForRows([row]);
+  return { ok: true, request: mapAdminRequestFromRow(row, serviceMap, paletteMap) };
+}
+
+export async function listLongArmRequestsForAdmin() {
+  const [rows] = await pool.query(
+    `SELECT * FROM long_arm_quilting_requests ORDER BY created_at DESC LIMIT 500`
+  );
+  const { serviceMap, paletteMap } = await loadServiceAndPaletteMapsForRows(rows);
+  return rows.map((row) => mapAdminRequestFromRow(row, serviceMap, paletteMap));
 }
 
 export async function setLongArmRequestAcknowledged(id, acknowledged) {

@@ -117,6 +117,11 @@ import {
   setLongArmRequestAcknowledged,
   updateLongArmRequestStatus,
 } from './lib/longArmQuiltingRequest.js';
+import {
+  buildLongArmRequestInvoicePdf,
+  longArmInvoicePdfFilename,
+} from './lib/longArmRequestInvoicePdf.js';
+import { emailCustomerLongArmRequestInvoice, loadLongArmRequestInvoiceContext } from './lib/longArmRequestInvoiceEmail.js';
 import { ensureCustomizeWizardConfigTable } from './lib/ensureCustomizeWizardConfigTable.js';
 import {
   loadCustomizeWizardConfig,
@@ -3020,6 +3025,40 @@ app.get('/api/admin/long-arm-quilting/requests', authMiddleware, async (_req, re
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to list service requests' });
+  }
+});
+
+app.get('/api/admin/long-arm-quilting/requests/:id/invoice.pdf', authMiddleware, async (req, res) => {
+  try {
+    const ctx = await loadLongArmRequestInvoiceContext(req.params.id);
+    if (!ctx.ok) {
+      return res.status(ctx.status ?? 404).json({ error: ctx.error });
+    }
+    const pdf = await buildLongArmRequestInvoicePdf(ctx.request);
+    const filename = longArmInvoicePdfFilename(ctx.request.request_number);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(pdf);
+  } catch (e) {
+    console.error('[long-arm invoice] PDF failed:', e);
+    res.status(500).json({ error: 'Failed to generate invoice PDF' });
+  }
+});
+
+app.post('/api/admin/long-arm-quilting/requests/:id/invoice/email', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid request id' });
+    const result = await emailCustomerLongArmRequestInvoice(id);
+    if (!result.ok) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+    res.json({ ok: true, invoiceEmailedAt: result.emailedAt });
+  } catch (e) {
+    console.error('[long-arm invoice] email failed:', e);
+    res.status(500).json({
+      error: e.message || 'Failed to email invoice',
+    });
   }
 });
 

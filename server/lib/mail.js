@@ -614,6 +614,72 @@ export async function sendOrderInvoiceEmail({
 }
 
 /**
+ * Emails the customer their long-arm service request invoice with PDF attached.
+ */
+export async function sendLongArmRequestInvoiceEmail({
+  to,
+  customerName,
+  requestNumber,
+  pdfBuffer,
+  filename,
+}) {
+  const toAddr = String(to ?? '')
+    .trim()
+    .toLowerCase();
+  if (!toAddr || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toAddr)) {
+    throw new Error('Invalid customer email on request');
+  }
+
+  if (!isSendGridConfigured()) {
+    throw new Error('SendGrid is not configured — set SENDGRID_API_KEY in server/.env');
+  }
+
+  const from = resolveSendGridFromCustomer();
+  if (!from) {
+    throw new Error('Set MAIL_FROM_ADDRESS or MAIL_FROM to a verified SendGrid sender');
+  }
+
+  if (!pdfBuffer || !Buffer.isBuffer(pdfBuffer)) {
+    throw new Error('Invoice PDF is missing');
+  }
+
+  const subject = `Invoice — Long-arm request ${requestNumber}`;
+
+  const text = [
+    `Hi ${customerName},`,
+    '',
+    `Please find your invoice for Bear River Quilting long-arm service request ${requestNumber} attached as a PDF.`,
+    '',
+    'Thank you for choosing our quilting services.',
+    '— Bear River Quilting',
+  ].join('\n');
+
+  const html = `
+<p>Hi ${escapeHtml(customerName)},</p>
+<p>Please find your invoice for Bear River Quilting long-arm service request <strong>${escapeHtml(requestNumber)}</strong> attached as a PDF.</p>
+<p>Thank you for choosing our quilting services.<br>— Bear River Quilting</p>
+`.trim();
+
+  await sendSendGridMail({
+    to: toAddr,
+    from,
+    subject,
+    text,
+    html,
+    attachments: [
+      {
+        content: pdfBuffer.toString('base64'),
+        filename: filename || `invoice-${requestNumber}.pdf`,
+        type: 'application/pdf',
+        disposition: 'attachment',
+      },
+    ],
+  });
+
+  console.log('[mail] Sent long-arm request invoice', { requestNumber, to: toAddr });
+}
+
+/**
  * Custom message from staff to the customer about their order.
  */
 export async function sendOrderCustomerMessageEmail({

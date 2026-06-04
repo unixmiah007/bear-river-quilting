@@ -6372,6 +6372,81 @@ tr:last-child td {
   line-height: 1.3;
 }
 
+.admin-long-arm-detail-dialog__invoice-msg {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+}
+
+.admin-long-arm-print-only {
+  display: none;
+}
+
+@media print {
+  body.is-printing-long-arm-detail * {
+    visibility: hidden;
+  }
+
+  body.is-printing-long-arm-detail .confirm-dialog-backdrop,
+  body.is-printing-long-arm-detail .confirm-dialog-backdrop * {
+    visibility: visible;
+  }
+
+  body.is-printing-long-arm-detail .confirm-dialog-backdrop {
+    position: absolute;
+    inset: 0;
+    display: block;
+    padding: 0;
+    background: #ffffff;
+  }
+
+  body.is-printing-long-arm-detail .admin-long-arm-detail-dialog {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0.5in;
+    overflow: visible;
+    box-shadow: none;
+    border: none;
+  }
+
+  body.is-printing-long-arm-detail .no-print {
+    display: none !important;
+  }
+
+  body.is-printing-long-arm-detail .admin-long-arm-print-only {
+    display: block;
+    margin: 0 0 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
+  body.is-printing-long-arm-detail .admin-long-arm-print-only__brand {
+    border-bottom: 1px solid #cccccc;
+    padding-bottom: 0.5rem;
+  }
+
+  body.is-printing-long-arm-detail a {
+    color: #000000;
+    text-decoration: none;
+  }
+
+  body.is-printing-long-arm-detail .badge {
+    border: 1px solid #999999;
+    background: transparent !important;
+    color: #000000 !important;
+  }
+
+  body.is-printing-long-arm-detail .admin-long-arm-detail-dialog__image-card img {
+    max-height: 2.5in;
+    object-fit: contain;
+    aspect-ratio: auto;
+  }
+}
+
 .admin-customize-requests-table .btn {
   white-space: nowrap;
 }

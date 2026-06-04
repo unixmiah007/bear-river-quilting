@@ -165,13 +165,29 @@ function LongArmRequestImages({ req, servicesCatalog }) {
   );
 }
 
+function printLongArmRequestDetail() {
+  document.body.classList.add('is-printing-long-arm-detail');
+  window.addEventListener(
+    'afterprint',
+    () => {
+      document.body.classList.remove('is-printing-long-arm-detail');
+    },
+    { once: true }
+  );
+  window.print();
+}
+
 function LongArmRequestDetailDialog({
   req,
   servicesCatalog,
   ackBusy,
+  invoiceEmailBusy,
+  invoiceEmailMsg,
   onClose,
   onToggleAck,
   onOpenFinalPayment,
+  onEmailInvoice,
+  onPrint,
 }) {
   if (!req) return null;
 
@@ -199,6 +215,9 @@ function LongArmRequestDetailDialog({
         aria-labelledby="long-arm-request-detail-title"
         onClick={(e) => e.stopPropagation()}
       >
+        <p className="admin-long-arm-print-only admin-long-arm-print-only__brand">
+          Bear River Quilting — Long-arm service request
+        </p>
         <h2 id="long-arm-request-detail-title" className="confirm-dialog__title">
           {req.request_number}
         </h2>
@@ -313,16 +332,31 @@ function LongArmRequestDetailDialog({
           ) : null}
         </dl>
 
-        <section className="admin-long-arm-detail-dialog__images-section">
+        <section className="admin-long-arm-detail-dialog__images-section admin-long-arm-detail-dialog__print-images">
           <h3 className="admin-long-arm-detail-dialog__images-heading">Images</h3>
           <LongArmRequestImages req={req} servicesCatalog={servicesCatalog} />
         </section>
 
-        <div className="confirm-dialog__actions admin-customize-detail-dialog__actions">
+        {invoiceEmailMsg ? (
+          <p className="muted admin-long-arm-detail-dialog__invoice-msg no-print">{invoiceEmailMsg}</p>
+        ) : null}
+
+        <div className="confirm-dialog__actions admin-customize-detail-dialog__actions no-print">
+          <button type="button" className="btn" onClick={onPrint}>
+            Print
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={invoiceEmailBusy || ackBusy}
+            onClick={() => onEmailInvoice(req)}
+          >
+            {invoiceEmailBusy ? 'Sending…' : 'E-mail customer invoice'}
+          </button>
           <button
             type="button"
             className="btn"
-            disabled={ackBusy}
+            disabled={ackBusy || invoiceEmailBusy}
             onClick={() => onToggleAck(req, ack !== 'Y')}
           >
             {ackBusy ? 'Saving…' : ack === 'Y' ? 'Mark not acknowledged' : 'Mark acknowledged'}
@@ -330,7 +364,8 @@ function LongArmRequestDetailDialog({
           {req.deposit_paid_at ? (
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn"
+              disabled={invoiceEmailBusy}
               onClick={() => {
                 onOpenFinalPayment(req);
                 onClose();
@@ -371,6 +406,8 @@ export default function AdminServiceRequests() {
   const [ackSavingId, setAckSavingId] = useState(null);
   const [requestPageSize, setRequestPageSize] = useState(5);
   const [requestPage, setRequestPage] = useState(1);
+  const [invoiceEmailBusy, setInvoiceEmailBusy] = useState(false);
+  const [invoiceEmailMsg, setInvoiceEmailMsg] = useState(null);
 
   const filteredRequests = useMemo(() => {
     const q = requestSearch.trim();
@@ -405,6 +442,16 @@ export default function AdminServiceRequests() {
   useEffect(() => {
     if (requestPage > requestTotalPages) setRequestPage(requestTotalPages);
   }, [requestPage, requestTotalPages]);
+
+  useEffect(() => {
+    setInvoiceEmailMsg(null);
+  }, [detailRequest?.id]);
+
+  useEffect(() => {
+    return () => {
+      document.body.classList.remove('is-printing-long-arm-detail');
+    };
+  }, []);
 
   const detailFromList = useMemo(() => {
     if (!detailRequest) return null;
@@ -610,6 +657,21 @@ export default function AdminServiceRequests() {
       setError(err.body?.error || err.message);
     } finally {
       setPaletteImageUploading(null);
+    }
+  }
+
+  async function emailRequestInvoice(req) {
+    if (!req?.id || invoiceEmailBusy) return;
+    setError(null);
+    setInvoiceEmailMsg(null);
+    setInvoiceEmailBusy(true);
+    try {
+      await adminApi.emailLongArmRequestInvoice(req.id);
+      setInvoiceEmailMsg(`Invoice emailed to ${req.customer_email}.`);
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setInvoiceEmailBusy(false);
     }
   }
 
@@ -1246,9 +1308,13 @@ export default function AdminServiceRequests() {
             req={detailFromList}
             servicesCatalog={services}
             ackBusy={detailFromList != null && ackSavingId === detailFromList.id}
+            invoiceEmailBusy={invoiceEmailBusy}
+            invoiceEmailMsg={invoiceEmailMsg}
             onClose={() => setDetailRequest(null)}
             onToggleAck={onAcknowledge}
             onOpenFinalPayment={openFinalPayment}
+            onEmailInvoice={emailRequestInvoice}
+            onPrint={printLongArmRequestDetail}
           />
 
           {finalPaymentRow ? (
