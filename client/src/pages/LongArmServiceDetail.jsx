@@ -1,13 +1,38 @@
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
+import { publicApi } from '../api.js';
+import ProductImage from '../components/ProductImage.jsx';
 import { getLongArmServiceDetailByPath } from '../lib/longArmServiceDetailContent.js';
 
 export default function LongArmServiceDetail() {
   const { pathname } = useLocation();
   const detail = getLongArmServiceDetailByPath(pathname);
+  const [cardImageUrl, setCardImageUrl] = useState(null);
+
+  useEffect(() => {
+    if (!detail?.slug) return undefined;
+    let cancelled = false;
+    publicApi
+      .listLongArmServices()
+      .then((rows) => {
+        if (cancelled) return;
+        const svc = (Array.isArray(rows) ? rows : []).find((s) => s.slug === detail.slug);
+        setCardImageUrl(svc?.image_url ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setCardImageUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [detail?.slug]);
 
   if (!detail) {
     return <Navigate to="/long-arm-quilting" replace />;
   }
+
+  const heroSrc = cardImageUrl || detail.heroImage;
+  const heroAlt = detail.heroImageAlt || detail.title;
 
   return (
     <article className="legal-page long-arm-service-detail">
@@ -26,7 +51,7 @@ export default function LongArmServiceDetail() {
       </header>
 
       <figure className="long-arm-service-detail__hero">
-        <img src={detail.heroImage} alt={detail.heroImageAlt} loading="eager" />
+        <ProductImage src={heroSrc} alt={heroAlt} />
       </figure>
 
       <div className="legal-page__body long-arm-service-detail__body">

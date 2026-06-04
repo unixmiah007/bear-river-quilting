@@ -6942,11 +6942,19 @@ tr:last-child td {
   border: 1px solid var(--border);
 }
 
-.long-arm-service-detail__hero img {
+.long-arm-service-detail__hero img,
+.long-arm-service-detail__hero .featured-no-image {
   width: 100%;
   max-height: min(420px, 52vw);
+  min-height: 12rem;
   object-fit: cover;
   display: block;
+}
+
+.long-arm-service-detail__hero .featured-no-image {
+  aspect-ratio: 4 / 3;
+  max-height: min(420px, 52vw);
+  place-items: center;
 }
 
 .long-arm-service-detail__section + .long-arm-service-detail__section {
