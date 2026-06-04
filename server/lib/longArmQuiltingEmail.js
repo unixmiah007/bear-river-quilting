@@ -8,7 +8,7 @@ import {
 } from './sendgridMail.js';
 import { siteLogoEmailHtml } from './emailBrand.js';
 import { getClientOrigin } from './clientOrigin.js';
-import { longArmQuiltSourceLabel, LONG_ARM_DEPOSIT_USD } from './longArmQuiltingRequest.js';
+import { longArmQuiltSourceLabel, LONG_ARM_DEPOSIT_USD, parseSelectedServiceIds } from './longArmQuiltingRequest.js';
 
 function escapeHtml(s) {
   return String(s ?? '')
@@ -39,12 +39,7 @@ async function loadRequestEmailContext(requestId) {
   const [[row]] = await pool.query('SELECT * FROM long_arm_quilting_requests WHERE id = ?', [id]);
   if (!row) return null;
 
-  let serviceIds = [];
-  try {
-    serviceIds = JSON.parse(row.selected_service_ids ?? '[]');
-  } catch {
-    serviceIds = [];
-  }
+  const serviceIds = parseSelectedServiceIds(row.selected_service_ids);
 
   let services = [];
   if (serviceIds.length > 0) {
@@ -55,7 +50,22 @@ async function loadRequestEmailContext(requestId) {
     services = svcRows;
   }
 
-  return { row, services };
+  let blanketPalette = null;
+  if (row.blanket_palette_id) {
+    const [[paletteRow]] = await pool.query(
+      'SELECT id, title, price FROM long_arm_blanket_palettes WHERE id = ?',
+      [row.blanket_palette_id]
+    );
+    if (paletteRow) {
+      blanketPalette = {
+        id: paletteRow.id,
+        title: paletteRow.title,
+        price: paletteRow.price != null ? Number(paletteRow.price) : null,
+      };
+    }
+  }
+
+  return { row, services, blanketPalette };
 }
 
 function buildServiceLines(services) {
@@ -69,11 +79,16 @@ function buildServiceLines(services) {
     .join('\n');
 }
 
-function buildDetailLines(row, services) {
+function buildDetailLines(row, services, blanketPalette) {
   return [
     `Request: ${row.request_number}`,
     `Deposit paid: ${formatUsd(row.deposit_amount ?? LONG_ARM_DEPOSIT_USD)}`,
     `Quilt source: ${longArmQuiltSourceLabel(row.quilt_source)}`,
+    blanketPalette
+      ? `Base quilt: ${blanketPalette.title} (${formatUsd(blanketPalette.price)})`
+      : row.quilt_source === 'use_ours'
+        ? 'Base quilt: (not recorded)'
+        : null,
     '',
     'Services:',
     buildServiceLines(services),
@@ -120,11 +135,11 @@ export async function sendLongArmDepositEmails(requestId) {
     return { customerOk: false, staffOk: false, error: 'Request not found' };
   }
 
-  const { row, services } = ctx;
+  const { row, services, blanketPalette } = ctx;
   const fromCustomer = resolveSendGridFromCustomer();
   const fromStaff = resolveSendGridFromStaff();
   const staffTo = parseOrderNotifyRecipients();
-  const detailLines = buildDetailLines(row, services);
+  const detailLines = buildDetailLines(row, services, blanketPalette);
   const adminUrl = `${getClientOrigin()}/admin/service-requests`;
   const logoHtml = siteLogoEmailHtml();
 

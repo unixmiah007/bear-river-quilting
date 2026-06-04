@@ -58,6 +58,7 @@ export const publicApi = {
       body: JSON.stringify(body),
     }),
   listLongArmServices: () => apiJsonArray('/api/long-arm-quilting/services'),
+  listLongArmBlanketPalettes: () => apiJsonArray('/api/long-arm-quilting/blanket-palettes'),
   createLongArmQuiltingStripeCheckoutSession: (body) =>
     api('/api/checkout/long-arm-quilting-stripe-session', {
       method: 'POST',
@@ -453,6 +454,45 @@ export const adminApi = {
     const fd = new FormData();
     fd.append('image', prepared[0]);
     const res = await fetch(`/api/admin/long-arm-quilting/services/${encodeURIComponent(id)}/image`, {
+      method: 'POST',
+      credentials: 'include',
+      body: fd,
+    });
+    const text = await res.text();
+    let data = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = { raw: text };
+      }
+    }
+    if (!res.ok) {
+      const err = new Error(data?.error || res.statusText || 'Upload failed');
+      err.status = res.status;
+      err.body = data;
+      throw err;
+    }
+    return data;
+  },
+  longArmBlanketPalettes: () => apiJsonArray('/api/admin/long-arm-quilting/blanket-palettes'),
+  createLongArmBlanketPalette: (body) =>
+    api('/api/admin/long-arm-quilting/blanket-palettes', { method: 'POST', body: JSON.stringify(body) }),
+  updateLongArmBlanketPalette: (id, body) =>
+    api(`/api/admin/long-arm-quilting/blanket-palettes/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteLongArmBlanketPalette: (id) =>
+    api(`/api/admin/long-arm-quilting/blanket-palettes/${id}`, { method: 'DELETE' }),
+  setLongArmBlanketPaletteVisibility: (id, isPublished) =>
+    api(`/api/admin/long-arm-quilting/blanket-palettes/${encodeURIComponent(id)}/visibility`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_published: !!isPublished }),
+    }),
+  uploadLongArmBlanketPaletteImage: async (id, file) => {
+    const { prepareUploadImageFiles } = await import('./lib/prepareUploadImages.js');
+    const prepared = await prepareUploadImageFiles([file]);
+    const fd = new FormData();
+    fd.append('image', prepared[0]);
+    const res = await fetch(`/api/admin/long-arm-quilting/blanket-palettes/${encodeURIComponent(id)}/image`, {
       method: 'POST',
       credentials: 'include',
       body: fd,

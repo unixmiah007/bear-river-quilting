@@ -1,6 +1,7 @@
 import pool from '../db.js';
 import { sendLongArmDepositEmails } from './longArmQuiltingEmail.js';
 import { loadServicesByIds } from './longArmQuiltingService.js';
+import { getPublishedLongArmBlanketPaletteById } from './longArmBlanketPalette.js';
 
 export const LONG_ARM_DEPOSIT_USD = 30;
 
@@ -22,6 +23,24 @@ function parseServiceIds(body) {
   return [...new Set(raw.map(Number).filter((n) => n > 0))];
 }
 
+/** MySQL JSON columns may arrive as arrays or JSON strings depending on driver/settings. */
+export function parseSelectedServiceIds(raw) {
+  if (Array.isArray(raw)) {
+    return raw.map(Number).filter((n) => n > 0);
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map(Number).filter((n) => n > 0);
+      if (typeof parsed === 'number' && parsed > 0) return [parsed];
+    } catch {
+      /* ignore */
+    }
+  }
+  if (typeof raw === 'number' && raw > 0) return [raw];
+  return [];
+}
+
 function requiredAddress(value, label) {
   const s = String(value ?? '').trim();
   if (!s) return { ok: false, error: `${label} is required` };
@@ -30,8 +49,8 @@ function requiredAddress(value, label) {
 
 export async function validateLongArmRequestBody(body) {
   const serviceIds = parseServiceIds(body);
-  if (serviceIds.length === 0) {
-    return { ok: false, status: 400, error: 'Select at least one service' };
+  if (serviceIds.length !== 1) {
+    return { ok: false, status: 400, error: 'Select exactly one service' };
   }
 
   const services = await loadServicesByIds(serviceIds);
@@ -44,9 +63,27 @@ export async function validateLongArmRequestBody(body) {
   const customerPhone = String(body?.customer?.phone ?? body?.customerPhone ?? '').trim() || null;
   const notes = String(body?.notes ?? '').trim() || null;
   const quiltSource = String(body?.quiltSource ?? body?.quilt_source ?? '').trim();
+  const blanketPaletteIdRaw = body?.blanketPaletteId ?? body?.blanket_palette_id;
+  const blanketPaletteId =
+    blanketPaletteIdRaw == null || blanketPaletteIdRaw === ''
+      ? null
+      : Number(blanketPaletteIdRaw);
 
   if (!quiltSource || !LONG_ARM_QUILT_SOURCES.has(quiltSource)) {
     return { ok: false, status: 400, error: 'Select whether you are sending your quilt or using ours' };
+  }
+
+  let blanketPalette = null;
+  if (quiltSource === 'use_ours') {
+    if (!blanketPaletteId || !Number.isFinite(blanketPaletteId) || blanketPaletteId <= 0) {
+      return { ok: false, status: 400, error: 'Select a base quilt from our palette' };
+    }
+    blanketPalette = await getPublishedLongArmBlanketPaletteById(blanketPaletteId);
+    if (!blanketPalette) {
+      return { ok: false, status: 400, error: 'Selected base quilt is invalid or unavailable' };
+    }
+  } else if (blanketPaletteId) {
+    return { ok: false, status: 400, error: 'Base quilt selection is only required when using our quilt(s)' };
   }
 
   if (!customerName || !customerEmail) {
@@ -87,6 +124,8 @@ export async function validateLongArmRequestBody(body) {
       serviceIds,
       services,
       quiltSource,
+      blanketPaletteId: blanketPalette?.id ?? null,
+      blanketPalette,
       customerName,
       customerEmail,
       customerPhone,
@@ -112,13 +151,8 @@ export async function validateLongArmRequestBody(body) {
   };
 }
 
-function mapRequestRow(row, services = []) {
-  let selectedServiceIds = [];
-  try {
-    selectedServiceIds = JSON.parse(row.selected_service_ids ?? '[]');
-  } catch {
-    selectedServiceIds = [];
-  }
+function mapRequestRow(row, services = [], blanketPalette = null) {
+  const selectedServiceIds = parseSelectedServiceIds(row.selected_service_ids);
   return {
     id: row.id,
     request_number: row.request_number,
@@ -126,6 +160,8 @@ function mapRequestRow(row, services = []) {
     acknowledged: row.acknowledged,
     selected_service_ids: selectedServiceIds,
     quilt_source: row.quilt_source ?? null,
+    blanket_palette_id: row.blanket_palette_id != null ? Number(row.blanket_palette_id) : null,
+    blanket_palette: blanketPalette,
     services,
     notes: row.notes,
     customer_name: row.customer_name,
@@ -163,16 +199,17 @@ export async function insertPendingLongArmRequest(body) {
 
   const [insert] = await pool.query(
     `INSERT INTO long_arm_quilting_requests (
-       request_number, status, selected_service_ids, quilt_source, notes,
+       request_number, status, selected_service_ids, quilt_source, blanket_palette_id, notes,
        customer_name, customer_email, customer_phone,
        shipping_address1, shipping_address2, shipping_city, shipping_state, shipping_postal_code, shipping_country,
        billing_name, billing_address1, billing_address2, billing_city, billing_state, billing_postal_code, billing_country,
        deposit_amount
-     ) VALUES (?, 'pending_payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, 'pending_payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       requestNumber,
       JSON.stringify(data.serviceIds),
       data.quiltSource,
+      data.blanketPaletteId,
       data.notes,
       data.customerName,
       data.customerEmail,
@@ -257,13 +294,12 @@ export async function listLongArmRequestsForAdmin() {
   );
 
   const allIds = new Set();
+  const paletteIds = new Set();
   for (const row of rows) {
-    try {
-      const ids = JSON.parse(row.selected_service_ids ?? '[]');
-      for (const id of ids) allIds.add(Number(id));
-    } catch {
-      /* ignore */
+    for (const id of parseSelectedServiceIds(row.selected_service_ids)) {
+      allIds.add(id);
     }
+    if (row.blanket_palette_id) paletteIds.add(Number(row.blanket_palette_id));
   }
 
   let serviceMap = new Map();
@@ -276,15 +312,29 @@ export async function listLongArmRequestsForAdmin() {
     serviceMap = new Map(svcRows.map((s) => [s.id, s]));
   }
 
+  let paletteMap = new Map();
+  if (paletteIds.size > 0) {
+    const idList = [...paletteIds];
+    const [paletteRows] = await pool.query(
+      `SELECT id, title, price, image_url FROM long_arm_blanket_palettes WHERE id IN (${idList.map(() => '?').join(',')})`,
+      idList
+    );
+    paletteMap = new Map(paletteRows.map((p) => [p.id, p]));
+  }
+
   return rows.map((row) => {
-    let ids = [];
-    try {
-      ids = JSON.parse(row.selected_service_ids ?? '[]');
-    } catch {
-      ids = [];
-    }
+    const ids = parseSelectedServiceIds(row.selected_service_ids);
     const services = ids.map((id) => serviceMap.get(Number(id))).filter(Boolean);
-    return mapRequestRow(row, services);
+    const paletteRow = row.blanket_palette_id ? paletteMap.get(Number(row.blanket_palette_id)) : null;
+    const blanketPalette = paletteRow
+      ? {
+          id: paletteRow.id,
+          title: paletteRow.title,
+          price: paletteRow.price != null ? Number(paletteRow.price) : null,
+          image_url: paletteRow.image_url,
+        }
+      : null;
+    return mapRequestRow(row, services, blanketPalette);
   });
 }
 

@@ -80,6 +80,13 @@ const DEFAULT_SERVICES = [
   },
 ];
 
+const DEFAULT_BLANKET_PALETTES = [
+  { title: 'Classic cotton quilt top', price: 89, sort_order: 1 },
+  { title: 'Modern patchwork starter kit', price: 129, sort_order: 2 },
+  { title: 'Heirloom charm quilt top', price: 149, sort_order: 3 },
+  { title: 'King-size panel quilt top', price: 179, sort_order: 4 },
+];
+
 /** Creates long-arm quilting tables and seeds default services when empty. */
 export async function ensureLongArmQuiltingTables(pool) {
   await pool.query(`
@@ -106,6 +113,7 @@ export async function ensureLongArmQuiltingTables(pool) {
       acknowledged CHAR(1) NOT NULL DEFAULT 'N',
       selected_service_ids JSON NOT NULL,
       quilt_source VARCHAR(32) NULL,
+      blanket_palette_id INT UNSIGNED NULL,
       notes TEXT NULL,
       customer_name VARCHAR(255) NOT NULL,
       customer_email VARCHAR(255) NOT NULL,
@@ -146,6 +154,25 @@ export async function ensureLongArmQuiltingTables(pool) {
       "ALTER TABLE long_arm_quilting_requests ADD COLUMN quilt_source VARCHAR(32) NULL AFTER selected_service_ids"
     );
   }
+  if (!(await columnExists(pool, 'long_arm_quilting_requests', 'blanket_palette_id'))) {
+    await pool.query(
+      'ALTER TABLE long_arm_quilting_requests ADD COLUMN blanket_palette_id INT UNSIGNED NULL AFTER quilt_source'
+    );
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS long_arm_blanket_palettes (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(255) NOT NULL,
+      price DECIMAL(10, 2) NOT NULL,
+      image_url VARCHAR(512) NULL,
+      is_published TINYINT(1) NOT NULL DEFAULT 1,
+      sort_order INT NOT NULL DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      KEY idx_labp_published (is_published, sort_order)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
 
   const [[countRow]] = await pool.query('SELECT COUNT(*) AS c FROM long_arm_quilting_services');
   if (Number(countRow.c) === 0) {
@@ -154,6 +181,17 @@ export async function ensureLongArmQuiltingTables(pool) {
         `INSERT INTO long_arm_quilting_services (slug, name, description, hourly_rate, sort_order, is_published)
          VALUES (?, ?, ?, ?, ?, 1)`,
         [svc.slug, svc.name, svc.description, svc.hourly_rate, svc.sort_order]
+      );
+    }
+  }
+
+  const [[paletteCountRow]] = await pool.query('SELECT COUNT(*) AS c FROM long_arm_blanket_palettes');
+  if (Number(paletteCountRow.c) === 0) {
+    for (const item of DEFAULT_BLANKET_PALETTES) {
+      await pool.query(
+        `INSERT INTO long_arm_blanket_palettes (title, price, sort_order, is_published)
+         VALUES (?, ?, ?, 1)`,
+        [item.title, item.price, item.sort_order]
       );
     }
   }

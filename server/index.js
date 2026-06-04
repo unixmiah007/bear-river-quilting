@@ -104,6 +104,15 @@ import {
   setLongArmServiceVisibility,
 } from './lib/longArmQuiltingService.js';
 import {
+  listPublishedLongArmBlanketPalettes,
+  listAllLongArmBlanketPalettes,
+  createLongArmBlanketPalette,
+  updateLongArmBlanketPalette,
+  deleteLongArmBlanketPalette,
+  setLongArmBlanketPaletteImage,
+  setLongArmBlanketPaletteVisibility,
+} from './lib/longArmBlanketPalette.js';
+import {
   listLongArmRequestsForAdmin,
   setLongArmRequestAcknowledged,
   updateLongArmRequestStatus,
@@ -302,6 +311,22 @@ const longArmServiceImageUpload = multer({
     destination(req, _file, cb) {
       const id = String(req.params.id);
       const dir = path.join(UPLOAD_ROOT, 'long-arm-services', id);
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename(_req, file, cb) {
+      cb(null, imageUploadFilename(file));
+    },
+  }),
+  limits: { fileSize: IMAGE_UPLOAD_MAX_BYTES, files: 1 },
+  fileFilter: imageUploadFileFilter,
+});
+
+const longArmBlanketPaletteImageUpload = multer({
+  storage: multer.diskStorage({
+    destination(req, _file, cb) {
+      const id = String(req.params.id);
+      const dir = path.join(UPLOAD_ROOT, 'long-arm-blanket-palettes', id);
       fs.mkdirSync(dir, { recursive: true });
       cb(null, dir);
     },
@@ -642,7 +667,17 @@ app.get('/api/long-arm-quilting/services', async (_req, res) => {
     res.json(services);
   } catch (e) {
     console.error('[long-arm/services]', e);
-    res.status(500).json({ error: 'Failed to load long-arm quilting services' });
+    res.status(500).json({ error: 'Failed to load services' });
+  }
+});
+
+app.get('/api/long-arm-quilting/blanket-palettes', async (_req, res) => {
+  try {
+    const palettes = await listPublishedLongArmBlanketPalettes();
+    res.json(palettes);
+  } catch (e) {
+    console.error('[long-arm/blanket-palettes]', e);
+    res.status(500).json({ error: 'Failed to load blanket palette' });
   }
 });
 
@@ -2866,6 +2901,106 @@ app.post(
       res.status(201).json({ ok: true, image_url: url });
     } catch (e) {
       console.error('[long-arm/service-image]', e);
+      if (file?.path && fs.existsSync(file.path)) {
+        try {
+          fs.unlinkSync(file.path);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+      res.status(400).json({ error: e.message || 'Could not process image' });
+    }
+  }
+);
+
+app.get('/api/admin/long-arm-quilting/blanket-palettes', authMiddleware, async (_req, res) => {
+  try {
+    const palettes = await listAllLongArmBlanketPalettes();
+    res.json(palettes);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to list blanket palette items' });
+  }
+});
+
+app.post('/api/admin/long-arm-quilting/blanket-palettes', authMiddleware, async (req, res) => {
+  try {
+    const result = await createLongArmBlanketPalette(req.body);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.status(201).json(result);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to create palette item' });
+  }
+});
+
+app.put('/api/admin/long-arm-quilting/blanket-palettes/:id', authMiddleware, async (req, res) => {
+  try {
+    const result = await updateLongArmBlanketPalette(req.params.id, req.body);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to update palette item' });
+  }
+});
+
+app.delete('/api/admin/long-arm-quilting/blanket-palettes/:id', authMiddleware, async (req, res) => {
+  try {
+    const result = await deleteLongArmBlanketPalette(req.params.id);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to delete palette item' });
+  }
+});
+
+app.patch('/api/admin/long-arm-quilting/blanket-palettes/:id/visibility', authMiddleware, async (req, res) => {
+  try {
+    const result = await setLongArmBlanketPaletteVisibility(req.params.id, !!req.body?.is_published);
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({ error: result.error });
+    }
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Failed to update visibility' });
+  }
+});
+
+app.post(
+  '/api/admin/long-arm-quilting/blanket-palettes/:id/image',
+  authMiddleware,
+  (req, res, next) => {
+    longArmBlanketPaletteImageUpload.single('image')(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message || 'Upload failed' });
+      next();
+    });
+  },
+  async (req, res) => {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'No image file received (use field name "image")' });
+    }
+    try {
+      const [normalized] = await normalizeUploadedImageFiles([file]);
+      const f = normalized ?? file;
+      const paletteId = req.params.id;
+      const url = `/uploads/long-arm-blanket-palettes/${paletteId}/${f.filename}`;
+      const result = await setLongArmBlanketPaletteImage(paletteId, url);
+      if (!result.ok) {
+        return res.status(result.status ?? 400).json({ error: result.error });
+      }
+      res.status(201).json({ ok: true, image_url: url });
+    } catch (e) {
+      console.error('[long-arm/blanket-palette-image]', e);
       if (file?.path && fs.existsSync(file.path)) {
         try {
           fs.unlinkSync(file.path);

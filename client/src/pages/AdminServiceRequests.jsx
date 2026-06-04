@@ -12,6 +12,13 @@ const emptyServiceForm = {
   is_published: true,
 };
 
+const emptyPaletteForm = {
+  title: '',
+  price: '',
+  sort_order: '0',
+  is_published: true,
+};
+
 function formatPrice(n) {
   if (n == null) return '—';
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(Number(n));
@@ -31,12 +38,16 @@ function quiltSourceLabel(value) {
 export default function AdminServiceRequests() {
   const [tab, setTab] = useState('services');
   const [services, setServices] = useState([]);
+  const [palettes, setPalettes] = useState([]);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [serviceForm, setServiceForm] = useState(emptyServiceForm);
+  const [paletteForm, setPaletteForm] = useState(emptyPaletteForm);
   const [editingServiceId, setEditingServiceId] = useState(null);
+  const [editingPaletteId, setEditingPaletteId] = useState(null);
   const [imageUploading, setImageUploading] = useState(null);
+  const [paletteImageUploading, setPaletteImageUploading] = useState(null);
   const [finalPaymentRow, setFinalPaymentRow] = useState(null);
   const [finalAmount, setFinalAmount] = useState('');
   const [finalNote, setFinalNote] = useState('');
@@ -48,6 +59,11 @@ export default function AdminServiceRequests() {
     setServices(Array.isArray(data) ? data : []);
   }, []);
 
+  const refreshPalettes = useCallback(async () => {
+    const data = await adminApi.longArmBlanketPalettes();
+    setPalettes(Array.isArray(data) ? data : []);
+  }, []);
+
   const refreshRequests = useCallback(async () => {
     const data = await adminApi.longArmRequests();
     setRequests(Array.isArray(data) ? data : []);
@@ -55,8 +71,8 @@ export default function AdminServiceRequests() {
 
   const refreshAll = useCallback(async () => {
     setError(null);
-    await Promise.all([refreshServices(), refreshRequests()]);
-  }, [refreshServices, refreshRequests]);
+    await Promise.all([refreshServices(), refreshPalettes(), refreshRequests()]);
+  }, [refreshServices, refreshPalettes, refreshRequests]);
 
   useEffect(() => {
     let cancelled = false;
@@ -158,6 +174,88 @@ export default function AdminServiceRequests() {
     }
   }
 
+  async function onCreatePalette(e) {
+    e.preventDefault();
+    setError(null);
+    try {
+      await adminApi.createLongArmBlanketPalette({
+        ...paletteForm,
+        price: Number(paletteForm.price),
+        sort_order: Number(paletteForm.sort_order) || 0,
+      });
+      setPaletteForm(emptyPaletteForm);
+      await refreshPalettes();
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    }
+  }
+
+  function startEditPalette(item) {
+    setEditingPaletteId(item.id);
+    setPaletteForm({
+      title: item.title,
+      price: item.price != null ? String(item.price) : '',
+      sort_order: String(item.sort_order ?? 0),
+      is_published: !!item.is_published,
+    });
+  }
+
+  async function onUpdatePalette(e) {
+    e.preventDefault();
+    setError(null);
+    try {
+      await adminApi.updateLongArmBlanketPalette(editingPaletteId, {
+        ...paletteForm,
+        price: Number(paletteForm.price),
+        sort_order: Number(paletteForm.sort_order) || 0,
+      });
+      setEditingPaletteId(null);
+      setPaletteForm(emptyPaletteForm);
+      await refreshPalettes();
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    }
+  }
+
+  async function onDeletePalette(id) {
+    if (!window.confirm('Delete this palette item?')) return;
+    setError(null);
+    try {
+      await adminApi.deleteLongArmBlanketPalette(id);
+      if (editingPaletteId === id) {
+        setEditingPaletteId(null);
+        setPaletteForm(emptyPaletteForm);
+      }
+      await refreshPalettes();
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    }
+  }
+
+  async function onTogglePalettePublished(item) {
+    setError(null);
+    try {
+      await adminApi.setLongArmBlanketPaletteVisibility(item.id, !item.is_published);
+      await refreshPalettes();
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    }
+  }
+
+  async function onUploadPaletteImage(paletteId, file) {
+    if (!file) return;
+    setPaletteImageUploading(paletteId);
+    setError(null);
+    try {
+      await adminApi.uploadLongArmBlanketPaletteImage(paletteId, file);
+      await refreshPalettes();
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setPaletteImageUploading(null);
+    }
+  }
+
   async function onAcknowledge(req, value) {
     setError(null);
     try {
@@ -230,6 +328,13 @@ export default function AdminServiceRequests() {
           onClick={() => setTab('services')}
         >
           Services
+        </button>
+        <button
+          type="button"
+          className={`btn${tab === 'palettes' ? ' btn-primary' : ''}`}
+          onClick={() => setTab('palettes')}
+        >
+          Blanket palette ({palettes.length})
         </button>
         <button
           type="button"
@@ -406,6 +511,154 @@ export default function AdminServiceRequests() {
         </>
       ) : null}
 
+      {tab === 'palettes' ? (
+        <>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Manage base quilt options shown when customers choose &ldquo;Use our quilt(s)&rdquo; on the
+            long-arm quilting request form.
+          </p>
+          <div className="table-wrap" style={{ marginBottom: '2rem' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Image</th>
+                  <th>Title</th>
+                  <th>Base price</th>
+                  <th>Published</th>
+                  <th>Updated</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {palettes.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="muted">
+                      No palette items yet.
+                    </td>
+                  </tr>
+                ) : (
+                  palettes.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        {item.image_url ? (
+                          <div className="admin-product-list-thumb">
+                            <ProductImage src={item.image_url} alt="" />
+                          </div>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                      <td>
+                        <strong>{item.title}</strong>
+                      </td>
+                      <td>{formatPrice(item.price)}</td>
+                      <td>
+                        <button type="button" className="btn" onClick={() => onTogglePalettePublished(item)}>
+                          {item.is_published ? 'Published' : 'Draft'}
+                        </button>
+                      </td>
+                      <td className="muted">{formatWhen(item.updated_at)}</td>
+                      <td>
+                        <div className="row" style={{ justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          <label className="btn" style={{ cursor: 'pointer' }}>
+                            {paletteImageUploading === item.id ? 'Uploading…' : 'Image'}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              hidden
+                              disabled={paletteImageUploading === item.id}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                e.target.value = '';
+                                onUploadPaletteImage(item.id, f);
+                              }}
+                            />
+                          </label>
+                          <button type="button" className="btn" onClick={() => startEditPalette(item)}>
+                            Edit
+                          </button>
+                          <button type="button" className="btn btn-danger" onClick={() => onDeletePalette(item.id)}>
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <h2>{editingPaletteId ? 'Edit palette item' : 'New palette item'}</h2>
+          <form className="form" onSubmit={editingPaletteId ? onUpdatePalette : onCreatePalette}>
+            <div className="field">
+              <label htmlFor="palette-title">Title</label>
+              <input
+                id="palette-title"
+                value={paletteForm.title}
+                onChange={(e) => setPaletteForm((f) => ({ ...f, title: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="palette-price">Base price (USD)</label>
+              <input
+                id="palette-price"
+                type="number"
+                min="0"
+                step="0.01"
+                value={paletteForm.price}
+                onChange={(e) => setPaletteForm((f) => ({ ...f, price: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="palette-sort">Sort order</label>
+              <input
+                id="palette-sort"
+                type="number"
+                value={paletteForm.sort_order}
+                onChange={(e) => setPaletteForm((f) => ({ ...f, sort_order: e.target.value }))}
+              />
+            </div>
+            <div className="field row">
+              <input
+                id="palette-pub"
+                type="checkbox"
+                checked={paletteForm.is_published}
+                onChange={(e) => setPaletteForm((f) => ({ ...f, is_published: e.target.checked }))}
+              />
+              <label htmlFor="palette-pub" style={{ margin: 0, textTransform: 'none', letterSpacing: 'normal' }}>
+                Published on website
+              </label>
+            </div>
+            <div className="row">
+              {editingPaletteId ? (
+                <>
+                  <button type="submit" className="btn btn-primary">
+                    Save changes
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      setEditingPaletteId(null);
+                      setPaletteForm(emptyPaletteForm);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button type="submit" className="btn btn-primary">
+                  Create palette item
+                </button>
+              )}
+            </div>
+          </form>
+        </>
+      ) : null}
+
       {tab === 'requests' ? (
         <>
           <div className="table-wrap">
@@ -416,6 +669,7 @@ export default function AdminServiceRequests() {
                   <th>Customer</th>
                   <th>Services</th>
                   <th>Quilt source</th>
+                  <th>Base quilt</th>
                   <th>Deposit</th>
                   <th>Status</th>
                   <th>Created</th>
@@ -425,7 +679,7 @@ export default function AdminServiceRequests() {
               <tbody>
                 {requests.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="muted">
+                    <td colSpan={9} className="muted">
                       No customer requests yet.
                     </td>
                   </tr>
@@ -456,6 +710,20 @@ export default function AdminServiceRequests() {
                         {(req.services ?? []).map((s) => s.name).join(', ') || '—'}
                       </td>
                       <td>{quiltSourceLabel(req.quilt_source)}</td>
+                      <td style={{ maxWidth: '12rem' }}>
+                        {req.blanket_palette ? (
+                          <>
+                            <strong>{req.blanket_palette.title}</strong>
+                            <div className="muted" style={{ fontSize: '0.85rem' }}>
+                              {formatPrice(req.blanket_palette.price)}
+                            </div>
+                          </>
+                        ) : req.quilt_source === 'use_ours' ? (
+                          <span className="muted">Not recorded</span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                       <td>
                         {req.deposit_paid_at ? (
                           <>

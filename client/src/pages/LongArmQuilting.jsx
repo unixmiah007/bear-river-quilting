@@ -78,8 +78,10 @@ export default function LongArmQuilting() {
   const [error, setError] = useState(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [step, setStep] = useState(1);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedServiceId, setSelectedServiceId] = useState(null);
   const [quiltSource, setQuiltSource] = useState('');
+  const [blanketPalettes, setBlanketPalettes] = useState([]);
+  const [selectedBlanketId, setSelectedBlanketId] = useState(null);
   const [form, setForm] = useState(initialForm);
   const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -92,8 +94,14 @@ export default function LongArmQuilting() {
     let cancelled = false;
     (async () => {
       try {
-        const rows = await publicApi.listLongArmServices();
-        if (!cancelled) setServices(Array.isArray(rows) ? rows : []);
+        const [rows, palettes] = await Promise.all([
+          publicApi.listLongArmServices(),
+          publicApi.listLongArmBlanketPalettes(),
+        ]);
+        if (!cancelled) {
+          setServices(Array.isArray(rows) ? rows : []);
+          setBlanketPalettes(Array.isArray(palettes) ? palettes : []);
+        }
       } catch (e) {
         if (!cancelled) setError(e.body?.error || e.message);
       } finally {
@@ -104,6 +112,22 @@ export default function LongArmQuilting() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!wizardOpen) return undefined;
+    let cancelled = false;
+    publicApi
+      .listLongArmBlanketPalettes()
+      .then((rows) => {
+        if (!cancelled) setBlanketPalettes(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => {
+        if (!cancelled) setBlanketPalettes([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wizardOpen]);
 
   useEffect(() => {
     const sessionId = searchParams.get('session_id');
@@ -200,29 +224,36 @@ export default function LongArmQuilting() {
     form.shippingCountry,
   ]);
 
-  function toggleService(id) {
-    setSelectedIds((ids) => {
-      const next = ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id];
-      if (next.length === 0) setQuiltSource('');
-      return next;
-    });
+  function selectService(id) {
+    setSelectedServiceId(id);
+  }
+
+  function selectQuiltSource(value) {
+    setQuiltSource(value);
+    if (value !== 'use_ours') setSelectedBlanketId(null);
   }
 
   function startRequest() {
     setError(null);
+    setSelectedServiceId(null);
     setQuiltSource('');
+    setSelectedBlanketId(null);
     setWizardOpen(true);
     setStep(1);
   }
 
   function nextStep() {
     setError(null);
-    if (step === 1 && selectedIds.length === 0) {
-      setError('Select at least one service to continue.');
+    if (step === 1 && !selectedServiceId) {
+      setError('Select a service to continue.');
       return;
     }
     if (step === 1 && !quiltSource) {
       setError('Choose whether you are sending your quilt or using ours.');
+      return;
+    }
+    if (step === 1 && quiltSource === 'use_ours' && !selectedBlanketId) {
+      setError('Select a base quilt from our palette.');
       return;
     }
     if (step === 2 && (!form.contactName || !form.contactEmail)) {
@@ -285,8 +316,9 @@ export default function LongArmQuilting() {
     setError(null);
     try {
       const payload = {
-        serviceIds: selectedIds,
+        serviceIds: selectedServiceId ? [selectedServiceId] : [],
         quiltSource,
+        blanketPaletteId: quiltSource === 'use_ours' ? selectedBlanketId : null,
         notes: form.notes,
         customer: {
           name: form.contactName,
@@ -322,7 +354,8 @@ export default function LongArmQuilting() {
     }
   }
 
-  const selectedServices = services.filter((s) => selectedIds.includes(s.id));
+  const selectedServices = services.filter((s) => s.id === selectedServiceId);
+  const selectedBlanket = blanketPalettes.find((p) => p.id === selectedBlanketId) ?? null;
 
   if (loading || confirmingPayment) {
     return (
@@ -398,7 +431,9 @@ export default function LongArmQuilting() {
               onClick={() => {
                 setWizardOpen(false);
                 setStep(1);
+                setSelectedServiceId(null);
                 setQuiltSource('');
+                setSelectedBlanketId(null);
                 setError(null);
               }}
             >
@@ -428,16 +463,17 @@ export default function LongArmQuilting() {
           <form className="form" onSubmit={(e) => e.preventDefault()}>
             {step === 1 ? (
               <div className="long-arm-wizard__services">
-                <p className="muted">Select one or more services you are interested in.</p>
-                <div className="long-arm-wizard__service-list">
+                <p className="muted">Select one service you are interested in.</p>
+                <div className="long-arm-wizard__service-list" role="radiogroup" aria-label="Long-arm service">
                   {services.map((svc) => {
-                    const checked = selectedIds.includes(svc.id);
+                    const checked = selectedServiceId === svc.id;
                     return (
                       <label key={svc.id} className={`long-arm-wizard__service-option${checked ? ' long-arm-wizard__service-option--selected' : ''}`}>
                         <input
-                          type="checkbox"
+                          type="radio"
+                          name="long-arm-service"
                           checked={checked}
-                          onChange={() => toggleService(svc.id)}
+                          onChange={() => selectService(svc.id)}
                         />
                         <span>
                           <strong>{svc.name}</strong>
@@ -449,7 +485,7 @@ export default function LongArmQuilting() {
                     );
                   })}
                 </div>
-                {selectedIds.length > 0 ? (
+                {selectedServiceId ? (
                   <div className="long-arm-wizard__quilt-source">
                     <h3 className="long-arm-wizard__quilt-source-heading">How will we work with your quilt?</h3>
                     <p className="muted">Select one option to continue to contact details.</p>
@@ -461,13 +497,59 @@ export default function LongArmQuilting() {
                           role="radio"
                           aria-checked={quiltSource === option.value}
                           className={`customize-path-chooser__option${quiltSource === option.value ? ' customize-path-chooser__option--active' : ''}`}
-                          onClick={() => setQuiltSource(option.value)}
+                          onClick={() => selectQuiltSource(option.value)}
                         >
                           <span className="customize-path-chooser__title">{option.title}</span>
                           <span className="customize-path-chooser__hint muted">{option.hint}</span>
                         </button>
                       ))}
                     </div>
+                    {quiltSource === 'send_yours' ? (
+                      <p className="long-arm-wizard__quilt-source-message" role="status">
+                        Great! We will ship you a box to ship back with your quilt(s).
+                      </p>
+                    ) : null}
+                    {quiltSource === 'use_ours' ? (
+                      <div className="long-arm-wizard__blanket-palette">
+                        <h4 className="long-arm-wizard__blanket-palette-heading">Choose a base quilt</h4>
+                        <p className="muted">Select one of our quilt tops or kits as your starting point.</p>
+                        {blanketPalettes.length === 0 ? (
+                          <p className="muted">Base quilt options will be listed here soon.</p>
+                        ) : (
+                          <div className="long-arm-blanket-palette-grid" role="radiogroup" aria-label="Base quilt palette">
+                            {blanketPalettes.map((item) => {
+                              const selected = selectedBlanketId === item.id;
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={selected}
+                                  className={`long-arm-blanket-palette-card${selected ? ' long-arm-blanket-palette-card--selected' : ''}`}
+                                  onClick={() => setSelectedBlanketId(item.id)}
+                                >
+                                  <span className="long-arm-blanket-palette-card__image">
+                                    {item.image_url ? (
+                                      <ProductImage src={item.image_url} alt="" />
+                                    ) : (
+                                      <div className="long-arm-blanket-palette-card__placeholder muted">No image</div>
+                                    )}
+                                  </span>
+                                  <span className="long-arm-blanket-palette-card__body">
+                                    <span className="long-arm-blanket-palette-card__title">{item.title}</span>
+                                    {item.price != null ? (
+                                      <span className="long-arm-blanket-palette-card__price">
+                                        {formatPrice(item.price)}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -668,7 +750,7 @@ export default function LongArmQuilting() {
             {step === 5 ? (
               <div className="long-arm-wizard__review">
                 <h3>Review &amp; pay deposit</h3>
-                <p className="muted">Selected services:</p>
+                <p className="muted">Selected service:</p>
                 <ul>
                   {selectedServices.map((s) => (
                     <li key={s.id}>{s.name}</li>
@@ -677,6 +759,17 @@ export default function LongArmQuilting() {
                 <p>
                   <strong>Quilt source:</strong> {quiltSourceLabel(quiltSource)}
                 </p>
+                {quiltSource === 'send_yours' ? (
+                  <p className="muted">
+                    We will ship you a box to return your quilt(s) to our studio.
+                  </p>
+                ) : null}
+                {selectedBlanket ? (
+                  <p>
+                    <strong>Base quilt:</strong> {selectedBlanket.title}
+                    {selectedBlanket.price != null ? ` (${formatPrice(selectedBlanket.price)})` : ''}
+                  </p>
+                ) : null}
                 <p>
                   <strong>Deposit due today:</strong> {formatPrice(DEPOSIT_USD)}
                 </p>
