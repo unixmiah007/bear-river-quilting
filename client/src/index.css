@@ -6952,6 +6952,122 @@ tr:last-child td {
   gap: 0.5rem;
 }
 
+.long-arm-wizard__summary {
+  margin-bottom: 1.35rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 4%, #fff);
+}
+
+.long-arm-wizard__summary-eyebrow {
+  margin: 0 0 0.75rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.long-arm-wizard__summary-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.long-arm-wizard__summary-service {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.long-arm-wizard__summary-thumb,
+.long-arm-wizard__summary-blanket-thumb {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--border) 35%, transparent);
+}
+
+.long-arm-wizard__summary-thumb img,
+.long-arm-wizard__summary-blanket-thumb img,
+.long-arm-wizard__summary-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.long-arm-wizard__summary-thumb-placeholder {
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 0.35rem;
+}
+
+.long-arm-wizard__summary-service-body strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.long-arm-wizard__summary-meta {
+  margin: 0.55rem 0 0;
+  line-height: 1.45;
+}
+
+.long-arm-wizard__summary-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.long-arm-wizard__summary-blanket {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.long-arm-wizard__summary-blanket-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.long-arm-wizard__summary-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.long-arm-wizard__summary-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  line-height: 1.5;
+}
+
+.long-arm-wizard__summary-list li + li {
+  margin-top: 0.2rem;
+}
+
+.long-arm-wizard__summary-address {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-style: normal;
+  line-height: 1.45;
+}
+
 .long-arm-wizard__service-option {
   display: flex;
   align-items: flex-start;

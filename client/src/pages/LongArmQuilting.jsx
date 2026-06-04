@@ -30,6 +30,120 @@ function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(Number(n));
 }
 
+function formatAddressBlock({ name, line1, line2, city, state, postal, country }) {
+  const lines = [
+    name,
+    line1,
+    line2,
+    [city, state, postal].filter(Boolean).join(', '),
+    country,
+  ].filter((line) => line != null && String(line).trim() !== '');
+  return lines.length > 0 ? lines : null;
+}
+
+function LongArmWizardSummary({ service, quiltSource, selectedBlanket, form, showContact, showShipping }) {
+  if (!service) return null;
+
+  const contactLines =
+    showContact && (form.contactName || form.contactEmail || form.contactPhone || form.notes)
+      ? [
+          form.contactName || null,
+          form.contactEmail || null,
+          form.contactPhone || null,
+          form.notes ? `Notes: ${form.notes}` : null,
+        ].filter(Boolean)
+      : null;
+
+  const shippingLines =
+    showShipping &&
+    formatAddressBlock({
+      name: form.contactName,
+      line1: form.shippingAddress1,
+      line2: form.shippingAddress2,
+      city: form.shippingCity,
+      state: form.shippingState,
+      postal: form.shippingPostalCode,
+      country: form.shippingCountry,
+    });
+
+  return (
+    <aside className="long-arm-wizard__summary" aria-label="Your request summary">
+      <p className="long-arm-wizard__summary-eyebrow">Your request</p>
+      <div className="long-arm-wizard__summary-service">
+        <div className="long-arm-wizard__summary-thumb">
+          {service.image_url ? (
+            <ProductImage src={service.image_url} alt="" />
+          ) : (
+            <div className="long-arm-wizard__summary-thumb-placeholder muted">No image</div>
+          )}
+        </div>
+        <div className="long-arm-wizard__summary-service-body">
+          <strong>{service.name}</strong>
+          {service.hourly_rate != null ? (
+            <p className="muted" style={{ margin: '0.2rem 0 0' }}>
+              {formatPrice(service.hourly_rate)}/hr
+            </p>
+          ) : null}
+          <p className="long-arm-wizard__summary-meta">
+            <span className="long-arm-wizard__summary-label">Quilt source</span>
+            {quiltSourceLabel(quiltSource)}
+          </p>
+          {quiltSource === 'send_yours' ? (
+            <p className="muted long-arm-wizard__summary-note">
+              We will ship you a box for your quilt(s).
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      {selectedBlanket ? (
+        <div className="long-arm-wizard__summary-blanket">
+          <span className="long-arm-wizard__summary-label">Base quilt</span>
+          <div className="long-arm-wizard__summary-blanket-row">
+            <div className="long-arm-wizard__summary-blanket-thumb">
+              {selectedBlanket.image_url ? (
+                <ProductImage src={selectedBlanket.image_url} alt="" />
+              ) : (
+                <div className="long-arm-wizard__summary-thumb-placeholder muted">No image</div>
+              )}
+            </div>
+            <div>
+              <strong>{selectedBlanket.title}</strong>
+              {selectedBlanket.price != null ? (
+                <p className="muted" style={{ margin: '0.15rem 0 0' }}>
+                  {formatPrice(selectedBlanket.price)}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {contactLines ? (
+        <div className="long-arm-wizard__summary-section">
+          <span className="long-arm-wizard__summary-label">Contact</span>
+          <ul className="long-arm-wizard__summary-list">
+            {contactLines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {shippingLines ? (
+        <div className="long-arm-wizard__summary-section">
+          <span className="long-arm-wizard__summary-label">Shipping</span>
+          <address className="long-arm-wizard__summary-address">
+            {shippingLines.map((line) => (
+              <span key={line}>{line}</span>
+            ))}
+          </address>
+        </div>
+      ) : null}
+    </aside>
+  );
+}
+
 function LongArmServiceImage({ index, src, placeholder }) {
   if (placeholder) {
     return (
@@ -354,7 +468,8 @@ export default function LongArmQuilting() {
     }
   }
 
-  const selectedServices = services.filter((s) => s.id === selectedServiceId);
+  const selectedService = services.find((s) => s.id === selectedServiceId) ?? null;
+  const selectedServices = selectedService ? [selectedService] : [];
   const selectedBlanket = blanketPalettes.find((p) => p.id === selectedBlanketId) ?? null;
 
   if (loading || confirmingPayment) {
@@ -557,6 +672,12 @@ export default function LongArmQuilting() {
 
             {step === 2 ? (
               <>
+                <LongArmWizardSummary
+                  service={selectedService}
+                  quiltSource={quiltSource}
+                  selectedBlanket={selectedBlanket}
+                  form={form}
+                />
                 <div className="field">
                   <label htmlFor="la-cname">Full name</label>
                   <input
@@ -599,6 +720,13 @@ export default function LongArmQuilting() {
 
             {step === 3 ? (
               <>
+                <LongArmWizardSummary
+                  service={selectedService}
+                  quiltSource={quiltSource}
+                  selectedBlanket={selectedBlanket}
+                  form={form}
+                  showContact
+                />
                 <div className="field">
                   <label htmlFor="la-sa1">Shipping address line 1</label>
                   <input
@@ -659,6 +787,14 @@ export default function LongArmQuilting() {
 
             {step === 4 ? (
               <>
+                <LongArmWizardSummary
+                  service={selectedService}
+                  quiltSource={quiltSource}
+                  selectedBlanket={selectedBlanket}
+                  form={form}
+                  showContact
+                  showShipping
+                />
                 <div className="field row">
                   <input
                     id="la-same-billing"
