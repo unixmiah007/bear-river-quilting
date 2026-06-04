@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180" viewBox="0 0 240 180" role="img" aria-label="Swirl cable stitch sample">
+  <rect width="240" height="180" fill="#f2ede7"/>
+  <rect x="8" y="8" width="224" height="164" rx="4" fill="#eae3d9" stroke="#d4c9b8"/>
+  <g fill="none" stroke="#5c4a6e" stroke-width="2.2" stroke-linecap="round">
+    <path d="M60 90 C60 50 100 50 100 90 C100 130 60 130 60 90"/>
+    <path d="M120 90 C120 50 160 50 160 90 C160 130 120 130 120 90"/>
+    <path d="M180 90 C180 50 220 50 220 90 C220 130 180 130 180 90"/>
+    <path d="M30 90 C30 50 70 50 70 90 C70 130 30 130 30 90"/>
+  </g>
+</svg>

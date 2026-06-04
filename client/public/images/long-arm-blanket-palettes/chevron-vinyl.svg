@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180" viewBox="0 0 240 180" role="img" aria-label="Chevron vinyl stitch sample">
+  <rect width="240" height="180" fill="#f4f0ea"/>
+  <rect x="8" y="8" width="224" height="164" rx="4" fill="#ece5dc" stroke="#d4c9b8"/>
+  <g fill="none" stroke="#7a4a52" stroke-width="2.2" stroke-linejoin="round">
+    <path d="M20 50 L40 30 L60 50 L80 30 L100 50 L120 30 L140 50 L160 30 L180 50 L200 30 L220 50"/>
+    <path d="M20 90 L40 70 L60 90 L80 70 L100 90 L120 70 L140 90 L160 70 L180 90 L200 70 L220 90"/>
+    <path d="M20 130 L40 110 L60 130 L80 110 L100 130 L120 110 L140 130 L160 110 L180 130 L200 110 L220 130"/>
+  </g>
+</svg>

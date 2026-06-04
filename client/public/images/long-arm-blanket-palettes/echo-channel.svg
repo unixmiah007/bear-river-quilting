@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180" viewBox="0 0 240 180" role="img" aria-label="Echo channel stitch sample">
+  <rect width="240" height="180" fill="#f3efe8"/>
+  <rect x="8" y="8" width="224" height="164" rx="4" fill="#ebe4da" stroke="#d4c9b8"/>
+  <g fill="none" stroke="#4a6b7c" stroke-width="2" stroke-linecap="round">
+    <rect x="50" y="35" width="140" height="110" rx="6"/>
+    <rect x="62" y="47" width="116" height="86" rx="4"/>
+    <rect x="74" y="59" width="92" height="62" rx="3"/>
+    <rect x="86" y="71" width="68" height="38" rx="2"/>
+  </g>
+</svg>

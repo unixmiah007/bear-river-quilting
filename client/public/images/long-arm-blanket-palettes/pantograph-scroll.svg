@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180" viewBox="0 0 240 180" role="img" aria-label="Pantograph scroll stitch sample">
+  <rect width="240" height="180" fill="#f5f0ea"/>
+  <rect x="8" y="8" width="224" height="164" rx="4" fill="#ede6dc" stroke="#d4c9b8"/>
+  <g fill="none" stroke="#7a5c4a" stroke-width="2" stroke-linecap="round">
+    <path d="M10 45 C40 25 70 65 100 45 S160 25 190 45 S230 65 250 45"/>
+    <path d="M10 75 C40 55 70 95 100 75 S160 55 190 75 S230 95 250 75"/>
+    <path d="M10 105 C40 85 70 125 100 105 S160 85 190 105 S230 125 250 105"/>
+    <path d="M10 135 C40 115 70 155 100 135 S160 115 190 135 S230 155 250 135"/>
+  </g>
+</svg>

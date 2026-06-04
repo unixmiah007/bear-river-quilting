@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180" viewBox="0 0 240 180" role="img" aria-label="Baptist fan stitch sample">
+  <rect width="240" height="180" fill="#f4efe8"/>
+  <rect x="8" y="8" width="224" height="164" rx="4" fill="#ece4da" stroke="#d4c9b8"/>
+  <g fill="none" stroke="#8b6f5c" stroke-width="1.6" stroke-linecap="round">
+    <path d="M120 168 A90 90 0 0 1 30 168"/>
+    <path d="M120 168 A75 75 0 0 1 45 168"/>
+    <path d="M120 168 A60 60 0 0 1 60 168"/>
+    <path d="M120 168 A45 45 0 0 1 75 168"/>
+    <path d="M120 168 A30 30 0 0 1 90 168"/>
+    <path d="M120 168 A90 90 0 0 0 210 168"/>
+    <path d="M120 168 A75 75 0 0 0 195 168"/>
+    <path d="M120 168 A60 60 0 0 0 180 168"/>
+    <path d="M120 168 A45 45 0 0 0 165 168"/>
+    <path d="M120 168 A30 30 0 0 0 150 168"/>
+  </g>
+</svg>

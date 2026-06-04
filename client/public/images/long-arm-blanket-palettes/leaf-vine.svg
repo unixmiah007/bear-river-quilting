@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180" viewBox="0 0 240 180" role="img" aria-label="Leaf vine stitch sample">
+  <rect width="240" height="180" fill="#f5f0e9"/>
+  <rect x="8" y="8" width="224" height="164" rx="4" fill="#ede6dc" stroke="#d4c9b8"/>
+  <g fill="none" stroke="#4a6b4a" stroke-width="1.8" stroke-linecap="round">
+    <path d="M30 140 Q80 90 120 50 Q160 90 210 40"/>
+    <path d="M95 75 Q85 55 75 65 Q85 85 95 75"/>
+    <path d="M130 58 Q140 38 150 48 Q140 68 130 58"/>
+    <path d="M165 48 Q175 28 185 38 Q175 58 165 48"/>
+    <path d="M110 95 Q100 75 90 85 Q100 105 110 95"/>
+    <path d="M150 78 Q160 58 170 68 Q160 88 150 78"/>
+  </g>
+</svg>

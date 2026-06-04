@@ -1,3 +1,5 @@
+import { syncStitchBlanketPalettes } from './longArmBlanketPaletteSeeds.js';
+
 async function columnExists(conn, table, column) {
   const db = process.env.MYSQL_DATABASE ?? 'cms_store';
   const [[row]] = await conn.query(
@@ -78,13 +80,6 @@ const DEFAULT_SERVICES = [
     hourly_rate: 20,
     sort_order: 9,
   },
-];
-
-const DEFAULT_BLANKET_PALETTES = [
-  { title: 'Classic cotton quilt top', price: 89, sort_order: 1 },
-  { title: 'Modern patchwork starter kit', price: 129, sort_order: 2 },
-  { title: 'Heirloom charm quilt top', price: 149, sort_order: 3 },
-  { title: 'King-size panel quilt top', price: 179, sort_order: 4 },
 ];
 
 /** Creates long-arm quilting tables and seeds default services when empty. */
@@ -185,14 +180,5 @@ export async function ensureLongArmQuiltingTables(pool) {
     }
   }
 
-  const [[paletteCountRow]] = await pool.query('SELECT COUNT(*) AS c FROM long_arm_blanket_palettes');
-  if (Number(paletteCountRow.c) === 0) {
-    for (const item of DEFAULT_BLANKET_PALETTES) {
-      await pool.query(
-        `INSERT INTO long_arm_blanket_palettes (title, price, sort_order, is_published)
-         VALUES (?, ?, ?, 1)`,
-        [item.title, item.price, item.sort_order]
-      );
-    }
-  }
+  await syncStitchBlanketPalettes(pool);
 }

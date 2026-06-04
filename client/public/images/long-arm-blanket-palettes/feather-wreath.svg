@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180" viewBox="0 0 240 180" role="img" aria-label="Feather wreath stitch sample">
+  <rect width="240" height="180" fill="#f3eee8"/>
+  <rect x="8" y="8" width="224" height="164" rx="4" fill="#ebe3d9" stroke="#d4c9b8"/>
+  <g fill="none" stroke="#6b4e3d" stroke-width="1.8" stroke-linecap="round">
+    <path d="M120 90 C120 55 155 55 155 90 C155 125 120 125 120 90"/>
+    <path d="M120 90 C85 90 85 55 120 55"/>
+    <path d="M120 90 C85 90 85 125 120 125"/>
+    <path d="M120 90 C155 90 155 125 120 125"/>
+    <path d="M120 72 Q108 58 95 72 Q108 86 120 72"/>
+    <path d="M128 72 Q140 58 153 72 Q140 86 128 72"/>
+    <path d="M120 108 Q108 122 95 108 Q108 94 120 108"/>
+    <path d="M128 108 Q140 122 153 108 Q140 94 128 108"/>
+    <path d="M102 90 Q88 76 102 62 Q116 76 102 90"/>
+    <path d="M138 90 Q152 76 138 62 Q124 76 138 90"/>
+    <path d="M102 90 Q88 104 102 118 Q116 104 102 90"/>
+    <path d="M138 90 Q152 104 138 118 Q124 104 138 90"/>
+  </g>
+</svg>
