@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminApi } from '../api.js';
 import PageLoading from '../components/PageLoading.jsx';
 import ProductImage from '../components/ProductImage.jsx';
@@ -19,6 +19,8 @@ const emptyPaletteForm = {
   is_published: true,
 };
 
+const REQUEST_PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 30, 'all'];
+
 function formatPrice(n) {
   if (n == null) return '—';
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(Number(n));
@@ -33,6 +35,317 @@ function quiltSourceLabel(value) {
   if (value === 'send_yours') return 'Send us your quilt(s)';
   if (value === 'use_ours') return 'Use our quilt(s)';
   return '—';
+}
+
+function displayValue(value) {
+  const s = value == null ? '' : String(value).trim();
+  return s || '—';
+}
+
+function acknowledgedLabel(value) {
+  return String(value || 'N').toUpperCase() === 'Y' ? 'Y' : 'N';
+}
+
+function statusLabel(status) {
+  const labels = {
+    pending_payment: 'Pending payment',
+    deposit_paid: 'Deposit paid',
+    in_progress: 'In progress',
+    completed: 'Completed',
+    cancelled: 'Cancelled',
+  };
+  return labels[status] ?? displayValue(status);
+}
+
+function formatAddressBlock(parts) {
+  const lines = parts.filter((p) => p != null && String(p).trim() !== '');
+  return lines.length ? lines.join('\n') : '—';
+}
+
+function serviceImageUrl(servicesCatalog, serviceId) {
+  const svc = servicesCatalog.find((s) => Number(s.id) === Number(serviceId));
+  const url = svc?.image_url;
+  return url != null && String(url).trim() !== '' ? String(url).trim() : null;
+}
+
+function requestSearchHaystack(req, servicesCatalog) {
+  const enrichedServices = (req.services ?? [])
+    .map((s) => {
+      const full = servicesCatalog.find((c) => Number(c.id) === Number(s.id));
+      return [s.name, s.hourly_rate != null ? String(s.hourly_rate) : '', full?.slug, full?.description]
+        .filter(Boolean)
+        .join(' ');
+    })
+    .join(' ');
+
+  const parts = [
+    req.request_number,
+    req.customer_name,
+    req.customer_email,
+    req.customer_phone,
+    enrichedServices,
+    quiltSourceLabel(req.quilt_source),
+    req.blanket_palette?.title,
+    req.blanket_palette?.price != null ? String(req.blanket_palette.price) : '',
+    req.notes,
+    statusLabel(req.status),
+    req.status,
+    acknowledgedLabel(req.acknowledged),
+    formatPrice(req.deposit_amount),
+    formatPrice(req.final_payment_amount),
+    formatWhen(req.created_at),
+    formatWhen(req.updated_at),
+    formatWhen(req.deposit_paid_at),
+    req.shipping_address1,
+    req.shipping_address2,
+    req.shipping_city,
+    req.shipping_state,
+    req.shipping_postal_code,
+    req.shipping_country,
+    req.billing_name,
+    req.billing_address1,
+    req.billing_address2,
+    req.billing_city,
+    req.billing_state,
+    req.billing_postal_code,
+    req.billing_country,
+    req.stripe_checkout_session_id,
+    req.stripe_payment_intent_id,
+  ];
+
+  return parts
+    .filter((v) => v != null && String(v).trim() !== '' && String(v) !== '—')
+    .join(' ')
+    .toLowerCase();
+}
+
+function requestMatchesSearch(req, query, servicesCatalog) {
+  if (!query) return true;
+  return requestSearchHaystack(req, servicesCatalog).includes(query.toLowerCase());
+}
+
+function LongArmRequestImages({ req, servicesCatalog }) {
+  const items = [];
+  for (const svc of req.services ?? []) {
+    const url = serviceImageUrl(servicesCatalog, svc.id);
+    if (url) {
+      items.push({ key: `svc-${svc.id}`, label: svc.name, url });
+    }
+  }
+  if (req.blanket_palette?.image_url) {
+    const url = String(req.blanket_palette.image_url).trim();
+    if (url) {
+      items.push({
+        key: `palette-${req.blanket_palette.id}`,
+        label: req.blanket_palette.title || 'Base quilt',
+        url,
+      });
+    }
+  }
+
+  if (!items.length) {
+    return (
+      <p className="muted admin-long-arm-detail-dialog__images-empty">
+        No images on file for this request.
+      </p>
+    );
+  }
+
+  return (
+    <div className="admin-long-arm-detail-dialog__images">
+      {items.map((item) => (
+        <figure key={item.key} className="admin-long-arm-detail-dialog__image-card">
+          <a href={item.url} target="_blank" rel="noreferrer" title={`Open ${item.label} in a new tab`}>
+            <img src={item.url} alt="" />
+          </a>
+          <figcaption>{item.label}</figcaption>
+        </figure>
+      ))}
+    </div>
+  );
+}
+
+function LongArmRequestDetailDialog({
+  req,
+  servicesCatalog,
+  ackBusy,
+  onClose,
+  onToggleAck,
+  onOpenFinalPayment,
+}) {
+  if (!req) return null;
+
+  const ack = acknowledgedLabel(req.acknowledged);
+  const shipping = formatAddressBlock([
+    req.shipping_address1,
+    req.shipping_address2,
+    [req.shipping_city, req.shipping_state, req.shipping_postal_code].filter(Boolean).join(', '),
+    req.shipping_country,
+  ]);
+  const billing = formatAddressBlock([
+    req.billing_name,
+    req.billing_address1,
+    req.billing_address2,
+    [req.billing_city, req.billing_state, req.billing_postal_code].filter(Boolean).join(', '),
+    req.billing_country,
+  ]);
+
+  return (
+    <div className="confirm-dialog-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="confirm-dialog admin-customize-detail-dialog admin-long-arm-detail-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="long-arm-request-detail-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="long-arm-request-detail-title" className="confirm-dialog__title">
+          {req.request_number}
+        </h2>
+        <p className="muted admin-customize-detail-dialog__meta">
+          Submitted {formatWhen(req.created_at)}
+          {req.updated_at && req.updated_at !== req.created_at
+            ? ` · Updated ${formatWhen(req.updated_at)}`
+            : ''}
+        </p>
+
+        <dl className="admin-customize-detail-dialog__dl">
+          <div>
+            <dt>Status</dt>
+            <dd>{statusLabel(req.status)}</dd>
+          </div>
+          <div>
+            <dt>Acknowledged</dt>
+            <dd>
+              <span className={`badge ${ack === 'Y' ? 'badge-on' : 'badge-off'}`}>{ack}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Service</dt>
+            <dd>
+              {(req.services ?? []).length
+                ? (req.services ?? []).map((s) => (
+                    <span key={s.id}>
+                      {s.name}
+                      {s.hourly_rate != null ? (
+                        <span className="muted"> · {formatPrice(s.hourly_rate)}/hr</span>
+                      ) : null}
+                    </span>
+                  ))
+                : '—'}
+            </dd>
+          </div>
+          <div>
+            <dt>Quilt source</dt>
+            <dd>{quiltSourceLabel(req.quilt_source)}</dd>
+          </div>
+          <div>
+            <dt>Base quilt</dt>
+            <dd>
+              {req.blanket_palette ? (
+                <>
+                  {req.blanket_palette.title}
+                  <br />
+                  <span className="muted">{formatPrice(req.blanket_palette.price)}</span>
+                </>
+              ) : req.quilt_source === 'use_ours' ? (
+                <span className="muted">Not recorded</span>
+              ) : (
+                '—'
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Notes</dt>
+            <dd className="admin-customize-detail-dialog__notes">{req.notes ? req.notes : '—'}</dd>
+          </div>
+          <div>
+            <dt>Deposit</dt>
+            <dd>
+              {req.deposit_paid_at ? (
+                <>
+                  {formatPrice(req.deposit_amount)} — paid {formatWhen(req.deposit_paid_at)}
+                </>
+              ) : (
+                <span className="badge badge-off">Unpaid</span>
+              )}
+            </dd>
+          </div>
+          {req.final_payment_amount != null ? (
+            <div>
+              <dt>Final payment</dt>
+              <dd>{formatPrice(req.final_payment_amount)}</dd>
+            </div>
+          ) : null}
+          <div>
+            <dt>Customer</dt>
+            <dd>
+              {displayValue(req.customer_name)}
+              <br />
+              <a href={`mailto:${req.customer_email}`}>{displayValue(req.customer_email)}</a>
+              {req.customer_phone ? (
+                <>
+                  <br />
+                  <a href={`tel:${req.customer_phone}`}>{req.customer_phone}</a>
+                </>
+              ) : null}
+            </dd>
+          </div>
+          <div>
+            <dt>Shipping</dt>
+            <dd className="admin-customize-detail-dialog__notes">{shipping}</dd>
+          </div>
+          <div>
+            <dt>Billing</dt>
+            <dd className="admin-customize-detail-dialog__notes">{billing}</dd>
+          </div>
+          {req.stripe_checkout_session_id ? (
+            <div>
+              <dt>Stripe checkout session</dt>
+              <dd className="admin-customize-detail-dialog__mono">{req.stripe_checkout_session_id}</dd>
+            </div>
+          ) : null}
+          {req.stripe_payment_intent_id ? (
+            <div>
+              <dt>Stripe payment intent</dt>
+              <dd className="admin-customize-detail-dialog__mono">{req.stripe_payment_intent_id}</dd>
+            </div>
+          ) : null}
+        </dl>
+
+        <section className="admin-long-arm-detail-dialog__images-section">
+          <h3 className="admin-long-arm-detail-dialog__images-heading">Images</h3>
+          <LongArmRequestImages req={req} servicesCatalog={servicesCatalog} />
+        </section>
+
+        <div className="confirm-dialog__actions admin-customize-detail-dialog__actions">
+          <button
+            type="button"
+            className="btn"
+            disabled={ackBusy}
+            onClick={() => onToggleAck(req, ack !== 'Y')}
+          >
+            {ackBusy ? 'Saving…' : ack === 'Y' ? 'Mark not acknowledged' : 'Mark acknowledged'}
+          </button>
+          {req.deposit_paid_at ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                onOpenFinalPayment(req);
+                onClose();
+              }}
+            >
+              Final payment
+            </button>
+          ) : null}
+          <button type="button" className="btn" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function AdminServiceRequests() {
@@ -53,6 +366,50 @@ export default function AdminServiceRequests() {
   const [finalNote, setFinalNote] = useState('');
   const [finalBusy, setFinalBusy] = useState(false);
   const [finalResult, setFinalResult] = useState(null);
+  const [requestSearch, setRequestSearch] = useState('');
+  const [detailRequest, setDetailRequest] = useState(null);
+  const [ackSavingId, setAckSavingId] = useState(null);
+  const [requestPageSize, setRequestPageSize] = useState(5);
+  const [requestPage, setRequestPage] = useState(1);
+
+  const filteredRequests = useMemo(() => {
+    const q = requestSearch.trim();
+    if (!q) return requests;
+    return requests.filter((req) => requestMatchesSearch(req, q, services));
+  }, [requests, requestSearch, services]);
+
+  const requestTotalPages = useMemo(() => {
+    if (requestPageSize === 'all' || filteredRequests.length === 0) return 1;
+    return Math.max(1, Math.ceil(filteredRequests.length / requestPageSize));
+  }, [filteredRequests.length, requestPageSize]);
+
+  const paginatedRequests = useMemo(() => {
+    if (filteredRequests.length === 0) return [];
+    if (requestPageSize === 'all') return filteredRequests;
+    const start = (requestPage - 1) * requestPageSize;
+    return filteredRequests.slice(start, start + requestPageSize);
+  }, [filteredRequests, requestPage, requestPageSize]);
+
+  const requestListRange = useMemo(() => {
+    if (filteredRequests.length === 0) return { start: 0, end: 0 };
+    if (requestPageSize === 'all') return { start: 1, end: filteredRequests.length };
+    const start = (requestPage - 1) * requestPageSize + 1;
+    const end = Math.min(requestPage * requestPageSize, filteredRequests.length);
+    return { start, end };
+  }, [filteredRequests.length, requestPage, requestPageSize]);
+
+  useEffect(() => {
+    setRequestPage(1);
+  }, [requestPageSize, requestSearch]);
+
+  useEffect(() => {
+    if (requestPage > requestTotalPages) setRequestPage(requestTotalPages);
+  }, [requestPage, requestTotalPages]);
+
+  const detailFromList = useMemo(() => {
+    if (!detailRequest) return null;
+    return requests.find((r) => r.id === detailRequest.id) ?? detailRequest;
+  }, [requests, detailRequest]);
 
   const refreshServices = useCallback(async () => {
     const data = await adminApi.longArmServices();
@@ -257,12 +614,16 @@ export default function AdminServiceRequests() {
   }
 
   async function onAcknowledge(req, value) {
+    if (!req?.id || ackSavingId != null) return;
     setError(null);
+    setAckSavingId(req.id);
     try {
       await adminApi.setLongArmRequestAcknowledged(req.id, value);
       await refreshRequests();
     } catch (err) {
       setError(err.body?.error || err.message);
+    } finally {
+      setAckSavingId(null);
     }
   }
 
@@ -327,7 +688,7 @@ export default function AdminServiceRequests() {
           className={`btn${tab === 'services' ? ' btn-primary' : ''}`}
           onClick={() => setTab('services')}
         >
-          Services
+          Long-Arm quilting services management
         </button>
         <button
           type="button"
@@ -370,22 +731,38 @@ export default function AdminServiceRequests() {
                   services.map((svc) => (
                     <tr key={svc.id}>
                       <td>
-                        {svc.image_url ? (
-                          <div className="admin-product-list-thumb">
-                            <ProductImage src={svc.image_url} alt="" />
-                          </div>
-                        ) : (
-                          <span className="muted">—</span>
-                        )}
+                        <a
+                          href="/long-arm-quilting"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="admin-service-public-link admin-service-public-link--image"
+                          title="View on long-arm quilting page"
+                        >
+                          {svc.image_url ? (
+                            <div className="admin-product-list-thumb">
+                              <ProductImage src={svc.image_url} alt="" />
+                            </div>
+                          ) : (
+                            <span className="muted">View page</span>
+                          )}
+                        </a>
                       </td>
                       <td>
-                        <strong>{svc.name}</strong>
-                        {svc.description ? (
-                          <div className="muted" style={{ fontSize: '0.85rem', maxWidth: '24rem' }}>
-                            {svc.description.slice(0, 120)}
-                            {svc.description.length > 120 ? '…' : ''}
-                          </div>
-                        ) : null}
+                        <a
+                          href="/long-arm-quilting"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="admin-service-public-link admin-service-public-link--name"
+                          title="View on long-arm quilting page"
+                        >
+                          <strong>{svc.name}</strong>
+                          {svc.description ? (
+                            <div className="muted" style={{ fontSize: '0.85rem', maxWidth: '24rem' }}>
+                              {svc.description.slice(0, 120)}
+                              {svc.description.length > 120 ? '…' : ''}
+                            </div>
+                          ) : null}
+                        </a>
                       </td>
                       <td>{formatPrice(svc.hourly_rate)}</td>
                       <td>
@@ -661,7 +1038,75 @@ export default function AdminServiceRequests() {
 
       {tab === 'requests' ? (
         <>
-          <div className="table-wrap">
+          <p className="muted" style={{ marginTop: 0 }}>
+            Click a row to view the full request, including service and base quilt images.
+          </p>
+          <div className="field admin-long-arm-requests-search">
+            <label htmlFor="long-arm-request-search">Search requests</label>
+            <input
+              id="long-arm-request-search"
+              type="search"
+              placeholder="Request #, customer, service, status, notes, addresses…"
+              value={requestSearch}
+              onChange={(e) => setRequestSearch(e.target.value)}
+              autoComplete="off"
+            />
+            {requestSearch.trim() ? (
+              <p className="muted admin-long-arm-requests-search__hint">
+                {filteredRequests.length} of {requests.length} matching
+              </p>
+            ) : null}
+          </div>
+          {requests.length > 0 ? (
+            <div className="admin-pagination">
+              <div className="admin-pagination__size">
+                <label htmlFor="long-arm-requests-page-size">Show</label>
+                <select
+                  id="long-arm-requests-page-size"
+                  value={String(requestPageSize)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setRequestPageSize(v === 'all' ? 'all' : Number(v));
+                  }}
+                >
+                  {REQUEST_PAGE_SIZE_OPTIONS.map((n) => (
+                    <option key={n} value={String(n)}>
+                      {n === 'all' ? 'All' : n}
+                    </option>
+                  ))}
+                </select>
+                <span className="muted">
+                  {requestPageSize === 'all'
+                    ? `All ${filteredRequests.length} shown`
+                    : `Showing ${requestListRange.start}–${requestListRange.end} of ${filteredRequests.length}`}
+                </span>
+              </div>
+              {requestPageSize !== 'all' && requestTotalPages > 1 ? (
+                <div className="admin-pagination__nav row">
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={requestPage <= 1}
+                    onClick={() => setRequestPage((p) => Math.max(1, p - 1))}
+                  >
+                    Previous
+                  </button>
+                  <span className="muted admin-pagination__status">
+                    Page {requestPage} of {requestTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={requestPage >= requestTotalPages}
+                    onClick={() => setRequestPage((p) => Math.min(requestTotalPages, p + 1))}
+                  >
+                    Next
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="table-wrap admin-service-requests-table">
             <table>
               <thead>
                 <tr>
@@ -683,9 +1128,26 @@ export default function AdminServiceRequests() {
                       No customer requests yet.
                     </td>
                   </tr>
+                ) : filteredRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="muted">
+                      No requests match your search.
+                    </td>
+                  </tr>
                 ) : (
-                  requests.map((req) => (
-                    <tr key={req.id}>
+                  paginatedRequests.map((req) => (
+                    <tr
+                      key={req.id}
+                      className="admin-long-arm-request-row--clickable"
+                      tabIndex={0}
+                      aria-label={`${req.request_number}: view details`}
+                      onClick={() => setDetailRequest(req)}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Enter' && e.key !== ' ') return;
+                        e.preventDefault();
+                        setDetailRequest(req);
+                      }}
+                    >
                       <td>
                         <strong>{req.request_number}</strong>
                         <div className="muted" style={{ fontSize: '0.85rem' }}>
@@ -694,9 +1156,12 @@ export default function AdminServiceRequests() {
                             type="button"
                             className="btn"
                             style={{ padding: '0.1rem 0.35rem', fontSize: '0.8rem' }}
-                            onClick={() => onAcknowledge(req, req.acknowledged !== 'Y')}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onAcknowledge(req, req.acknowledged !== 'Y');
+                            }}
                           >
-                            {req.acknowledged === 'Y' ? 'Y' : 'N'}
+                            {ackSavingId === req.id ? '…' : req.acknowledged === 'Y' ? 'Y' : 'N'}
                           </button>
                         </div>
                       </td>
@@ -744,6 +1209,7 @@ export default function AdminServiceRequests() {
                       <td>
                         <select
                           value={req.status}
+                          onClick={(e) => e.stopPropagation()}
                           onChange={(e) => onStatusChange(req, e.target.value)}
                           aria-label={`Status for ${req.request_number}`}
                         >
@@ -757,7 +1223,14 @@ export default function AdminServiceRequests() {
                       <td className="muted">{formatWhen(req.created_at)}</td>
                       <td>
                         {req.deposit_paid_at ? (
-                          <button type="button" className="btn btn-primary" onClick={() => openFinalPayment(req)}>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openFinalPayment(req);
+                            }}
+                          >
                             Final payment
                           </button>
                         ) : null}
@@ -768,6 +1241,15 @@ export default function AdminServiceRequests() {
               </tbody>
             </table>
           </div>
+
+          <LongArmRequestDetailDialog
+            req={detailFromList}
+            servicesCatalog={services}
+            ackBusy={detailFromList != null && ackSavingId === detailFromList.id}
+            onClose={() => setDetailRequest(null)}
+            onToggleAck={onAcknowledge}
+            onOpenFinalPayment={openFinalPayment}
+          />
 
           {finalPaymentRow ? (
             <section className="card" style={{ marginTop: '1.5rem' }}>
