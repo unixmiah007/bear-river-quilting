@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import SiteLayout from './layouts/SiteLayout.jsx';
 import AdminLayout from './layouts/AdminLayout.jsx';
 import RouteSuspenseFallback from './components/RouteSuspenseFallback.jsx';
+import { LONG_ARM_SERVICE_DETAIL_ROUTES } from './lib/longArmServicePages.js';
 
 const Home = lazy(() => import('./pages/Home.jsx'));
 const DynamicPage = lazy(() => import('./pages/DynamicPage.jsx'));
@@ -19,6 +20,7 @@ const Customize = lazy(() => import('./pages/Customize.jsx'));
 const CustomizeSuccess = lazy(() => import('./pages/CustomizeSuccess.jsx'));
 const LongArmQuilting = lazy(() => import('./pages/LongArmQuilting.jsx'));
 const LongArmQuiltingSuccess = lazy(() => import('./pages/LongArmQuiltingSuccess.jsx'));
+const LongArmServiceDetail = lazy(() => import('./pages/LongArmServiceDetail.jsx'));
 const AdminLogin = lazy(() => import('./pages/AdminLogin.jsx'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
 const AdminPages = lazy(() => import('./pages/AdminPages.jsx'));
@@ -111,6 +113,17 @@ export default function App() {
             </SuspenseRoute>
           }
         />
+        {LONG_ARM_SERVICE_DETAIL_ROUTES.map((path) => (
+          <Route
+            key={path}
+            path={path}
+            element={
+              <SuspenseRoute>
+                <LongArmServiceDetail />
+              </SuspenseRoute>
+            }
+          />
+        ))}
         <Route
           path="/products"
           element={

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
 import PageLoading from '../components/PageLoading.jsx';
 import ScrollReveal from '../components/ScrollReveal.jsx';
+import { longArmServiceDetailPath } from '../lib/longArmServicePages.js';
 
 const DEPOSIT_USD = 30;
 const DEPOSIT_PAUSE_SECONDS = 4;
@@ -144,23 +145,27 @@ function LongArmWizardSummary({ service, quiltSource, selectedBlanket, form, sho
   );
 }
 
-function LongArmServiceImage({ index, src, placeholder }) {
-  if (placeholder) {
-    return (
-      <ScrollReveal
-        index={index}
-        content
-        className="long-arm-service-card__image long-arm-service-card__image--placeholder muted"
-      >
-        No image
-      </ScrollReveal>
-    );
-  }
-
-  return (
+function LongArmServiceImage({ index, src, placeholder, linkTo }) {
+  const image = placeholder ? (
+    <ScrollReveal
+      index={index}
+      content
+      className="long-arm-service-card__image long-arm-service-card__image--placeholder muted"
+    >
+      No image
+    </ScrollReveal>
+  ) : (
     <ScrollReveal index={index} className="long-arm-service-card__image">
       <ProductImage src={src} alt="" />
     </ScrollReveal>
+  );
+
+  if (!linkTo) return image;
+
+  return (
+    <Link to={linkTo} className="long-arm-service-card__image-link" aria-label="Learn more about this service">
+      {image}
+    </Link>
   );
 }
 
@@ -512,6 +517,7 @@ export default function LongArmQuilting() {
                   index={index}
                   src={svc.image_url}
                   placeholder={!svc.image_url}
+                  linkTo={longArmServiceDetailPath(svc.slug)}
                 />
                 <div className="long-arm-service-card__body">
                   <h2>{svc.name}</h2>

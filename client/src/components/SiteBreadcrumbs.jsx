@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
+import { getLongArmServiceDetailByPath } from '../lib/longArmServiceDetailContent.js';
 
 const STATIC_ROUTE_LABELS = {
   '/about': 'About Us',
@@ -57,6 +58,13 @@ function buildBreadcrumbs(pathname, searchParams, params, labels) {
       pathname.startsWith('/long-arm') ? 'Long-Arm Quilting Services' : 'Customize';
     crumbs.push({ label: parentLabel, to: parent });
     crumbs.push({ label: STATIC_ROUTE_LABELS[pathname], to: pathname });
+    return crumbs;
+  }
+
+  const longArmDetail = getLongArmServiceDetailByPath(pathname);
+  if (longArmDetail) {
+    crumbs.push({ label: 'Long-Arm Quilting Services', to: '/long-arm-quilting' });
+    crumbs.push({ label: longArmDetail.breadcrumbLabel, to: pathname });
     return crumbs;
   }
 

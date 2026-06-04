@@ -6910,6 +6910,70 @@ tr:last-child td {
   padding: 0;
 }
 
+.long-arm-service-card__image-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: inherit;
+  transition: opacity 0.15s ease;
+}
+
+.long-arm-service-card__image-link:hover {
+  opacity: 0.92;
+}
+
+.long-arm-service-card__image-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.long-arm-service-detail__header {
+  margin-bottom: 1.25rem;
+}
+
+.long-arm-service-detail__intro {
+  max-width: 42rem;
+}
+
+.long-arm-service-detail__hero {
+  margin: 0 0 2rem;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.long-arm-service-detail__hero img {
+  width: 100%;
+  max-height: min(420px, 52vw);
+  object-fit: cover;
+  display: block;
+}
+
+.long-arm-service-detail__section + .long-arm-service-detail__section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+
+.long-arm-service-detail__figure {
+  margin: 1.25rem 0 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.long-arm-service-detail__figure img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  display: block;
+}
+
+.long-arm-service-detail__cta {
+  margin-top: 2.5rem;
+  padding: 1.25rem 1.35rem;
+}
+
 .long-arm-service-card__image {
   aspect-ratio: 4 / 3;
   overflow: hidden;
