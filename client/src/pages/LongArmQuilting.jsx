@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { publicApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
 import PageLoading from '../components/PageLoading.jsx';
+import ScrollReveal from '../components/ScrollReveal.jsx';
 
 const DEPOSIT_USD = 30;
 const DEPOSIT_PAUSE_SECONDS = 4;
@@ -27,6 +28,26 @@ function quiltSourceLabel(value) {
 function formatPrice(n) {
   if (n == null) return null;
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(Number(n));
+}
+
+function LongArmServiceImage({ index, src, placeholder }) {
+  if (placeholder) {
+    return (
+      <ScrollReveal
+        index={index}
+        content
+        className="long-arm-service-card__image long-arm-service-card__image--placeholder muted"
+      >
+        No image
+      </ScrollReveal>
+    );
+  }
+
+  return (
+    <ScrollReveal index={index} className="long-arm-service-card__image">
+      <ProductImage src={src} alt="" />
+    </ScrollReveal>
+  );
 }
 
 const initialForm = {
@@ -337,17 +358,13 @@ export default function LongArmQuilting() {
           {services.length === 0 ? (
             <p className="muted">Services will be listed here soon.</p>
           ) : (
-            services.map((svc) => (
+            services.map((svc, index) => (
               <article key={svc.id} className="long-arm-service-card card">
-                {svc.image_url ? (
-                  <div className="long-arm-service-card__image">
-                    <ProductImage src={svc.image_url} alt="" />
-                  </div>
-                ) : (
-                  <div className="long-arm-service-card__image long-arm-service-card__image--placeholder muted">
-                    No image
-                  </div>
-                )}
+                <LongArmServiceImage
+                  index={index}
+                  src={svc.image_url}
+                  placeholder={!svc.image_url}
+                />
                 <div className="long-arm-service-card__body">
                   <h2>{svc.name}</h2>
                   {svc.hourly_rate != null ? (

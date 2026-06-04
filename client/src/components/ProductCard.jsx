@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import FavoriteProductButton from './FavoriteProductButton.jsx';
 import ProductShareButton from './ProductShareButton.jsx';
 import ProductImage from './ProductImage.jsx';
+import ScrollReveal from './ScrollReveal.jsx';
 import { formatProductSizeLabel } from '../lib/productSizes.js';
 import { stripRichHtml } from '../lib/richText.js';
 
@@ -18,6 +19,7 @@ export default function ProductCard({
   showFavorite = false,
   showCustomize = false,
   showShare = false,
+  revealIndex,
 }) {
   const detailPath = `/products/${product.id}`;
   const customizePath = `/customize?product=${encodeURIComponent(product.id)}`;
@@ -39,7 +41,13 @@ export default function ProductCard({
         />
       ) : null}
       <Link className="featured-card__body" to={detailPath} style={{ position: 'relative' }}>
-        <ProductImage src={product.image_url} alt={product.name} />
+        {revealIndex != null ? (
+          <ScrollReveal index={revealIndex} className="featured-card__reveal">
+            <ProductImage src={product.image_url} alt={product.name} />
+          </ScrollReveal>
+        ) : (
+          <ProductImage src={product.image_url} alt={product.name} />
+        )}
         {discountPercent > 0 ? (
           <span className="product-card-discount-badge" aria-label={`${discountPercent}% off`}>
             {discountPercent}% OFF

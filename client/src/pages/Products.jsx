@@ -153,10 +153,11 @@ export default function Products() {
         <div className="empty">No products match your filters.</div>
       ) : (
         <div className="card-grid">
-          {visibleProducts.map((p) => (
+          {visibleProducts.map((p, index) => (
             <ProductCard
               key={p.id}
               product={p}
+              revealIndex={index}
               showFavorite
               showShare
               showCustomize

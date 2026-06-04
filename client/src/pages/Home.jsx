@@ -14,6 +14,7 @@ import { HOME_TESTIMONIALS } from '../lib/homeTestimonials.js';
 import HomeHeroBackdrop from '../components/HomeHeroBackdrop.jsx';
 import CustomizePromoBanner from '../components/CustomizePromoBanner.jsx';
 import PageLoading from '../components/PageLoading.jsx';
+import ScrollReveal from '../components/ScrollReveal.jsx';
 
 export default function Home() {
   const [carouselProducts, setCarouselProducts] = useState([]);
@@ -133,36 +134,44 @@ export default function Home() {
             </div>
           </div>
           <div className="hero-mosaic">
-            <img
-              src={IMPROV_QUILTING_IMAGE}
-              alt="Handmade quilt folded in soft warm tones"
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-            />
-            <img
-              src={IMPROV_QUILT_BASTING_IMAGE}
-              alt="Quilted bed styling in modern neutral palette"
-              loading="lazy"
-              decoding="async"
-            />
-            <img
-              src={IMPROV_QUILTING_010_IMAGE}
-              alt="Close-up texture of handcrafted quilt stitching"
-              loading="lazy"
-              decoding="async"
-            />
+            <ScrollReveal index={0} className="hero-mosaic__cell">
+              <img
+                src={IMPROV_QUILTING_IMAGE}
+                alt="Handmade quilt folded in soft warm tones"
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+              />
+            </ScrollReveal>
+            <ScrollReveal index={1} className="hero-mosaic__cell">
+              <img
+                src={IMPROV_QUILT_BASTING_IMAGE}
+                alt="Quilted bed styling in modern neutral palette"
+                loading="lazy"
+                decoding="async"
+              />
+            </ScrollReveal>
+            <ScrollReveal index={2} className="hero-mosaic__cell">
+              <img
+                src={IMPROV_QUILTING_010_IMAGE}
+                alt="Close-up texture of handcrafted quilt stitching"
+                loading="lazy"
+                decoding="async"
+              />
+            </ScrollReveal>
           </div>
         </div>
       </section>
 
       <section className="story-grid">
         <article className="story-card">
-          <img
-            src={SEWING_MACHINE_IMAGE}
-            alt="Vintage sewing machine used for quilt craftsmanship"
-            loading="lazy"
-          />
+          <ScrollReveal index={0} className="story-card__image">
+            <img
+              src={SEWING_MACHINE_IMAGE}
+              alt="Vintage sewing machine used for quilt craftsmanship"
+              loading="lazy"
+            />
+          </ScrollReveal>
           <div>
             <h3>Designed for everyday luxury</h3>
             <p className="muted">
@@ -172,11 +181,13 @@ export default function Home() {
           </div>
         </article>
         <article className="story-card">
-          <img
-            src={QUILT_CRAFT_DETAIL_IMAGE}
-            alt="Handcrafted quilt detail showing stitch and fabric work"
-            loading="lazy"
-          />
+          <ScrollReveal index={1} className="story-card__image">
+            <img
+              src={QUILT_CRAFT_DETAIL_IMAGE}
+              alt="Handcrafted quilt detail showing stitch and fabric work"
+              loading="lazy"
+            />
+          </ScrollReveal>
           <div>
             <h3>Craft details you can see up close</h3>
             <p className="muted">
@@ -197,10 +208,11 @@ export default function Home() {
         ) : hasBestSellers ? (
           <>
             <div className="card-grid featured-carousel-grid">
-              {visibleBestSellers.map((p) => (
+              {visibleBestSellers.map((p, index) => (
                 <ProductCard
-                  key={p.id}
+                  key={`best-slot-${index}`}
                   product={p}
+                  revealIndex={index}
                   showFavorite
                   onAddToCart={(item) => {
                     addItem(item, 1);
@@ -236,10 +248,11 @@ export default function Home() {
         ) : hasFeatured ? (
           <>
             <div className="card-grid featured-carousel-grid">
-              {visibleFeatured.map((p) => (
+              {visibleFeatured.map((p, index) => (
                 <ProductCard
-                  key={p.id}
+                  key={`featured-slot-${index}`}
                   product={p}
+                  revealIndex={index}
                   showFavorite
                   onAddToCart={(item) => {
                     addItem(item, 1);

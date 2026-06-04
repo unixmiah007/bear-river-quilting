@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import ProductImage from './ProductImage.jsx';
+import ScrollReveal from './ScrollReveal.jsx';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -31,13 +32,15 @@ export default function ProductsHero({ featuredProducts = [] }) {
         </div>
         <div className="hero-mosaic hero-mosaic--four hero-mosaic--products" aria-label="Featured products">
           {tiles.length > 0 ? (
-            tiles.map((p) => (
+            tiles.map((p, index) => (
               <Link
                 key={p.id}
                 to={`/products/${p.id}`}
                 className="products-hero-tile"
               >
-                <ProductImage src={p.image_url} alt={p.name} />
+                <ScrollReveal index={index} className="products-hero-tile__media">
+                  <ProductImage src={p.image_url} alt={p.name} />
+                </ScrollReveal>
                 <span className="products-hero-tile__meta">
                   <span className="products-hero-tile__name">{p.name}</span>
                   <span className="products-hero-tile__price">{formatPrice(p.price)}</span>
