@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import ProductImage from './ProductImage.jsx';
 import ScrollReveal from './ScrollReveal.jsx';
+import PageLoading from './PageLoading.jsx';
 
 function formatPrice(n) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(
@@ -8,8 +9,8 @@ function formatPrice(n) {
   );
 }
 
-export default function ProductsHero({ featuredProducts = [] }) {
-  const tiles = featuredProducts.slice(0, 4);
+export default function ProductsHero({ topProducts = [], loading = false }) {
+  const tiles = topProducts.slice(0, 4);
 
   return (
     <section className="hero products-hero" aria-labelledby="products-hero-heading">
@@ -30,8 +31,10 @@ export default function ProductsHero({ featuredProducts = [] }) {
             </Link>
           </div>
         </div>
-        <div className="hero-mosaic hero-mosaic--four hero-mosaic--products" aria-label="Featured products">
-          {tiles.length > 0 ? (
+        <div className="hero-mosaic hero-mosaic--four hero-mosaic--products" aria-label="Top selling products">
+          {loading ? (
+            <PageLoading active label="Loading top sellers…" inline />
+          ) : tiles.length > 0 ? (
             tiles.map((p, index) => (
               <Link
                 key={p.id}
@@ -43,13 +46,18 @@ export default function ProductsHero({ featuredProducts = [] }) {
                 </ScrollReveal>
                 <span className="products-hero-tile__meta">
                   <span className="products-hero-tile__name">{p.name}</span>
-                  <span className="products-hero-tile__price">{formatPrice(p.price)}</span>
+                  <span className="products-hero-tile__price">
+                    {formatPrice(p.price)}
+                    {p.units_sold != null && Number(p.units_sold) > 0 ? (
+                      <span className="products-hero-tile__sold"> · {Number(p.units_sold)} sold</span>
+                    ) : null}
+                  </span>
                 </span>
               </Link>
             ))
           ) : (
             <p className="muted products-hero-tile products-hero-tile--empty">
-              Mark products as <strong>Featured</strong> in Admin to highlight them here.
+              Top sellers will appear here once orders are recorded.
             </p>
           )}
         </div>

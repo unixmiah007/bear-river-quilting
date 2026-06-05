@@ -2258,6 +2258,12 @@ h2 {
   font-weight: 600;
 }
 
+.products-hero-tile__sold {
+  font-size: 0.78rem;
+  font-weight: 500;
+  opacity: 0.92;
+}
+
 .products-hero-tile--empty {
   grid-column: 1 / -1;
   display: flex;

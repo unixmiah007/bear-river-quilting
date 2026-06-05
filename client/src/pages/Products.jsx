@@ -5,13 +5,23 @@ import ProductCard from '../components/ProductCard.jsx';
 import PageLoading from '../components/PageLoading.jsx';
 import { stripRichHtml } from '../lib/richText.js';
 import ProductsHero from '../components/ProductsHero.jsx';
+import CustomizePromoBanner from '../components/CustomizePromoBanner.jsx';
 import { useCart } from '../context/CartContext.jsx';
+
+function productDiscountPercent(product) {
+  return Math.max(0, Math.min(100, Math.floor(Number(product?.discount_percent) || 0)));
+}
+
+function isDiscountedProduct(product) {
+  return productDiscountPercent(product) > 0;
+}
 
 export default function Products() {
   const [searchParams] = useSearchParams();
   const categorySlug = searchParams.get('category')?.trim() || '';
   const [products, setProducts] = useState([]);
-  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [topBestSellers, setTopBestSellers] = useState([]);
+  const [loadingTopSellers, setLoadingTopSellers] = useState(true);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -38,17 +48,31 @@ export default function Products() {
 
   useEffect(() => {
     let cancelled = false;
+    setLoadingTopSellers(true);
+    publicApi
+      .bestSellers()
+      .then((rows) => {
+        if (!cancelled) setTopBestSellers(Array.isArray(rows) ? rows.slice(0, 4) : []);
+      })
+      .catch(() => {
+        if (!cancelled) setTopBestSellers([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTopSellers(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.all([
-      publicApi.listProducts(categorySlug || undefined),
-      publicApi.featuredProducts(),
-    ])
-      .then(([rows, featured]) => {
-        if (!cancelled) {
-          setProducts(Array.isArray(rows) ? rows : []);
-          setFeaturedProducts(Array.isArray(featured) ? featured : []);
-        }
+    publicApi
+      .listProducts(categorySlug || undefined)
+      .then((rows) => {
+        if (!cancelled) setProducts(Array.isArray(rows) ? rows : []);
       })
       .catch((e) => {
         if (!cancelled) {
@@ -87,9 +111,15 @@ export default function Products() {
         p.name.toLowerCase().includes(term) ||
         stripRichHtml(p.description).toLowerCase().includes(term);
       const inPrice = Number(p.price) <= priceCap;
-      return inText && inPrice;
+      const inDiscount = sort !== 'discounted' || isDiscountedProduct(p);
+      return inText && inPrice && inDiscount;
     });
     return filtered.sort((a, b) => {
+      if (sort === 'discounted') {
+        const byDiscount = productDiscountPercent(b) - productDiscountPercent(a);
+        if (byDiscount !== 0) return byDiscount;
+        return Number(b.id) - Number(a.id);
+      }
       if (sort === 'price-asc') return Number(a.price) - Number(b.price);
       if (sort === 'price-desc') return Number(b.price) - Number(a.price);
       return Number(b.id) - Number(a.id);
@@ -98,7 +128,8 @@ export default function Products() {
 
   return (
     <>
-      <ProductsHero featuredProducts={featuredProducts} />
+      <ProductsHero topProducts={topBestSellers} loading={loadingTopSellers} />
+      <CustomizePromoBanner />
       <section id="products-catalog" className="products-catalog" aria-label="Product catalog">
       {activeCategory ? (
         <h2 className="products-catalog__heading" style={{ marginTop: 0 }}>
@@ -140,6 +171,7 @@ export default function Products() {
             <option value="newest">Newest</option>
             <option value="price-asc">Price: Low to High</option>
             <option value="price-desc">Price: High to Low</option>
+            <option value="discounted">Discounted</option>
           </select>
         </div>
       </div>
@@ -150,7 +182,11 @@ export default function Products() {
             : 'No published products yet.'}
         </div>
       ) : visibleProducts.length === 0 ? (
-        <div className="empty">No products match your filters.</div>
+        <div className="empty">
+          {sort === 'discounted'
+            ? 'No discounted products match your filters.'
+            : 'No products match your filters.'}
+        </div>
       ) : (
         <div className="card-grid">
           {visibleProducts.map((p, index) => (
