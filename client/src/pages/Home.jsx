@@ -5,7 +5,7 @@ import {
   IMPROV_QUILT_BASTING_IMAGE,
   IMPROV_QUILTING_010_IMAGE,
   IMPROV_QUILTING_IMAGE,
-  QUILT_CRAFT_DETAIL_IMAGE,
+  QUILTING_CRAFT_DETAIL_CLOSEUP_IMAGE,
   SEWING_MACHINE_IMAGE,
 } from '../lib/quiltAssets.js';
 import ProductCard from '../components/ProductCard.jsx';
@@ -13,6 +13,7 @@ import { useCart } from '../context/CartContext.jsx';
 import { HOME_TESTIMONIALS } from '../lib/homeTestimonials.js';
 import HomeHeroBackdrop from '../components/HomeHeroBackdrop.jsx';
 import CustomizePromoBanner from '../components/CustomizePromoBanner.jsx';
+import MeetDesignerBanner from '../components/MeetDesignerBanner.jsx';
 import PageLoading from '../components/PageLoading.jsx';
 import ScrollReveal from '../components/ScrollReveal.jsx';
 
@@ -81,6 +82,8 @@ export default function Home() {
   }, [bestSellers, bestStartIndex]);
 
   const hasBestSellers = visibleBestSellers.length > 0;
+
+  const topFourBestSellers = useMemo(() => bestSellers.slice(0, 4), [bestSellers]);
 
   useEffect(() => {
     if (carouselProducts.length <= 3) return undefined;
@@ -163,6 +166,8 @@ export default function Home() {
         </div>
       </section>
 
+      <MeetDesignerBanner topProducts={topFourBestSellers} loading={loadingBest} />
+
       <section className="story-grid">
         <article className="story-card">
           <ScrollReveal index={0} className="story-card__image">
@@ -183,8 +188,8 @@ export default function Home() {
         <article className="story-card">
           <ScrollReveal index={1} className="story-card__image">
             <img
-              src={QUILT_CRAFT_DETAIL_IMAGE}
-              alt="Handcrafted quilt detail showing stitch and fabric work"
+              src={QUILTING_CRAFT_DETAIL_CLOSEUP_IMAGE}
+              alt="Close-up of long-arm quilting stitches and patchwork fabric texture"
               loading="lazy"
             />
           </ScrollReveal>
@@ -201,7 +206,9 @@ export default function Home() {
       <section className="featured best-sellers">
         <div className="featured-head">
           <h2>Best sellers</h2>
-          <Link to="/p/heritage-quilts">See collections</Link>
+          <Link to="/p/heritage-quilts" className="featured-head__link">
+            See collections
+          </Link>
         </div>
         {loadingBest ? (
           <PageLoading active label="Loading best sellers…" inline />
@@ -241,7 +248,9 @@ export default function Home() {
       <section className="featured">
         <div className="featured-head">
           <h2>Featured products carousel</h2>
-          <Link to="/p/heritage-quilts">See all collections</Link>
+          <Link to="/p/heritage-quilts" className="featured-head__link">
+            See all collections
+          </Link>
         </div>
         {loadingFeatured ? (
           <PageLoading active label="Loading featured pieces…" inline />

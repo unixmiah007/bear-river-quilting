@@ -5,9 +5,13 @@ export const IMPROV_QUILTING_010_IMAGE = '/assets/improv-quilting-tutorial-010.j
 export const IMPROV_QUILTING_020_IMAGE = '/assets/improv-quilting-tutorial-020.jpg';
 export const SEWING_MACHINE_IMAGE = '/assets/sewing-machine.jpg';
 export const QUILT_CRAFT_DETAIL_IMAGE = '/assets/quilt-craft-detail.webp';
+/** Homepage “Craft details you can see up close” story card. */
+export const QUILTING_CRAFT_DETAIL_CLOSEUP_IMAGE = '/assets/quilting-craft-detail-closeup.jpg';
 export const QUILT_STUDIO_IMAGE = '/assets/quilt-studio.jpg';
 export const QUILT_MISTY_IMAGE = '/assets/quilt-misty.jpg';
 export const ABOUT_OWNER_IMAGE = '/assets/about-owner.png';
+/** Homepage “Meet the designer” banner portrait. */
+export const MEET_DESIGNER_IMAGE = '/assets/meet-designer.jpg';
 
 export const BATTING_COTTON_IMAGE = '/assets/batting-cotton.svg';
 export const BATTING_WOOL_IMAGE = '/assets/batting-wool.svg';
