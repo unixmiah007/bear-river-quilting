@@ -20,6 +20,7 @@ const Customize = lazy(() => import('./pages/Customize.jsx'));
 const CustomizeSuccess = lazy(() => import('./pages/CustomizeSuccess.jsx'));
 const LongArmQuilting = lazy(() => import('./pages/LongArmQuilting.jsx'));
 const LongArmQuiltingSuccess = lazy(() => import('./pages/LongArmQuiltingSuccess.jsx'));
+const TrackLongArmServiceOrder = lazy(() => import('./pages/TrackLongArmServiceOrder.jsx'));
 const LongArmServiceDetail = lazy(() => import('./pages/LongArmServiceDetail.jsx'));
 const AdminLogin = lazy(() => import('./pages/AdminLogin.jsx'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
@@ -110,6 +111,14 @@ export default function App() {
           element={
             <SuspenseRoute>
               <LongArmQuiltingSuccess />
+            </SuspenseRoute>
+          }
+        />
+        <Route
+          path="/long-arm-quilting/track"
+          element={
+            <SuspenseRoute>
+              <TrackLongArmServiceOrder />
             </SuspenseRoute>
           }
         />

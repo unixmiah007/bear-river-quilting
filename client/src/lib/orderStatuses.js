@@ -52,3 +52,20 @@ export function labelForCustomQuiltStatus(status) {
   if (s === 'submitted') return 'Submitted';
   return labelForOrderStatus(status);
 }
+
+export const LONG_ARM_STATUS_OPTIONS = [
+  { value: 'pending_payment', label: 'Pending payment' },
+  { value: 'deposit_paid', label: 'Deposit paid' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
+export function labelForLongArmStatus(status) {
+  const s = String(status ?? '')
+    .trim()
+    .toLowerCase();
+  const match = LONG_ARM_STATUS_OPTIONS.find((o) => o.value === s);
+  if (match) return match.label;
+  return status || '—';
+}

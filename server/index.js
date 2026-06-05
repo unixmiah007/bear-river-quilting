@@ -153,6 +153,8 @@ import { listOrderRefunds, recordManualOrderRefund } from './lib/orderRefunds.js
 import { getAdminNavBadgeCounts } from './lib/adminNavBadgeCounts.js';
 import { getOrderStats } from './lib/orderStats.js';
 import { lookupCustomerCustomQuiltRequests } from './lib/customQuiltCustomerLookup.js';
+import { lookupCustomerLongArmRequests } from './lib/longArmCustomerLookup.js';
+import { sendLongArmTrackingNotification } from './lib/longArmTracking.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameRoot = path.dirname(__filename);
@@ -860,6 +862,34 @@ app.post('/api/customer/custom-quilt-requests', async (req, res) => {
       });
     }
     res.status(500).json({ error: 'Could not load custom quilt requests.' });
+  }
+});
+
+app.post('/api/customer/long-arm-quilting-requests', async (req, res) => {
+  try {
+    const result = await lookupCustomerLongArmRequests(
+      req.body?.email,
+      req.body?.requestNumber ?? req.body?.serviceRequestNumber
+    );
+    if (!result.ok) {
+      return res.status(result.status ?? 400).json({
+        error: result.error,
+        hint: result.hint,
+      });
+    }
+    if (result.mode === 'detail') {
+      return res.json({ mode: 'detail', request: result.request });
+    }
+    res.json({ mode: 'list', requests: result.requests });
+  } catch (e) {
+    console.error('[customer/long-arm-quilting-requests]', e);
+    if (e.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(500).json({
+        error: 'Long-arm service requests are not set up in the database yet.',
+        hint: 'Restart the API server to apply schema updates.',
+      });
+    }
+    res.status(500).json({ error: 'Could not load long-arm service requests.' });
   }
 });
 
@@ -3085,6 +3115,33 @@ app.put('/api/admin/long-arm-quilting/requests/:id/status', authMiddleware, asyn
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+app.post('/api/admin/long-arm-quilting/requests/:id/tracking', authMiddleware, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const result = await sendLongArmTrackingNotification(id, {
+      carrier: req.body?.carrier,
+      trackingNumber: req.body?.trackingNumber,
+      sendEmail: req.body?.sendEmail !== false,
+    });
+    if (!result.ok) {
+      return res.status(result.status ?? 500).json({ error: result.error });
+    }
+    res.json({
+      ok: true,
+      requestNumber: result.requestNumber,
+      carrier: result.carrier,
+      trackingNumber: result.trackingNumber,
+      trackingUrl: result.trackingUrl,
+      status: result.status,
+      emailSent: !!result.emailSent,
+      warning: result.warning ?? null,
+    });
+  } catch (e) {
+    console.error('[long-arm tracking] notify failed:', e);
+    res.status(500).json({ error: 'Failed to send tracking notification' });
   }
 });
 

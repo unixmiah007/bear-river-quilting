@@ -541,6 +541,89 @@ ${trackHtml}
 }
 
 /**
+ * Emails the customer shipment tracking for a long-arm service request.
+ */
+export async function sendLongArmTrackingEmail({
+  to,
+  customerName,
+  requestNumber,
+  carrierLabel,
+  trackingNumber,
+  trackingUrl,
+}) {
+  const toAddr = String(to ?? '')
+    .trim()
+    .toLowerCase();
+  if (!toAddr || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toAddr)) {
+    throw new Error('Invalid customer email on long-arm service request');
+  }
+
+  if (!isSendGridConfigured()) {
+    throw new Error('SendGrid is not configured — set SENDGRID_API_KEY in server/.env');
+  }
+
+  const from = resolveSendGridFromCustomer();
+  if (!from) {
+    throw new Error('Set MAIL_FROM_ADDRESS or MAIL_FROM to a verified SendGrid sender');
+  }
+
+  const trackUrl = `${getClientOrigin()}/long-arm-quilting/track?${new URLSearchParams({
+    email: toAddr,
+    requestNumber: String(requestNumber ?? '').trim(),
+  }).toString()}`;
+
+  const trackLine = trackingUrl
+    ? `Track your package: ${trackingUrl}`
+    : `Tracking number: ${trackingNumber}`;
+
+  const text = [
+    `Hi ${customerName},`,
+    '',
+    `Good news — your long-arm service request ${requestNumber} has shipped.`,
+    '',
+    `Carrier: ${carrierLabel}`,
+    `Tracking number: ${trackingNumber}`,
+    trackingUrl ? '' : null,
+    trackingUrl ? trackLine : null,
+    '',
+    `View your service request status: ${trackUrl}`,
+    '',
+    'Thank you for choosing Bear River Quilting.',
+    '— Bear River Quilting',
+  ]
+    .filter((line) => line !== null)
+    .join('\n');
+
+  const trackHtml = trackingUrl
+    ? `<p><a href="${escapeHtml(trackingUrl)}">Track your package on ${escapeHtml(carrierLabel)}</a></p>`
+    : '';
+
+  const html = `
+<p>Hi ${escapeHtml(customerName)},</p>
+<p>Good news — your long-arm service request <strong>${escapeHtml(requestNumber)}</strong> has shipped.</p>
+<table cellpadding="6" cellspacing="0" style="border-collapse:collapse;margin:1rem 0">
+<tbody>
+<tr><td style="padding:4px 12px 4px 0;color:#6b7280">Carrier</td><td><strong>${escapeHtml(carrierLabel)}</strong></td></tr>
+<tr><td style="padding:4px 12px 4px 0;color:#6b7280">Tracking #</td><td><strong>${escapeHtml(trackingNumber)}</strong></td></tr>
+</tbody>
+</table>
+${trackHtml}
+<p><a href="${escapeHtml(trackUrl)}">View service request status on our website</a></p>
+<p>Thank you for choosing Bear River Quilting.<br>— Bear River Quilting</p>
+`.trim();
+
+  await sendSendGridMail({
+    to: toAddr,
+    from,
+    subject: `Your long-arm service ${requestNumber} has shipped`,
+    text,
+    html,
+  });
+
+  console.log('[mail] Sent long-arm tracking email', { requestNumber, to: toAddr, carrier: carrierLabel });
+}
+
+/**
  * Emails the customer their order invoice with PDF attached.
  */
 export async function sendOrderInvoiceEmail({

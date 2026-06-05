@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminApi } from '../api.js';
+import OrderTrackingDisplay from '../components/OrderTrackingDisplay.jsx';
 import PageLoading from '../components/PageLoading.jsx';
 import ProductImage from '../components/ProductImage.jsx';
+import { SHIPPING_CARRIER_OPTIONS } from '../lib/shippingCarriers.js';
 
 const emptyServiceForm = {
   name: '',
@@ -111,6 +113,9 @@ function requestSearchHaystack(req, servicesCatalog) {
     req.billing_country,
     req.stripe_checkout_session_id,
     req.stripe_payment_intent_id,
+    req.tracking_carrier,
+    req.tracking_number,
+    formatWhen(req.tracking_notified_at),
   ];
 
   return parts
@@ -183,6 +188,11 @@ function LongArmRequestDetailDialog({
   ackBusy,
   invoiceEmailBusy,
   invoiceEmailMsg,
+  trackingBusy,
+  trackingMsg,
+  trackingForm,
+  onTrackingFormChange,
+  onSendTracking,
   onClose,
   onToggleAck,
   onOpenFinalPayment,
@@ -330,7 +340,65 @@ function LongArmRequestDetailDialog({
               <dd className="admin-customize-detail-dialog__mono">{req.stripe_payment_intent_id}</dd>
             </div>
           ) : null}
+          {req.tracking_number ? (
+            <div>
+              <dt>Shipment tracking</dt>
+              <dd>
+                <OrderTrackingDisplay
+                  carrier={req.tracking_carrier}
+                  trackingNumber={req.tracking_number}
+                  notifiedAt={req.tracking_notified_at}
+                />
+              </dd>
+            </div>
+          ) : null}
         </dl>
+
+        <form className="form admin-tracking-form no-print" onSubmit={onSendTracking}>
+          <h3 className="admin-long-arm-detail-dialog__images-heading">Email customer tracking</h3>
+          <p className="muted admin-tracking-form__hint">
+            Saves tracking on the request (visible on <strong>/long-arm-quilting/track</strong>) and
+            emails <strong>{req.customer_email}</strong> when SendGrid is configured. Requests in{' '}
+            <em>deposit paid</em> or <em>in progress</em> are marked <em>completed</em> when tracking
+            is saved.
+          </p>
+          <div className="row admin-tracking-form__fields">
+            <div className="field" style={{ flex: 1, minWidth: '10rem' }}>
+              <label htmlFor="long-arm-tracking-carrier">Shipper</label>
+              <select
+                id="long-arm-tracking-carrier"
+                value={trackingForm.carrier}
+                onChange={(e) => onTrackingFormChange({ carrier: e.target.value })}
+                required
+              >
+                {SHIPPING_CARRIER_OPTIONS.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ flex: 2, minWidth: '12rem' }}>
+              <label htmlFor="long-arm-tracking-number">Tracking number</label>
+              <input
+                id="long-arm-tracking-number"
+                value={trackingForm.trackingNumber}
+                onChange={(e) => onTrackingFormChange({ trackingNumber: e.target.value })}
+                placeholder="e.g. 9400111899223344556677"
+                required
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          {trackingMsg ? (
+            <p className="page-body" style={{ color: '#065f46' }}>
+              {trackingMsg}
+            </p>
+          ) : null}
+          <button type="submit" className="btn btn-primary" disabled={trackingBusy || ackBusy || invoiceEmailBusy}>
+            {trackingBusy ? 'Saving…' : 'Save tracking & notify customer'}
+          </button>
+        </form>
 
         <section className="admin-long-arm-detail-dialog__images-section admin-long-arm-detail-dialog__print-images">
           <h3 className="admin-long-arm-detail-dialog__images-heading">Images</h3>
@@ -408,6 +476,9 @@ export default function AdminServiceRequests() {
   const [requestPage, setRequestPage] = useState(1);
   const [invoiceEmailBusy, setInvoiceEmailBusy] = useState(false);
   const [invoiceEmailMsg, setInvoiceEmailMsg] = useState(null);
+  const [trackingBusy, setTrackingBusy] = useState(false);
+  const [trackingMsg, setTrackingMsg] = useState(null);
+  const [trackingForm, setTrackingForm] = useState({ carrier: 'usps', trackingNumber: '' });
 
   const filteredRequests = useMemo(() => {
     const q = requestSearch.trim();
@@ -445,6 +516,7 @@ export default function AdminServiceRequests() {
 
   useEffect(() => {
     setInvoiceEmailMsg(null);
+    setTrackingMsg(null);
   }, [detailRequest?.id]);
 
   useEffect(() => {
@@ -457,6 +529,14 @@ export default function AdminServiceRequests() {
     if (!detailRequest) return null;
     return requests.find((r) => r.id === detailRequest.id) ?? detailRequest;
   }, [requests, detailRequest]);
+
+  useEffect(() => {
+    if (!detailFromList) return;
+    setTrackingForm({
+      carrier: detailFromList.tracking_carrier || 'usps',
+      trackingNumber: detailFromList.tracking_number || '',
+    });
+  }, [detailFromList?.id, detailFromList?.tracking_carrier, detailFromList?.tracking_number]);
 
   const refreshServices = useCallback(async () => {
     const data = await adminApi.longArmServices();
@@ -687,6 +767,39 @@ export default function AdminServiceRequests() {
     } finally {
       setAckSavingId(null);
     }
+  }
+
+  async function sendTracking(e) {
+    e.preventDefault();
+    if (!detailFromList?.id || trackingBusy) return;
+    setTrackingBusy(true);
+    setTrackingMsg(null);
+    setError(null);
+    try {
+      const result = await adminApi.sendLongArmTracking(detailFromList.id, {
+        carrier: trackingForm.carrier,
+        trackingNumber: trackingForm.trackingNumber.trim(),
+      });
+      if (result.emailSent) {
+        setTrackingMsg(
+          `Tracking saved and emailed to ${detailFromList.customer_email} (${result.carrier}: ${result.trackingNumber}).`
+        );
+      } else {
+        setTrackingMsg(
+          result.warning ||
+            `Tracking saved (${result.carrier}: ${result.trackingNumber}). Email was not sent — check SendGrid in server/.env.`
+        );
+      }
+      await refreshRequests();
+    } catch (err) {
+      setError(err.body?.error || err.message);
+    } finally {
+      setTrackingBusy(false);
+    }
+  }
+
+  function updateTrackingForm(partial) {
+    setTrackingForm((f) => ({ ...f, ...partial }));
   }
 
   async function onStatusChange(req, status) {
@@ -1310,6 +1423,11 @@ export default function AdminServiceRequests() {
             ackBusy={detailFromList != null && ackSavingId === detailFromList.id}
             invoiceEmailBusy={invoiceEmailBusy}
             invoiceEmailMsg={invoiceEmailMsg}
+            trackingBusy={trackingBusy}
+            trackingMsg={trackingMsg}
+            trackingForm={trackingForm}
+            onTrackingFormChange={updateTrackingForm}
+            onSendTracking={sendTracking}
             onClose={() => setDetailRequest(null)}
             onToggleAck={onAcknowledge}
             onOpenFinalPayment={openFinalPayment}

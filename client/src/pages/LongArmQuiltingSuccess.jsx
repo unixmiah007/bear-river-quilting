@@ -95,9 +95,26 @@ export default function LongArmQuiltingSuccess() {
             </>
           ) : null}
         </p>
-        <Link className="btn btn-primary" to="/long-arm-quilting">
-          Back to long-arm services
-        </Link>
+        <div className="row">
+          {state.requestNumber && state.email ? (
+            <Link
+              className="btn btn-primary"
+              to={`/long-arm-quilting/track?${new URLSearchParams({
+                email: state.email,
+                requestNumber: state.requestNumber,
+              }).toString()}`}
+            >
+              Track service order
+            </Link>
+          ) : (
+            <Link className="btn btn-primary" to="/long-arm-quilting/track">
+              Track service order
+            </Link>
+          )}
+          <Link className="btn" to="/long-arm-quilting">
+            Back to long-arm services
+          </Link>
+        </div>
       </article>
     );
   }
@@ -120,9 +137,26 @@ export default function LongArmQuiltingSuccess() {
           </>
         ) : null}
       </p>
-      <Link className="btn btn-primary" to="/long-arm-quilting">
-        Back to long-arm services
-      </Link>
+      <div className="row">
+        {state.requestNumber && state.email ? (
+          <Link
+            className="btn btn-primary"
+            to={`/long-arm-quilting/track?${new URLSearchParams({
+              email: state.email,
+              requestNumber: state.requestNumber,
+            }).toString()}`}
+          >
+            Track service order
+          </Link>
+        ) : (
+          <Link className="btn btn-primary" to="/long-arm-quilting/track">
+            Track service order
+          </Link>
+        )}
+        <Link className="btn" to="/long-arm-quilting">
+          Back to long-arm services
+        </Link>
+      </div>
     </article>
   );
 }

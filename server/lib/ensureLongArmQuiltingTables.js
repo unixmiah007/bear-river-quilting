@@ -154,6 +154,21 @@ export async function ensureLongArmQuiltingTables(pool) {
       'ALTER TABLE long_arm_quilting_requests ADD COLUMN blanket_palette_id INT UNSIGNED NULL AFTER quilt_source'
     );
   }
+  if (!(await columnExists(pool, 'long_arm_quilting_requests', 'tracking_carrier'))) {
+    await pool.query(
+      "ALTER TABLE long_arm_quilting_requests ADD COLUMN tracking_carrier VARCHAR(32) NULL AFTER final_payment_amount"
+    );
+  }
+  if (!(await columnExists(pool, 'long_arm_quilting_requests', 'tracking_number'))) {
+    await pool.query(
+      'ALTER TABLE long_arm_quilting_requests ADD COLUMN tracking_number VARCHAR(128) NULL AFTER tracking_carrier'
+    );
+  }
+  if (!(await columnExists(pool, 'long_arm_quilting_requests', 'tracking_notified_at'))) {
+    await pool.query(
+      'ALTER TABLE long_arm_quilting_requests ADD COLUMN tracking_notified_at TIMESTAMP NULL AFTER tracking_number'
+    );
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS long_arm_blanket_palettes (

@@ -45,6 +45,9 @@ export default function LongArmQuiltingHero({ services = [], depositUsd = 30, on
                 Request a service
               </button>
             ) : null}
+            <Link className="btn" to="/long-arm-quilting/track">
+              Track service order
+            </Link>
           </div>
         </div>
         <div

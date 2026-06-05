@@ -185,6 +185,9 @@ function mapRequestRow(row, services = [], blanketPalette = null) {
     stripe_checkout_session_id: row.stripe_checkout_session_id,
     stripe_payment_intent_id: row.stripe_payment_intent_id,
     final_payment_amount: row.final_payment_amount != null ? Number(row.final_payment_amount) : null,
+    tracking_carrier: row.tracking_carrier ?? null,
+    tracking_number: row.tracking_number ?? null,
+    tracking_notified_at: row.tracking_notified_at ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };

@@ -70,6 +70,8 @@ export const publicApi = {
     api('/api/customer/orders', { method: 'POST', body: JSON.stringify(body) }),
   customerCustomQuiltLookup: (body) =>
     api('/api/customer/custom-quilt-requests', { method: 'POST', body: JSON.stringify(body) }),
+  customerLongArmLookup: (body) =>
+    api('/api/customer/long-arm-quilting-requests', { method: 'POST', body: JSON.stringify(body) }),
   customerOrderMessages: (body) =>
     api('/api/customer/orders/messages', { method: 'POST', body: JSON.stringify(body) }),
   customerOrderMessage: (body) =>
@@ -432,6 +434,11 @@ export const adminApi = {
     }),
   sendCustomQuiltTracking: (id, body) =>
     api(`/api/admin/custom-quilt-requests/${encodeURIComponent(id)}/tracking`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  sendLongArmTracking: (id, body) =>
+    api(`/api/admin/long-arm-quilting/requests/${encodeURIComponent(id)}/tracking`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
