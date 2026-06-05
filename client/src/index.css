@@ -2043,8 +2043,31 @@ h2 {
   min-height: clamp(220px, 32vw, 360px);
 }
 
-.products-hero {
+.products-hero,
+.long-arm-hero {
   margin-bottom: 2rem;
+}
+
+.long-arm-hero__backdrop img {
+  object-position: center 42%;
+}
+
+.long-arm-hero__scrim {
+  background: linear-gradient(
+    118deg,
+    rgba(255, 255, 255, 0.94) 0%,
+    rgba(255, 255, 255, 0.88) 36%,
+    rgba(255, 255, 255, 0.72) 58%,
+    rgba(255, 255, 255, 0.5) 100%
+  );
+}
+
+.long-arm-hero .hero-mosaic--products {
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
+  padding: 0.35rem;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .products-hero .page-body {
@@ -2138,6 +2161,10 @@ h2 {
 }
 
 .products-catalog {
+  scroll-margin-top: 1rem;
+}
+
+.long-arm-wizard {
   scroll-margin-top: 1rem;
 }
 

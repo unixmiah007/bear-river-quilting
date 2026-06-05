@@ -13,6 +13,9 @@ export const BATTING_COTTON_IMAGE = '/assets/batting-cotton.svg';
 export const BATTING_WOOL_IMAGE = '/assets/batting-wool.svg';
 export const BATTING_BAMBOO_IMAGE = '/assets/batting-bamboo.svg';
 
+/** Long-arm quilting page hero background (client/public/assets). */
+export const LONG_ARM_HERO_BACKGROUND_IMAGE = '/assets/long-arm-hero-studio.jpg';
+
 /** Products page hero mosaic (client/public/assets). */
 export const PRODUCTS_HERO_IMAGES = [
   {

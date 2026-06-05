@@ -4,6 +4,7 @@ import { publicApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
 import PageLoading from '../components/PageLoading.jsx';
 import ScrollReveal from '../components/ScrollReveal.jsx';
+import LongArmQuiltingHero from '../components/LongArmQuiltingHero.jsx';
 import { longArmServiceDetailPath } from '../lib/longArmServicePages.js';
 
 const DEPOSIT_USD = 30;
@@ -249,11 +250,20 @@ export default function LongArmQuilting() {
     const next = new URLSearchParams(searchParams);
     next.delete('service');
     setSearchParams(next, { replace: true });
-
-    requestAnimationFrame(() => {
-      document.querySelector('.long-arm-wizard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
   }, [loading, services, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!wizardOpen) return;
+    requestAnimationFrame(() => {
+      const section = document.getElementById('long-arm-service-request');
+      section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const heading = section?.querySelector('h2');
+      if (heading instanceof HTMLElement) {
+        heading.setAttribute('tabindex', '-1');
+        heading.focus({ preventScroll: true });
+      }
+    });
+  }, [wizardOpen]);
 
   useEffect(() => {
     if (!wizardOpen) return undefined;
@@ -517,19 +527,15 @@ export default function LongArmQuilting() {
         </div>
       ) : null}
 
-      <header className="long-arm-page__header">
-        <p className="eyebrow">Professional finishing</p>
-        <h1>Long-Arm Quilting Services</h1>
-        <p className="page-body">
-          Send us your quilt top and we will finish it on our long-arm machine with the care and
-          craftsmanship Bear River Quilting is known for. Browse our services below, then request a
-          quote and pay a {formatPrice(DEPOSIT_USD)} deposit to get started.
-        </p>
-      </header>
+      <LongArmQuiltingHero
+        services={services}
+        depositUsd={DEPOSIT_USD}
+        onStartRequest={startRequest}
+      />
 
       {error && !wizardOpen ? <p className="error">{error}</p> : null}
 
-      <section className="long-arm-services">
+      <section id="long-arm-services" className="long-arm-services" aria-label="All long-arm services">
         <div className="long-arm-services__grid">
           {services.length === 0 ? (
             <p className="muted">Services will be listed here soon.</p>
@@ -566,7 +572,12 @@ export default function LongArmQuilting() {
       </section>
 
       {wizardOpen ? (
-        <section className="long-arm-wizard card" style={{ marginTop: '2rem' }}>
+        <section
+          id="long-arm-service-request"
+          className="long-arm-wizard card"
+          style={{ marginTop: '2rem' }}
+          aria-label="Service request"
+        >
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ margin: 0 }}>Service request</h2>
             <button
