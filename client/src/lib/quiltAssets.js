@@ -20,6 +20,26 @@ export const BATTING_BAMBOO_IMAGE = '/assets/batting-bamboo.svg';
 /** Long-arm quilting page hero background (client/public/assets). */
 export const LONG_ARM_HERO_BACKGROUND_IMAGE = '/assets/long-arm-hero-studio.jpg';
 
+/** Custom studio promo banner — one shown at random on each page load. */
+export const CUSTOM_STUDIO_BANNER_IMAGES = [
+  {
+    src: QUILT_STUDIO_IMAGE,
+    alt: 'Handmade quilt displayed in a bright Bear River Quilting studio',
+  },
+  {
+    src: QUILTING_CRAFT_DETAIL_CLOSEUP_IMAGE,
+    alt: 'Close-up of long-arm quilting stitches and patchwork fabric texture',
+  },
+  {
+    src: IMPROV_QUILTING_020_IMAGE,
+    alt: 'Quilter arranging colorful improv patchwork blocks on a design wall',
+  },
+  {
+    src: '/assets/products-hero-quilt-couch.jpg',
+    alt: 'Handmade quilt draped on a sofa in a cozy living room',
+  },
+];
+
 /** Products page hero mosaic (client/public/assets). */
 export const PRODUCTS_HERO_IMAGES = [
   {

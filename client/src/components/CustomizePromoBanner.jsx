@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { publicApi } from '../api.js';
-import { QUILT_STUDIO_IMAGE } from '../lib/quiltAssets.js';
+import { CUSTOM_STUDIO_BANNER_IMAGES } from '../lib/quiltAssets.js';
+
+function pickCustomStudioBannerImage() {
+  const images = CUSTOM_STUDIO_BANNER_IMAGES;
+  if (!images.length) return null;
+  return images[Math.floor(Math.random() * images.length)];
+}
 
 export default function CustomizePromoBanner() {
+  const [bannerImage] = useState(pickCustomStudioBannerImage);
   const [featuredProducts, setFeaturedProducts] = useState([]);
 
   useEffect(() => {
@@ -85,13 +92,16 @@ export default function CustomizePromoBanner() {
           aria-label="Open the custom quilt design wizard"
         >
           <div className="customize-promo__photo-wrap">
-            <img
-              className="customize-promo__photo"
-              src={QUILT_STUDIO_IMAGE}
-              alt="Quilt fabrics and tools laid out in the Bear River studio"
-              loading="lazy"
-              decoding="async"
-            />
+            {bannerImage ? (
+              <img
+                className="customize-promo__photo"
+                src={bannerImage.src}
+                alt={bannerImage.alt}
+                loading="eager"
+                decoding="async"
+                fetchPriority="high"
+              />
+            ) : null}
             <span className="customize-promo__badge">New</span>
             {featuredProducts.length > 0 ? (
               <div className="customize-promo__featured" aria-label="Featured products">
