@@ -4,6 +4,7 @@ import { publicApi } from '../api.js';
 import ProductImage from '../components/ProductImage.jsx';
 import CustomizeOwnDesignUpload from '../components/CustomizeOwnDesignUpload.jsx';
 import CustomizePurchasePreview from '../components/CustomizePurchasePreview.jsx';
+import CustomizeServicesBanner from '../components/CustomizeServicesBanner.jsx';
 import PageLoading from '../components/PageLoading.jsx';
 import {
   OWN_DESIGN_DEPOSIT_USD,
@@ -125,6 +126,8 @@ export default function Customize() {
   const [payCountdown, setPayCountdown] = useState(0);
   const [wizardConfig, setWizardConfig] = useState(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
+  const [longArmServices, setLongArmServices] = useState([]);
+  const [loadingServices, setLoadingServices] = useState(true);
   const [designPath, setDesignPath] = useState('catalog');
   const [ownDesignPreviewUrl, setOwnDesignPreviewUrl] = useState('');
   const [ownDesignUploading, setOwnDesignUploading] = useState(false);
@@ -163,6 +166,24 @@ export default function Customize() {
       batting: f.batting || config.defaults.batting || 'cotton',
     }));
   }, [config.defaults?.productSize, config.defaults?.colorPalette, config.defaults?.batting]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadServices() {
+      try {
+        const rows = await publicApi.listLongArmServices();
+        if (!cancelled) setLongArmServices(Array.isArray(rows) ? rows : []);
+      } catch {
+        if (!cancelled) setLongArmServices([]);
+      } finally {
+        if (!cancelled) setLoadingServices(false);
+      }
+    }
+    loadServices();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -383,6 +404,7 @@ export default function Customize() {
   if (config.enabled === false) {
     return (
       <article className="customize-page">
+        <CustomizeServicesBanner services={longArmServices} loading={loadingServices} />
         <h1>{config.page?.title ?? 'Customize your quilt'}</h1>
         <p className="page-body">
           {config.messages?.wizardDisabled ??
@@ -404,6 +426,7 @@ export default function Customize() {
 
   return (
     <article className="customize-page">
+      <CustomizeServicesBanner services={longArmServices} loading={loadingServices} />
       <header className="customize-page__header">
         <p className="eyebrow">{config.page?.eyebrow ?? 'Custom studio'}</p>
         <h1>{config.page?.title ?? 'Customize your quilt'}</h1>

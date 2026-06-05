@@ -5387,6 +5387,60 @@ tr:last-child td {
   color: var(--text);
 }
 
+.customize-services-banner {
+  margin-bottom: 2rem;
+}
+
+.customize-services-banner__backdrop img {
+  object-position: center 35%;
+}
+
+.customize-services-banner__scrim {
+  background: linear-gradient(
+    118deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.9) 40%,
+    rgba(255, 255, 255, 0.78) 62%,
+    rgba(255, 255, 255, 0.55) 100%
+  );
+}
+
+.customize-services-banner__copy {
+  padding: 0.25rem 0;
+}
+
+.customize-services-banner__copy h2 {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.45rem, 2.8vw, 2.1rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.customize-services-banner__mosaic-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0.5rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.customize-services-banner__mosaic {
+  flex: 1;
+  min-height: clamp(200px, 28vw, 320px);
+}
+
+.customize-services-banner__empty {
+  margin: auto;
+  padding: 1.5rem 1rem;
+  text-align: center;
+}
+
 .customize-page__header {
   margin-bottom: 1.5rem;
   padding-bottom: 1rem;
